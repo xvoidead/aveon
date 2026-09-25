@@ -347,6 +347,9 @@ function registerIpc() {
 
   handle('lyrics:get', (track) => texts.find(track)); // Musixmatch по словам → LRCLIB → …
   handle('censor:plan', (track) => censor.plan(track));
+  // Дискография артиста — из Яндекс Музыки, если она подключена
+  handle('artist:info', (name, hintId) => (config.getSecret('ym.token') ? ym.artistByName(name, hintId) : null));
+  handle('artist:album', (id) => ym.album(String(id).replace(/^ym:/, '')));
 
   // Аккаунт и синхронизация
   handle('acc:status', () => account.status());

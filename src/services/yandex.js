@@ -29,8 +29,16 @@ function headers(extra = {}) {
 async function api(pathname, params = {}, opts = {}) {
   const u = new URL(API + pathname);
   for (const [k, v] of Object.entries(params)) u.searchParams.set(k, v);
-  const res = await request(u, { headers: headers(opts.headers), method: opts.method, body: opts.body });
-  return res.result;
+  // Соединение иногда рвётся ещё до ответа сервера — такие сбои повторяем
+  for (let i = 0; ; i++) {
+    try {
+      const res = await request(u, { headers: headers(opts.headers), method: opts.method, body: opts.body });
+      return res.result;
+    } catch (e) {
+      if (i >= 2 || e.status) throw e; // e.status — сервер ответил, повтор не поможет
+      await new Promise((r) => setTimeout(r, 500 * (i + 1)));
+    }
+  }
 }
 
 function cover(uri, size = '300x300') {
@@ -50,7 +58,8 @@ function mapTrack(t) {
     cover: cover(t.coverUri || album?.coverUri),
     link: album ? `https://music.yandex.ru/album/${album.id}/track/${t.id}` : '',
     playable: t.available !== false,
-    ref: { id: String(t.id) },
+    // id исполнителей — чтобы открыть страницу артиста без поиска по имени
+    ref: { id: String(t.id), artists: (t.artists || []).map((a) => ({ id: String(a.id), name: a.name })) },
   };
 }
 
@@ -145,6 +154,63 @@ async function stream(track) {
   }
 }
 
+// ---------- артисты и альбомы (страница артиста) ----------
+
+const plain = (s) => String(s || '').toLowerCase().replace(/ё/g, 'е').replace(/[^\p{L}\p{N}]+/gu, '');
+const artistCache = new Map();
+
+// Артист по имени: только точное совпадение, иначе можно открыть чужую страницу
+async function findArtist(name) {
+  const res = await api('/search', { text: name, type: 'artist', page: 0, nocorrect: 'true' });
+  const want = plain(name);
+  const hit = (res.artists?.results || []).slice(0, 8).find((a) => plain(a.name) === want);
+  return hit ? String(hit.id) : null;
+}
+
+function mapAlbum(a) {
+  return {
+    id: `ym:${a.id}`,
+    title: a.title + (a.version ? ` (${a.version})` : ''),
+    year: a.year || null,
+    type: a.type === 'single' ? 'single' : 'album', // сборники и live — к альбомам
+    cover: cover(a.coverUri, '400x400'),
+    count: a.trackCount || 0,
+  };
+}
+
+// Дискография: популярные треки и все релизы, новые сверху
+async function artist(id) {
+  const hit = artistCache.get(id);
+  if (hit && Date.now() - hit.at < 10 * 60 * 1000) return hit.data;
+  const brief = await api(`/artists/${id}/brief-info`);
+  const albums = [];
+  for (let page = 0; page < 10; page++) {
+    const res = await api(`/artists/${id}/direct-albums`, { page, 'page-size': 100, 'sort-by': 'year' });
+    albums.push(...(res.albums || []));
+    if (!res.pager || albums.length >= res.pager.total || !res.albums?.length) break;
+  }
+  const a = brief.artist || {};
+  const data = {
+    id: `ym:${id}`,
+    name: a.name,
+    cover: cover(a.cover?.uri || a.ogImage, '400x400'),
+    popular: (brief.popularTracks || []).map(mapTrack).filter(Boolean),
+    albums: albums.map(mapAlbum),
+  };
+  artistCache.set(id, { at: Date.now(), data });
+  return data;
+}
+
+async function artistByName(name, hintId) {
+  const id = hintId || (await findArtist(name));
+  return id ? artist(id) : null;
+}
+
+async function album(id) {
+  const a = await api(`/albums/${id}/with-tracks`);
+  return { ...mapAlbum(a), tracks: (a.volumes || []).flat().map(mapTrack).filter(Boolean) };
+}
+
 function reset() { uidCache = null; }
 
-module.exports = { search, collections, collection, stream, reset };
+module.exports = { search, collections, collection, stream, reset, artistByName, album };

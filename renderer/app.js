@@ -4,8 +4,8 @@ const api = window.tishe;
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
-const NAMES = { local: 'Мои файлы', albums: 'Альбомы', ym: 'Яндекс Музыка', sc: 'SoundCloud', sp: 'Spotify' };
-const VIEWS = ['local', 'albums', 'ym', 'sc', 'sp'];
+const NAMES = { local: 'Мои файлы', artists: 'Артисты', albums: 'Альбомы', ym: 'Яндекс Музыка', sc: 'SoundCloud', sp: 'Spotify' };
+const VIEWS = ['local', 'artists', 'albums', 'ym', 'sc', 'sp'];
 const SHORT = { local: 'файл', ym: 'Яндекс', sc: 'SoundCloud', sp: 'Spotify' };
 
 const state = {
@@ -492,7 +492,7 @@ function prev() {
 function showNow(track, stream) {
   $('#now-title').textContent = track.title;
   $('#btn-now-album').disabled = false;
-  $('#now-artist').textContent = track.artist || 'Исполнитель неизвестен';
+  $('#now-artist').innerHTML = track.artist ? artistLinks(track.artist) : 'Исполнитель неизвестен'; // имя — ссылка на артиста
   $('#now-cover').innerHTML = track.cover ? `<img src="${esc(track.cover)}" alt="">` : '<span class="porthole-empty">♪</span>';
   const via = $('#now-via');
   if (stream?.via) {
@@ -765,7 +765,7 @@ function rowHtml(t, i) {
   const edit = state.view === 'local' && t.source === 'local' ? ' editable' : '';
   return `<div class="row${t.playable === false ? ' disabled' : ''}" data-i="${i}"${draggable}>
     <div class="num">${cover}<button class="play-hover" data-kind="play" tabindex="-1" aria-label="Играть"><svg><use href="#i-play"/></svg></button></div>
-    <div class="t-main"><div class="t-title${edit}" title="${esc(t.title)}">${esc(t.title)}</div><div class="t-artist${edit}">${tags}${esc(t.artist)}</div></div>
+    <div class="t-main"><div class="t-title${edit}" title="${esc(t.title)}">${esc(t.title)}</div><div class="t-artist${edit}">${tags}${artistLinks(t.artist)}</div></div>
     <div class="t-album col-album">${esc(t.album)}</div>
     <div class="col-time">${fmt(t.duration)}</div>
     <button class="row-more" aria-label="Действия с треком" aria-haspopup="menu"><svg><use href="#i-more"/></svg></button>
@@ -820,6 +820,10 @@ function openTrackMenu(i, pos) {
   const t = state.shown[i];
   if (!t) return;
   const items = albumMenuItems([t]);
+  const artists = splitArtists(t.artist); // artists.js / extras.js
+  if (artists.length) {
+    items.unshift(...artists.slice(0, 3).map((name) => ({ label: artists.length > 1 ? name : 'Перейти к артисту', icon: 'i-user', onClick: () => openArtist(name) })), { sep: true });
+  }
   if (t.source === 'local') items.unshift({ label: 'Изменить теги и обложку', icon: 'i-pencil', onClick: () => openEditor(t) }, { sep: true });
   if (state.view === 'albums' && state.album) {
     items.push({ sep: true }, { label: 'Убрать из альбома', icon: 'i-trash', danger: true, onClick: () => removeFromAlbum([t]) });
@@ -1042,7 +1046,7 @@ function renderActions() {
     box.lastElementChild.previousElementSibling.title = 'Переименовать альбом';
   } else if (state.view === 'local' && state.cfg.localFolders.length) {
     add('', 'i-refresh', () => scanLocal(true)).setAttribute('aria-label', 'Пересканировать папки');
-  } else if (state.sub && state.sub !== 'search' && serviceReady(state.view)) {
+  } else if (['ym', 'sc', 'sp'].includes(state.view) && state.sub && state.sub !== 'search' && serviceReady(state.view)) {
     add('', 'i-refresh', () => { delete state.cache[`${state.view}:${state.sub}`]; openView(state.view, state.sub); }).setAttribute('aria-label', 'Обновить');
   }
 }
@@ -1103,6 +1107,7 @@ async function openView(view, sub = null) {
   input.value = state.queries[view] || '';
   input.placeholder = {
     local: 'Искать в своих файлах',
+    artists: sub ? 'Искать у артиста' : 'Искать артиста',
     albums: 'Искать в альбоме',
     ym: 'Искать в Яндекс Музыке',
     sc: 'Искать в SoundCloud',
@@ -1111,6 +1116,7 @@ async function openView(view, sub = null) {
   renderCollections();
 
   if (view === 'local') { renderLocal(); return; }
+  if (view === 'artists') { openArtists(sub); return; } // artists.js
 
   if (view === 'albums') {
     if (!sub) {
@@ -1206,9 +1212,10 @@ let localFilterTimer;
 
 searchInput.addEventListener('input', () => {
   state.queries[state.view] = searchInput.value;
-  if (state.view === 'local' || state.view === 'albums') {
+  if (state.view === 'local' || state.view === 'albums' || state.view === 'artists') {
     clearTimeout(localFilterTimer);
-    localFilterTimer = setTimeout(state.view === 'local' ? renderLocal : renderAlbum, 120);
+    const render = { local: renderLocal, albums: renderAlbum, artists: () => openArtists(state.sub) }[state.view];
+    localFilterTimer = setTimeout(render, 120);
   }
 });
 
@@ -1216,7 +1223,7 @@ $('#search-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   const q = searchInput.value.trim();
   const view = state.view;
-  if (view === 'local' || view === 'albums' || !q) return;
+  if (view === 'local' || view === 'albums' || view === 'artists' || !q) return;
   if (!serviceReady(view)) { openSettings(view); return; }
   state.queries[view] = q;
   const seq = ++viewSeq;

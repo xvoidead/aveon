@@ -43,6 +43,10 @@ contextBridge.exposeInMainWorld('tishe', {
   },
   lyrics: (track) => call('lyrics:get', track),
   censor: { plan: (track) => call('censor:plan', track) },
+  artist: {
+    info: (name, hintId) => call('artist:info', name, hintId),
+    album: (id) => call('artist:album', id),
+  },
   account: {
     status: () => call('acc:status'),
     register: (server, login, password, name) => call('acc:register', server, login, password, name),

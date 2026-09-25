@@ -705,11 +705,10 @@ function onTrackShown(track) {
   const editable = track.source === 'local';
   $('#now-cover').classList.toggle('editable', editable);
   $('#now-title').classList.toggle('editable', editable);
-  $('#now-artist').classList.toggle('editable', editable);
   $('#now-cover').title = editable ? 'Изменить обложку и теги' : '';
 }
 
-for (const id of ['#now-cover', '#now-title', '#now-artist']) {
+for (const id of ['#now-cover', '#now-title']) { // имя исполнителя — ссылка на артиста (artists.js)
   $(id).addEventListener('click', () => { if (state.track?.source === 'local') openEditor(state.track); });
 }
 
