@@ -190,10 +190,21 @@ async function artist(id) {
     if (!res.pager || albums.length >= res.pager.total || !res.albums?.length) break;
   }
   const a = brief.artist || {};
+  const photo = a.cover?.uri || a.ogImage;
+  // Второе фото артиста (если есть) — на баннер, чтобы не повторять аватарку
+  const bannerUri = (brief.allCovers || []).map((c) => c.uri).find((u) => u && u !== photo) || photo;
   const data = {
     id: `ym:${id}`,
     name: a.name,
-    cover: cover(a.cover?.uri || a.ogImage, '400x400'),
+    cover: cover(photo, '400x400'),
+    banner: cover(bannerUri, '1000x1000'),
+    video: /^https:\/\//.test(brief.backgroundVideoUrl || '') ? brief.backgroundVideoUrl : '',
+    color: a.derivedColors?.average || '',
+    listeners: brief.stats?.lastMonthListeners ?? null,
+    listenersDelta: brief.stats?.lastMonthListenersDelta ?? null,
+    likes: a.likesCount ?? null,
+    countries: a.countries || [],
+    years: [a.initDate, a.endDate].filter(Boolean).map((d) => String(d).slice(0, 4)),
     popular: (brief.popularTracks || []).map(mapTrack).filter(Boolean),
     albums: albums.map(mapAlbum),
   };

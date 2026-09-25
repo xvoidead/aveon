@@ -127,6 +127,7 @@ function renderArtistChips(artist, inAlbum = false) {
 }
 
 function renderArtistGrid() {
+  $('#content').classList.remove('hero-on');
   renderArtistChips(null);
   $('#view-title').textContent = NAMES.artists;
   const q = artistKey(state.queries.artists);
@@ -225,6 +226,53 @@ function discoCards(albums, libTitles) {
   }).join('')}</div>`;
 }
 
+// ---------- шапка артиста ----------
+// Фоновое видео артиста из Яндекса (или крупное фото), аватарка, имя и слушатели за месяц
+
+const fmtNum = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1).replace(/\.0$/, '').replace('.', ',')} млн`
+  : n >= 1e4 ? `${Math.round(n / 1e3)} тыс.` : n.toLocaleString('ru'));
+// После «млн» и «тыс.» — всегда «слушателей», иначе по обычным правилам
+const pluralNum = (n, one, few, many) => (n >= 1e4 ? many : plural(n, one, few, many));
+
+function heroHtml(artist, disco, loading) {
+  const photo = disco?.cover || artist.cover;
+  const banner = disco?.banner || photo;
+  const calm = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const bg = disco?.video && !calm
+    ? `<video class="hero-bg" src="${esc(disco.video)}" poster="${esc(banner)}" autoplay muted loop playsinline disablepictureinpicture></video>`
+    : `<div class="hero-bg${banner ? '' : ' empty'}" data-bg="${esc(banner || '')}"></div>`;
+  const stats = [];
+  if (disco?.listeners != null) {
+    const d = disco.listenersDelta;
+    const delta = d ? ` <span class="${d > 0 ? 'up' : 'down'}" title="За месяц">${d > 0 ? '↑' : '↓'} ${fmtNum(Math.abs(d))}</span>` : '';
+    stats.push(`<b>${fmtNum(disco.listeners)}</b> ${pluralNum(disco.listeners, 'слушатель', 'слушателя', 'слушателей')} за месяц${delta}`);
+  }
+  if (disco?.likes) stats.push(`<b>${fmtNum(disco.likes)}</b> ${pluralNum(disco.likes, 'лайк', 'лайка', 'лайков')}`);
+  if (!disco && artist.count) stats.push(`у тебя ${artist.count} ${plural(artist.count, 'трек', 'трека', 'треков')}`);
+  if (loading) stats.push('загружаю из Яндекс Музыки…');
+  const years = disco?.years || [];
+  const meta = [...(disco?.countries || []), years.length > 1 ? years.join('–') : years.length ? `с ${years[0]}` : ''].filter(Boolean).join(' · ');
+  const color = /^#[0-9a-f]{6}$/i.test(disco?.color || '') ? ` style="--hero:${disco.color}"` : '';
+  const canPlay = state.shown.length > 0;
+  return `<section class="artist-hero"${color}>
+    ${bg}
+    <div class="hero-shade"></div>
+    <div class="hero-body">
+      <span class="hero-pic">${photo ? `<img src="${esc(photo)}" alt="">` : esc(artist.name.trim()[0]?.toUpperCase() || '♪')}</span>
+      <div class="hero-text">
+        <span class="hero-kind">Артист</span>
+        <h2 class="hero-name">${esc(artist.name)}</h2>
+        ${stats.length ? `<p class="hero-stats">${stats.join('<i>·</i>')}</p>` : ''}
+        ${meta ? `<p class="hero-meta">${esc(meta)}</p>` : ''}
+        <div class="hero-actions">
+          <button class="btn primary" data-hero="play" ${canPlay ? '' : 'disabled'}><svg><use href="#i-play"/></svg><span>Слушать</span></button>
+          <button class="btn" data-hero="shuffle" ${canPlay ? '' : 'disabled'}><svg><use href="#i-shuffle"/></svg><span>Вперемешку</span></button>
+        </div>
+      </div>
+    </div>
+  </section>`;
+}
+
 const sectionHead = (title, count) => `<h3 class="disc-h">${esc(title)}${count != null ? `<span>${count}</span>` : ''}</h3>`;
 
 function renderArtist(artist, { keepScroll = false } = {}) {
@@ -257,9 +305,10 @@ function renderArtist(artist, { keepScroll = false } = {}) {
   const el = $('#tracklist');
   el.hidden = false;
   let i = 0;
-  const parts = [];
+  const parts = [heroHtml(artist, disco, loading)];
+  $('#content').classList.add('hero-on'); // заголовок раздела прячем — имя уже в шапке
   if (popular.length) parts.push(`<section class="disc-sec">${sectionHead('Популярное')}${popular.map((t) => rowHtml(t, i++)).join('')}</section>`);
-  if (loading) parts.push('<div class="disc-loading"><div class="spinner"></div><span>Загружаю дискографию из Яндекс Музыки…</span></div>');
+  if (loading && !popular.length) parts.push('<div class="disc-loading"><div class="spinner"></div><span>Загружаю дискографию из Яндекс Музыки…</span></div>');
   if (d?.status === 'error') parts.push(`<p class="disc-note">Дискография не загрузилась: ${esc(d.error)}. Открой артиста ещё раз, чтобы повторить.</p>`);
   if (albums.length) parts.push(`<section class="disc-sec">${sectionHead('Альбомы', albums.length)}${discoCards(albums, libTitles)}</section>`);
   if (singles.length) parts.push(`<section class="disc-sec">${sectionHead('Синглы и EP', singles.length)}${discoCards(singles, libTitles)}</section>`);
@@ -279,6 +328,8 @@ function renderArtist(artist, { keepScroll = false } = {}) {
     }).join('')}</section>`);
   }
   el.innerHTML = parts.join('');
+  const bg = el.querySelector('.hero-bg[data-bg]');
+  if (bg?.dataset.bg) bg.style.backgroundImage = `url("${bg.dataset.bg.replace(/"/g, '%22')}")`;
   el.scrollTop = keepScroll ? scroll : 0;
 
   const bits = [];
@@ -291,6 +342,7 @@ function renderArtist(artist, { keepScroll = false } = {}) {
 }
 
 async function openDiscAlbum(artist, id) {
+  $('#content').classList.remove('hero-on');
   renderArtistChips(artist, true);
   const known = art.disco.get(artist.key)?.data?.albums.find((a) => a.id === id);
   $('#view-title').textContent = known?.title || 'Альбом';
@@ -330,6 +382,13 @@ $('#tracklist').addEventListener('click', (e) => {
   if (card) { openView('artists', card.dataset.artistKey); return; }
   const disc = e.target.closest('.disc-card');
   if (disc) { openView('artists', `${state.sub.split(SUB_SEP)[0]}${SUB_SEP}${disc.dataset.disc}`); return; }
+  const hero = e.target.closest('[data-hero]');
+  if (hero && state.shown.length) {
+    const shuffle = hero.dataset.hero === 'shuffle';
+    if (!!state.cfg.shuffle !== shuffle) toggleShuffle();
+    playFrom(state.shown, shuffle ? Math.floor(Math.random() * state.shown.length) : 0);
+    return;
+  }
   const play = e.target.closest('[data-play-from]');
   if (play) {
     const from = +play.dataset.playFrom;

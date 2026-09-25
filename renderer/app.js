@@ -1212,6 +1212,7 @@ let viewSeq = 0;
 
 async function openView(view, sub = null) {
   const seq = ++viewSeq;
+  $('#content').classList.remove('hero-on'); // шапку артиста показывает только его страница (artists.js)
   hideOverlays(); // статистика и текст песни закрываются при переходе в раздел
   state.view = view;
   state.sub = sub;
