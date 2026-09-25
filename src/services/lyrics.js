@@ -5,12 +5,19 @@ const API = 'https://lrclib.net/api';
 const HEADERS = { 'User-Agent': 'aveon-player/1.0 (desktop music player)' }; // LRCLIB просит указывать клиент
 const cache = new Map();
 
-// «Song (feat. X) [Remastered 2011]» → «Song»
-function cleanTitle(s) {
-  return (s || '')
-    .replace(/\s*[([](feat|ft|with|prod|remaster|remastered|official|lyrics?|audio|video|explicit)[^)\]]*[)\]]/gi, '')
-    .replace(/\s+[-–—]\s+(remaster|remastered|live|radio edit|mono|stereo).*$/i, '')
-    .trim();
+const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+// «Daft Punk - Song (feat. X) [Original Version] - Daft Punk» → «Song»
+function cleanTitle(s, artist = '') {
+  let t = (s || '')
+    .replace(/\s*[([][^)\]]*\b(feat|ft|with|prod|remaster(ed)?|official|lyrics?|audio|video|explicit|version|radio|edit|hd|hq)\b[^)\]]*[)\]]/gi, '')
+    .replace(/\s+[-–—]\s+(remaster|remastered|live|radio edit|mono|stereo).*$/i, '');
+  // На SoundCloud исполнитель часто сидит прямо в названии
+  if (artist) {
+    const a = escRe(artist);
+    t = t.replace(new RegExp(`^\\s*${a}\\s*[-–—]\\s*`, 'i'), '').replace(new RegExp(`\\s*[-–—]\\s*${a}\\s*$`, 'i'), '');
+  }
+  return t.trim();
 }
 
 function firstArtist(s) {
@@ -28,8 +35,8 @@ function pack(r) {
 
 async function find(track) {
   if (cache.has(track.id)) return cache.get(track.id);
-  const title = cleanTitle(track.title);
   const artist = firstArtist(track.artist);
+  const title = cleanTitle(track.title, artist);
   let result = null;
 
   // 1) Точное совпадение с длительностью
