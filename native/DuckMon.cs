@@ -120,6 +120,57 @@ namespace Tishe
         public string Device;
     }
 
+    // Программы, которые пишут весь звук системы (NVIDIA Instant Replay, OBS, Medal…), Windows показывает
+    // так же, как Discord: пик их сессии — это пик всего микса, вместе с голосами. Если сложить их
+    // с остальными программами, вычитание съедает голоса целиком. Такие «зеркала» узнаём по поведению:
+    // пик совпадает с пиком Discord, когда рядом звучит программа с заметно другим уровнем
+    // (настоящая программа совпасть с миксом в этот момент не может), и не вычитаем их.
+    static class Mirrors
+    {
+        const int Need = 8, Max = 40;
+        static readonly Dictionary<string, int> score = new Dictionary<string, int>();
+        // Известные записыватели звука считаем зеркалами сразу: пока звучит только музыка,
+        // по поведению их не отличить от самого плеера, а голос съедался бы с первой фразы
+        static readonly HashSet<string> Known = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "nvcontainer" };
+
+        public static void Seed(string key, string proc)
+        {
+            if (proc != null && Known.Contains(proc) && !score.ContainsKey(key)) score[key] = Max;
+        }
+
+        public static bool Is(string key)
+        {
+            int s;
+            return score.TryGetValue(key, out s) && s >= Need;
+        }
+
+        static bool Same(float a, float d) { return Math.Abs(a - d) <= Math.Max(0.0002f, d * 0.01f); }
+
+        // d — пик Discord на устройстве, peaks — пики остальных сессий вывода там же.
+        // Возвращает сумму пиков программ, чей звук Discord захватил, без зеркал.
+        public static float OthersSum(float d, List<KeyValuePair<string, float>> peaks)
+        {
+            if (peaks == null) return 0;
+            if (d >= 0.005f)
+            {
+                bool otherSound = false;
+                foreach (var p in peaks)
+                    if (p.Value >= Math.Max(0.002f, d * 0.25f) && !Same(p.Value, d)) { otherSound = true; break; }
+                foreach (var p in peaks)
+                {
+                    int s;
+                    score.TryGetValue(p.Key, out s);
+                    if (Same(p.Value, d)) { if (otherSound) s = Math.Min(Max, s + 1); }
+                    else if (Math.Abs(p.Value - d) > d * 0.2f) s = Math.Max(0, s - 1);
+                    score[p.Key] = s;
+                }
+            }
+            float sum = 0;
+            foreach (var p in peaks) if (!Is(p.Key)) sum += p.Value;
+            return sum;
+        }
+    }
+
     static class Program
     {
         const int eRender = 0, eCapture = 1, DEVICE_STATE_ACTIVE = 1, CLSCTX_ALL = 23, AudioSessionStateActive = 1;
@@ -178,7 +229,7 @@ namespace Tishe
                 // что играют другие программы. Считаем по каждому устройству: пик Discord и сумму
                 // пиков остальных программ, а голосом считаем только то, что сверх этой суммы.
                 var discordPeak = new Dictionary<string, float>();
-                var othersPeak = new Dictionary<string, float>();
+                var othersPeaks = new Dictionary<string, List<KeyValuePair<string, float>>>();
 
                 foreach (var s in sessions)
                 {
@@ -206,9 +257,10 @@ namespace Tishe
                         {
                             if (metered)
                             {
-                                float cur;
-                                othersPeak.TryGetValue(s.Device, out cur);
-                                othersPeak[s.Device] = cur + p;
+                                List<KeyValuePair<string, float>> list;
+                                if (!othersPeaks.TryGetValue(s.Device, out list)) othersPeaks[s.Device] = list = new List<KeyValuePair<string, float>>();
+                                list.Add(new KeyValuePair<string, float>(s.Key, p));
+                                Mirrors.Seed(s.Key, s.Proc);
                             }
                             if (s.Volume != null && IsTarget(s.Proc))
                             {
@@ -223,8 +275,9 @@ namespace Tishe
                 float outPeak = 0, rawPeak = 0, mixPeak = 0;
                 foreach (var kv in discordPeak)
                 {
-                    float others;
-                    othersPeak.TryGetValue(kv.Key, out others);
+                    List<KeyValuePair<string, float>> list;
+                    othersPeaks.TryGetValue(kv.Key, out list);
+                    float others = Mirrors.OthersSum(kv.Value, list);
                     rawPeak = Math.Max(rawPeak, kv.Value);
                     mixPeak = Math.Max(mixPeak, others);
                     // Небольшой запас на то, что счётчики снимаются не в один и тот же миг
@@ -239,7 +292,7 @@ namespace Tishe
                     {
                         float p = -1; int st = -1;
                         try { if (s.Meter != null) s.Meter.GetPeakValue(out p); s.Control.GetState(out st); } catch { }
-                        Console.Error.WriteLine((s.Capture ? "CAP " : "OUT ") + s.Proc + " pid=" + s.Pid + " state=" + st +
+                        Console.Error.WriteLine((s.Capture ? "CAP " : Mirrors.Is(s.Key) ? "MIR " : "OUT ") + s.Proc + " pid=" + s.Pid + " state=" + st +
                             " peak=" + p.ToString("0.0000", inv) + " dev=" + (s.Device.Length > 12 ? s.Device.Substring(s.Device.Length - 12) : s.Device));
                     }
                     Console.Error.WriteLine("--");

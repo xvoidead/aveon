@@ -42,6 +42,7 @@ contextBridge.exposeInMainWorld('tishe', {
     apply: (tracks) => call('meta:apply', tracks),
   },
   lyrics: (track) => call('lyrics:get', track),
+  censor: { plan: (track) => call('censor:plan', track) },
   store: {
     get: (name) => call('store:get', name),
     set: (name, data) => call('store:set', name, data),
@@ -70,6 +71,9 @@ contextBridge.exposeInMainWorld('tishe', {
   win: {
     action: (a) => ipcRenderer.send('win', a),
     onState: (cb) => on('win:state', cb),
+    // Кнопки в превью окна на панели задач
+    thumbState: (st) => ipcRenderer.send('thumb:state', st),
+    onThumb: (cb) => on('thumb', cb),
   },
   openExternal: (url) => ipcRenderer.send('open:external', url),
 });

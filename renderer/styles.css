@@ -292,7 +292,7 @@ svg { width: 18px; height: 18px; flex: none; }
 }
 .input:focus { border-color: var(--hoop); }
 input[type="range"] { flex: 1; accent-color: var(--amber); }
-.seg { display: inline-flex; padding: 3px; gap: 3px; border-radius: 10px; background: var(--oak); border: 1px solid var(--rivet-2); }
+.seg { display: inline-flex; flex-wrap: wrap; padding: 3px; gap: 3px; border-radius: 10px; background: var(--oak); border: 1px solid var(--rivet-2); }
 .seg button { padding: 6px 14px; border-radius: 7px; color: var(--text-3); }
 .seg button.on { background: var(--rivet-2); color: var(--text); }
 .sub-fields[data-off] { display: none; }
@@ -402,7 +402,7 @@ input[type="range"] { flex: 1; accent-color: var(--amber); }
 /* ---------- строчные буквы везде, кроме полей ввода (токены и ссылки чувствительны к регистру) ---------- */
 body { text-transform: lowercase; }
 input, select, textarea, code, .keep-case { text-transform: none; }
-body.keep-titles :is(.t-title, .t-artist, .t-album, .now-title, .now-artist, .lyric, .top-title, .top-artist, .artist-name, .lib-head h1) { text-transform: none; }
+body.keep-titles :is(.t-title, .t-artist, .t-album, .now-title, .now-artist, .fs-title, .fs-artist, .lyric, .top-title, .top-artist, .artist-name, .lib-head h1) { text-transform: none; }
 
 .icon-btn[aria-pressed="true"] { color: var(--amber); background: var(--rivet-2); }
 
@@ -430,6 +430,9 @@ body.keep-titles :is(.t-title, .t-artist, .t-album, .now-title, .now-artist, .ly
 .lyric.past { opacity: .3; }
 .lyric.active { color: var(--text); opacity: 1; filter: none; transform: scale(1.04); }
 .lyric.gap { letter-spacing: .3em; }
+/* караоке (Musixmatch): в активной строке спетые слова светятся, остальные ждут */
+.lyric.active.karaoke .w { color: var(--text-3); transition: color .18s ease, text-shadow .18s ease; }
+.lyric.active.karaoke .w.sung { color: var(--text); text-shadow: 0 0 18px color-mix(in srgb, var(--amber) 35%, transparent); }
 .lyrics-plain .lyric { cursor: default; opacity: .9; filter: none; color: var(--text-2); font-size: 22px; transform: none; }
 .lyrics-note { margin: 0 0 18px; color: var(--text-3); font-size: 13px; }
 .lyrics-empty { display: flex; flex-direction: column; gap: 10px; padding-top: 12vh; max-width: 420px; }
@@ -513,3 +516,58 @@ body.keep-titles :is(.t-title, .t-artist, .t-album, .now-title, .now-artist, .ly
 .editor-foot { display: flex; align-items: center; gap: 8px; padding: 20px 28px 22px; }
 .editor-foot .spacer { flex: 1; }
 .search input::placeholder, .input::placeholder { text-transform: lowercase; }
+
+/* ---------- эквалайзер ---------- */
+.eq-sheet { width: min(760px, calc(100vw - 48px)); }
+.eq-body { display: flex; flex-direction: column; gap: 18px; padding: 10px 28px 26px; }
+.eq-title { display: flex; align-items: center; gap: 14px; }
+.eq-presets { align-self: flex-start; }
+.eq-panel { position: relative; height: clamp(200px, 42vh, 300px); display: flex; }
+#eq.off .eq-panel, #eq.off .eq-foot input { opacity: .4; }
+.eq-curve { position: absolute; left: 0; top: 0; width: 100%; height: 100%; pointer-events: none; } /* top/height ставит eq.js */
+.eq-bands { position: relative; flex: 1; display: grid; grid-template-columns: repeat(10, 1fr); }
+.eq-band { display: flex; flex-direction: column; align-items: center; gap: 8px; min-width: 0; }
+.eq-band .db { height: 14px; font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.eq-band .db.on { color: var(--amber); }
+.eq-band input[type="range"] {
+  flex: 1; width: 28px; min-height: 0; writing-mode: vertical-lr; direction: rtl;
+  accent-color: var(--amber); background: transparent; cursor: ns-resize;
+}
+.eq-band .hz { font-size: 12px; color: var(--text-2); }
+.eq-foot { display: flex; align-items: center; gap: 14px; max-width: 560px; }
+.eq-foot label { color: var(--text-2); white-space: nowrap; }
+.eq-foot .val { min-width: 56px; text-align: right; color: var(--text-3); font-variant-numeric: tabular-nums; font-size: 13px; }
+
+/* ---------- во весь экран ---------- */
+.fs { position: fixed; inset: 0; z-index: 15; overflow: hidden; background: var(--oak); color: var(--text); animation: fs-in .35s ease; }
+@keyframes fs-in { from { opacity: 0; } }
+.fs-bg {
+  position: absolute; inset: -12%; background: center / cover no-repeat var(--oak);
+  filter: blur(70px) saturate(1.4) brightness(.45); transform: scale(1.1); transition: background-image .6s ease;
+}
+.fs-bg::after { content: ""; position: absolute; inset: 0; background: radial-gradient(ellipse at 30% 50%, transparent, rgb(10 7 5 / .55)); }
+.fs-exit { position: absolute; top: 18px; right: 18px; z-index: 2; }
+.fs-main {
+  position: relative; height: 100%; display: grid; grid-template-columns: minmax(300px, 40%) 1fr;
+  grid-template-rows: minmax(0, 1fr); /* ряд = высота экрана, иначе его раздует длинный текст */
+  gap: clamp(32px, 5vw, 96px); align-items: center; padding: 0 clamp(32px, 6vw, 120px);
+}
+.fs-now { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.fs-cover {
+  width: min(100%, 52vh); aspect-ratio: 1; border-radius: 14px; background: center / cover no-repeat var(--rivet);
+  box-shadow: 0 30px 90px rgb(0 0 0 / .55); display: grid; place-items: center; font-size: 64px; color: var(--text-3);
+  margin-bottom: 18px;
+}
+.fs-title { font: 700 clamp(24px, 2.6vw, 40px)/1.15 var(--display); letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.fs-artist { color: var(--text-2); font-size: clamp(15px, 1.3vw, 19px); }
+.fs-seek { display: flex; align-items: center; gap: 12px; width: min(100%, 52vh); margin-top: 10px; }
+.fs-seek .time { color: var(--text-2); }
+.fs-controls { display: flex; align-items: center; gap: 18px; margin-top: 4px; }
+.fs-lyrics { align-self: stretch; min-width: 0; min-height: 0; display: flex; }
+.fs-lyrics .lyrics { position: relative; inset: auto; flex: 1; min-height: 0; background: transparent; padding: 0; }
+.fs-lyrics .lyrics-head { display: none; }
+.fs-lyrics .lyrics-body { padding: 40vh 0 50vh; }
+.fs-lyrics .lyric { font-size: clamp(28px, 3.2vw, 54px); max-width: 20ch; }
+.fs :is(.fs-exit, .fs-seek, .fs-controls) { transition: opacity .4s ease; }
+.fs.idle { cursor: none; }
+.fs.idle :is(.fs-exit, .fs-seek, .fs-controls) { opacity: 0; }

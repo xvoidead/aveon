@@ -11,7 +11,9 @@ const ym = require('./src/services/yandex');
 const sp = require('./src/services/spotify');
 const albums = require('./src/albums');
 const store = require('./src/store');
-const lyrics = require('./src/services/lyrics');
+const texts = require('./src/services/texts');
+const thumbar = require('./src/thumbar');
+const censor = require('./src/censor');
 
 const SOURCES = { sc, ym, sp };
 const MIME = {
@@ -65,9 +67,13 @@ function createWindow() {
   });
   Menu.setApplicationMenu(null);
   win.loadFile(path.join(__dirname, 'renderer', 'index.html'));
-  win.once('ready-to-show', () => win.show());
+  win.once('ready-to-show', () => {
+    win.show();
+    thumbar.update(win, (action) => send('thumb', action)); // кнопки ставятся только на показанное окно
+  });
   win.on('maximize', () => win.webContents.send('win:state', { maximized: true }));
   win.on('unmaximize', () => win.webContents.send('win:state', { maximized: false }));
+  win.on('leave-full-screen', () => win.webContents.send('win:state', { fullscreen: false }));
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//.test(url)) shell.openExternal(url);
     return { action: 'deny' };
@@ -315,7 +321,8 @@ function registerIpc() {
   // Снимки треков из сессии/статистики — со своими тегами
   handle('meta:apply', (tracks) => tracks.map(local.applyOverride));
 
-  handle('lyrics:get', (track) => lyrics.find(track));
+  handle('lyrics:get', (track) => texts.find(track)); // Musixmatch по словам → LRCLIB → …
+  handle('censor:plan', (track) => censor.plan(track));
 
   // Где остановился и статистика прослушивания
   handle('store:get', (name) => {
@@ -330,6 +337,10 @@ function registerIpc() {
     e.returnValue = true;
   });
 
+  ipcMain.on('thumb:state', (e, st) => thumbar.update(win, (action) => send('thumb', action), {
+    playing: !!st?.playing,
+    hasTrack: !!st?.hasTrack,
+  }));
   ipcMain.on('duck:level', (e, level) => duck.setDuck(level));
   ipcMain.on('open:external', (e, url) => { if (/^https?:\/\//.test(url)) shell.openExternal(url); });
   ipcMain.on('win', (e, action) => {
@@ -337,6 +348,8 @@ function registerIpc() {
     if (action === 'min') win.minimize();
     if (action === 'max') (win.isMaximized() ? win.unmaximize() : win.maximize());
     if (action === 'close') win.close();
+    if (action === 'fullscreen-on') win.setFullScreen(true);
+    if (action === 'fullscreen-off') win.setFullScreen(false);
   });
 }
 

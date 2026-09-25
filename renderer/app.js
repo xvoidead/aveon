@@ -191,9 +191,11 @@ function setSlider(el, f) {
 }
 
 // ---------- аудиодвижок ----------
-// audio → lowpass → «гул» (peaking) ─┬─→ master → volume → analyser → колонки
-//                                     └─→ гребёнка (delay + обратная связь) → combWet ─┘
+//                      ┌→ cDry ─────────────────────┐
+// audio → эквалайзер ──┼→ плывущая задержка → cWarble ┼→ lowpass → «гул» (peaking) ─┬─→ master → volume → analyser → колонки
+//                      └→ кольцевой модулятор → cRing ┘                              └─→ гребёнка → combWet ─┘
 // Эффект бочки: срез высоких, резонанс и короткие переотражения, как будто музыка играет внутри бочки.
+// Ветки cDry / cWarble / cRing и писк cBleep — самоцензура (censor.js): искажают спрятанное слово.
 
 const audio = $('#audio');
 let ctx = null, hls = null;
@@ -206,7 +208,7 @@ let seeking = false;
 function ensureGraph() {
   if (ctx) return;
   ctx = new AudioContext({ latencyHint: 'playback' });
-  const src = ctx.createMediaElementSource(audio);
+  const src = eqBuild(ctx.createMediaElementSource(audio)); // eq.js: 10 полос и предусилитель
   fx.lp = ctx.createBiquadFilter();
   fx.lp.type = 'lowpass';
   fx.lp.frequency.value = 20000;
@@ -228,7 +230,38 @@ function ensureGraph() {
   fx.analyser.fftSize = 1024;
   fx.analyser.smoothingTimeConstant = 0.8;
 
-  src.connect(fx.lp).connect(fx.boom).connect(fx.master);
+  // Самоцензура: сухой сигнал и искажения всегда подключены, смешиваются по силе цензуры
+  fx.cDry = ctx.createGain();
+  fx.cWarble = ctx.createDelay(0.1);
+  fx.cWarble.delayTime.value = 0.03;
+  const lfo = ctx.createOscillator(); // плавающая задержка = «плывущая» высота тона
+  lfo.frequency.value = 6;
+  const lfoDepth = ctx.createGain();
+  lfoDepth.gain.value = 0.008;
+  lfo.connect(lfoDepth).connect(fx.cWarble.delayTime);
+  lfo.start();
+  fx.cWarbleWet = ctx.createGain();
+  fx.cWarbleWet.gain.value = 0;
+  fx.cRing = ctx.createGain(); // кольцевая модуляция: сигнал × синус 70 Гц — «робот»
+  fx.cRing.gain.value = 0;
+  const carrier = ctx.createOscillator();
+  carrier.frequency.value = 70;
+  carrier.connect(fx.cRing.gain);
+  carrier.start();
+  fx.cRingWet = ctx.createGain();
+  fx.cRingWet.gain.value = 0;
+  fx.cBleep = ctx.createGain();
+  fx.cBleep.gain.value = 0;
+  const tone = ctx.createOscillator();
+  tone.frequency.value = 1000;
+  tone.connect(fx.cBleep);
+  tone.start();
+
+  src.connect(fx.cDry).connect(fx.lp);
+  src.connect(fx.cWarble).connect(fx.cWarbleWet).connect(fx.lp);
+  src.connect(fx.cRing).connect(fx.cRingWet).connect(fx.lp);
+  fx.cBleep.connect(fx.vol);
+  fx.lp.connect(fx.boom).connect(fx.master);
   fx.boom.connect(fx.comb);
   fx.comb.connect(fx.combFb).connect(fx.comb);
   fx.comb.connect(fx.combWet).connect(fx.master);
@@ -237,28 +270,29 @@ function ensureGraph() {
   applyEffect(duck.m);
 }
 
-// m: 0 — чистый звук, 1 — полностью «в бочке» (или приглушено, если выбран режим громкости)
+// m: 0 — чистый звук, 1 — полностью «в бочке» (или приглушено, если выбран режим громкости).
+// Поверх — самоцензура: c от 0 до 1 (censor.js) тоже уводит в бочку и искажает звук.
 function applyEffect(m) {
   if (!ctx) return;
   const d = state.cfg.duck;
   const t = ctx.currentTime;
-  const k = 0.02;
-  if (d.effect === 'volume') {
-    fx.lp.frequency.setTargetAtTime(20000, t, k);
-    fx.lp.Q.setTargetAtTime(0.707, t, k);
-    fx.boom.gain.setTargetAtTime(0, t, k);
-    fx.combWet.gain.setTargetAtTime(0, t, k);
-    fx.master.gain.setTargetAtTime(1 - m * (1 - d.level), t, k);
-    return;
-  }
+  const c = cz.c;
+  const effect = state.cfg.censor?.effect || 'barrel';
+  const k = c > 0.001 ? 0.008 : 0.02; // слово короткое — цензура должна включаться быстро
+  const quiet = d.effect === 'volume' ? m : 0;
+  const b = Math.max(d.effect === 'volume' ? 0 : m, c);
   // Частоту среза ведём по логарифму — на слух это ровное «закрывание»
-  const freq = 20000 * Math.pow(d.barrelCutoff / 20000, m);
+  const freq = 20000 * Math.pow(d.barrelCutoff / 20000, b);
   const boom = d.barrelBoom;
   fx.lp.frequency.setTargetAtTime(freq, t, k);
-  fx.lp.Q.setTargetAtTime(0.707 + m * boom * 4.5, t, k);
-  fx.boom.gain.setTargetAtTime(m * boom * 9, t, k);
-  fx.combWet.gain.setTargetAtTime(m * boom * 0.38, t, k);
-  fx.master.gain.setTargetAtTime(1 - m * (1 - d.barrelLevel), t, k);
+  fx.lp.Q.setTargetAtTime(0.707 + b * boom * 4.5, t, k);
+  fx.boom.gain.setTargetAtTime(b * boom * 9, t, k);
+  fx.combWet.gain.setTargetAtTime(b * boom * 0.38, t, k);
+  fx.master.gain.setTargetAtTime((1 - b * (1 - d.barrelLevel)) * (1 - quiet * (1 - d.level)), t, k);
+  fx.cDry.gain.setTargetAtTime(effect === 'barrel' ? 1 : 1 - c, t, k);
+  fx.cWarbleWet.gain.setTargetAtTime(effect === 'warble' ? c : 0, t, k);
+  fx.cRingWet.gain.setTargetAtTime(effect === 'robot' ? c * 1.4 : 0, t, k); // модуляция вдвое снижает мощность
+  fx.cBleep.gain.setTargetAtTime(effect === 'bleep' ? c * 0.18 : 0, t, k);
 }
 
 // Во сколько раз эффект снижает громкость — для приглушения других программ через микшер
@@ -366,6 +400,7 @@ function updatePlayState() {
   $('#btn-play').setAttribute('aria-label', playing ? 'Пауза' : 'Играть');
   document.body.classList.toggle('paused', !playing);
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
+  api.win.thumbState({ playing, hasTrack: !!state.track });
   markPlaying();
   if (playing) startViz();
 }
@@ -458,6 +493,7 @@ function showNow(track, stream) {
     via.hidden = true;
   }
   document.title = `${track.title} — ${track.artist || 'авеон'}`;
+  api.win.thumbState({ playing: !audio.paused, hasTrack: true });
   if ('mediaSession' in navigator) {
     navigator.mediaSession.metadata = new MediaMetadata({
       title: track.title,
@@ -652,6 +688,7 @@ function duckTick() {
   duck.m += (want - duck.m) * (1 - Math.exp(-dt / Math.max(10, tau / 3)));
   if (Math.abs(duck.m - want) < 0.003) duck.m = want;
 
+  censorTick(dt); // censor.js
   applyEffect(duck.m);
   document.documentElement.style.setProperty('--m', duck.m.toFixed(3));
   const ext = d.targets?.length ? externalLevel(duck.m) : 1;
@@ -1362,6 +1399,7 @@ async function renderSettings() {
       </div></div>
       ${rangeField('micSensitivity', 'Чувствительность', 0, 1, 0.01)}
     </section>
+${censorSettingsHtml()}
 
     <section class="sec" data-sec="ym">
       <h3 class="sec-title">Яндекс Музыка<span class="state ${c.has['ym.token'] ? 'ok' : ''}">${c.has['ym.token'] ? 'подключена' : 'не подключена'}</span></h3>
@@ -1435,6 +1473,7 @@ async function renderSettings() {
       renderSettings();
     };
   });
+  bindCensorSettings(body); // censor.js
   $('#mic-device', body).onchange = async (e) => {
     await saveCfg({ duck: { micDevice: e.target.value } });
     micStop(); // перезапустится с новым устройством на следующем такте
@@ -1633,6 +1672,11 @@ document.addEventListener('keydown', (e) => {
 // ---------- окно ----------
 
 $$('[data-win]').forEach((b) => { b.onclick = () => api.win.action(b.dataset.win); });
+api.win.onThumb((action) => {
+  if (action === 'toggle') togglePlay();
+  else if (action === 'next') next();
+  else if (action === 'prev') prev();
+});
 
 // ---------- старт ----------
 // Запускаемся, когда выполнены все скрипты (extras.js подключается после app.js)

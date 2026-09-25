@@ -32,6 +32,8 @@
     <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M5 19l1-4 9.5-9.5a2.1 2.1 0 0 1 3 3L9 18z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
     <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-grip" viewBox="0 0 24 24"><circle cx="9" cy="7" r="1.4" fill="currentColor"/><circle cx="15" cy="7" r="1.4" fill="currentColor"/><circle cx="9" cy="12" r="1.4" fill="currentColor"/><circle cx="15" cy="12" r="1.4" fill="currentColor"/><circle cx="9" cy="17" r="1.4" fill="currentColor"/><circle cx="15" cy="17" r="1.4" fill="currentColor"/></symbol>
+    <symbol id="i-full" viewBox="0 0 24 24"><path d="M4.5 9V5.5a1 1 0 0 1 1-1H9M15 4.5h3.5a1 1 0 0 1 1 1V9M19.5 15v3.5a1 1 0 0 1-1 1H15M9 19.5H5.5a1 1 0 0 1-1-1V15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-eq" viewBox="0 0 24 24"><path d="M6 4v16M12 4v16M18 4v16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".45"/><path d="M3.8 14h4.4M9.8 8h4.4M15.8 12h4.4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
     <symbol id="i-lyrics" viewBox="0 0 24 24"><path d="M4 6h10M4 10.5h13M4 15h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M16.5 20a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm2-2v-6.5l2.5.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-stats" viewBox="0 0 24 24"><path d="M5 19V11M10 19V5M15 19v-7M20 19V9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
     <symbol id="i-chevron-l" viewBox="0 0 24 24"><path d="m14.5 6-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -86,7 +88,9 @@
     <div class="volume-row">
       <button class="icon-btn small" id="btn-mute" aria-label="Выключить звук"><svg><use href="#i-vol"/></svg></button>
       <div class="slider volume" id="volume"><div class="slider-fill" id="volume-fill"></div><div class="slider-knob"></div></div>
+      <button class="icon-btn small" id="btn-eq" aria-label="Эквалайзер" title="Эквалайзер (E)" aria-pressed="false"><svg><use href="#i-eq"/></svg></button>
       <button class="icon-btn small" id="btn-lyrics" aria-label="Текст песни" title="Текст песни (L)" aria-pressed="false"><svg><use href="#i-lyrics"/></svg></button>
+      <button class="icon-btn small" id="btn-fs" aria-label="Во весь экран" title="Во весь экран (F)"><svg><use href="#i-full"/></svg></button>
       <button class="icon-btn small" id="btn-now-album" aria-label="Добавить в альбом" title="Добавить в альбом" disabled><svg><use href="#i-album-add"/></svg></button>
     </div>
 
@@ -154,6 +158,54 @@
     </section>
   </main>
 
+  <section class="fs" id="fs" hidden aria-label="Во весь экран">
+    <div class="fs-bg" id="fs-bg"></div>
+    <button class="icon-btn fs-exit" id="fs-exit" aria-label="Выйти из полноэкранного режима" title="Выйти (Esc)"><svg><use href="#i-close"/></svg></button>
+    <div class="fs-main">
+      <div class="fs-now">
+        <div class="fs-cover" id="fs-cover"></div>
+        <div class="fs-title" id="fs-title"></div>
+        <div class="fs-artist" id="fs-artist"></div>
+        <div class="fs-seek">
+          <span class="time" id="fs-cur">0:00</span>
+          <div class="slider progress" id="fs-progress"><div class="slider-fill"></div><div class="slider-knob"></div></div>
+          <span class="time" id="fs-dur">0:00</span>
+        </div>
+        <div class="fs-controls">
+          <button class="icon-btn" id="fs-prev" aria-label="Предыдущий трек"><svg><use href="#i-prev"/></svg></button>
+          <button class="play-btn" id="fs-play" aria-label="Играть"><svg><use href="#i-play"/></svg></button>
+          <button class="icon-btn" id="fs-next" aria-label="Следующий трек"><svg><use href="#i-next"/></svg></button>
+        </div>
+      </div>
+      <div class="fs-lyrics" id="fs-lyrics"></div>
+    </div>
+  </section>
+
+  <div class="modal" id="eq" hidden>
+    <div class="sheet eq-sheet" role="dialog" aria-labelledby="eq-title">
+      <div class="sheet-head">
+        <div class="eq-title">
+          <h2 id="eq-title">Эквалайзер</h2>
+          <label class="switch"><input type="checkbox" id="eq-enabled" aria-label="Эквалайзер включён"><span></span></label>
+        </div>
+        <button class="icon-btn" id="eq-close" aria-label="Закрыть эквалайзер"><svg><use href="#i-close"/></svg></button>
+      </div>
+      <div class="eq-body">
+        <div class="seg eq-presets" id="eq-presets"></div>
+        <div class="eq-panel" id="eq-panel">
+          <canvas class="eq-curve" id="eq-curve"></canvas>
+          <div class="eq-bands" id="eq-bands"></div>
+        </div>
+        <div class="eq-foot">
+          <label for="eq-preamp">Предусилитель</label>
+          <input type="range" id="eq-preamp" min="-12" max="6" step="0.5">
+          <span class="val" id="eq-preamp-val"></span>
+          <button class="btn" id="eq-reset">Сбросить</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="modal" id="settings" hidden>
     <div class="sheet" role="dialog" aria-label="Настройки">
       <div class="sheet-head">
@@ -219,5 +271,8 @@
   <script src="../node_modules/hls.js/dist/hls.light.min.js"></script>
   <script src="app.js"></script>
   <script src="extras.js"></script>
+  <script src="eq.js"></script>
+  <script src="fullscreen.js"></script>
+  <script src="censor.js"></script>
 </body>
 </html>
