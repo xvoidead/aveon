@@ -61,7 +61,7 @@ function shareable(t) {
 
 // Свои действия с плеером → в комнату
 for (const ev of ['play', 'pause', 'seeked']) {
-  audio.addEventListener(ev, () => {
+  onAudio(ev, () => {
     if (!Together.room || Together.quiet() || !state.track) return;
     if (ev === 'pause' && audio.ended) return; // конец трека — не пауза
     Together.send();

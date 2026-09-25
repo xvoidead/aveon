@@ -16,6 +16,7 @@ const thumbar = require('./src/thumbar');
 const censor = require('./src/censor');
 const account = require('./src/account');
 const together = require('./src/together');
+const discord = require('./src/discord');
 
 const SOURCES = { sc, ym, sp };
 const MIME = {
@@ -266,6 +267,7 @@ function registerIpc() {
     config.set(patch);
     if (patch.duck?.targets) duck.setTargets(config.get().duck.targets);
     account.settingsChanged(patch);
+    if (patch.discord) discord.settingsChanged();
     return config.publicView();
   });
   handle('cfg:secret', (key, value) => {
@@ -371,6 +373,10 @@ function registerIpc() {
   handle('tg:stream', (track) => sharedStream(track));
   ipcMain.on('tg:send', (e, state, beat) => together.send(state, beat));
 
+  // Discord: что сейчас играет
+  ipcMain.on('discord:update', (e, p) => discord.update(p));
+  handle('discord:status', () => discord.status());
+
   // Где остановился и статистика прослушивания
   handle('store:get', (name) => {
     const data = store.read(name);
@@ -420,6 +426,7 @@ app.whenReady().then(() => {
   duck.setTargets(config.get().duck.targets);
   duck.start((m) => send('duck:meter', m), (s) => send('duck:status', s));
   together.init((ev) => send('together:event', ev));
+  discord.init();
   account.init((ev) => {
     if (ev.changed?.albums) local.allowFiles(albums.localPaths());
     if (ev.changed?.settings) duck.setTargets(config.get().duck.targets);
@@ -429,6 +436,7 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', () => {
   duck.stop();
+  discord.stop();
   config.flush();
   app.quit();
 });

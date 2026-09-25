@@ -193,14 +193,28 @@ function setSlider(el, f) {
 }
 
 // ---------- аудиодвижок ----------
+// audio  → регулятор ┐
+// audio2 → регулятор ┴→ mix (плавный переход между треками)
+//
 //                      ┌→ cDry ─────────────────────┐
-// audio → эквалайзер ──┼→ плывущая задержка → cWarble ┼→ lowpass → «гул» (peaking) ─┬─→ master → volume → analyser → колонки
+//   mix → эквалайзер ──┼→ плывущая задержка → cWarble ┼→ lowpass → «гул» (peaking) ─┬─→ master → volume → analyser → колонки
 //                      └→ кольцевой модулятор → cRing ┘                              └─→ гребёнка → combWet ─┘
 // Эффект бочки: срез высоких, резонанс и короткие переотражения, как будто музыка играет внутри бочки.
 // Ветки cDry / cWarble / cRing и писк cBleep — самоцензура (censor.js): искажают спрятанное слово.
 
-const audio = $('#audio');
-let ctx = null, hls = null;
+// Два плеера по очереди: пока один доигрывает с затуханием («хвост»), другой уже играет следующий трек.
+// audio — тот, что сейчас главный; всё остальное приложение работает только с ним.
+const decks = [$('#audio'), $('#audio2')];
+let audio = decks[0];
+let ctx = null;
+const hlsOf = new Map(); // элемент → hls.js
+let tail = null;         // { el, dur, timer } — доигрывающий трек
+let autoFade = 0;        // > 0: переход начат сам за столько секунд до конца трека
+
+// События только от главного элемента: хвост доигрывает молча
+function onAudio(type, fn) {
+  for (const el of decks) el.addEventListener(type, (e) => { if (e.target === audio) fn(e); });
+}
 const fx = {};
 let loadSeq = 0;
 let failStreak = 0;
@@ -210,7 +224,14 @@ let seeking = false;
 function ensureGraph() {
   if (ctx) return;
   ctx = new AudioContext({ latencyHint: 'playback' });
-  const src = eqBuild(ctx.createMediaElementSource(audio)); // eq.js: 10 полос и предусилитель
+  // у каждого плеера свой регулятор (для перехода между треками), дальше общий микшер → эквалайзер
+  fx.mix = ctx.createGain();
+  fx.deck = new Map(decks.map((el) => {
+    const g = ctx.createGain();
+    ctx.createMediaElementSource(el).connect(g).connect(fx.mix);
+    return [el, g];
+  }));
+  const src = eqBuild(fx.mix); // eq.js: 10 полос и предусилитель
   fx.lp = ctx.createBiquadFilter();
   fx.lp.type = 'lowpass';
   fx.lp.frequency.value = 20000;
@@ -310,18 +331,107 @@ function applyVolume() {
   if (fx.vol) fx.vol.gain.setTargetAtTime(v * v, ctx.currentTime, 0.02); // квадрат ближе к восприятию громкости
 }
 
+function dropHls(el) {
+  hlsOf.get(el)?.destroy();
+  hlsOf.delete(el);
+}
+
 function attach(url, isHls) {
-  if (hls) { hls.destroy(); hls = null; }
+  const el = audio;
+  dropHls(el);
   if (isHls && window.Hls?.isSupported()) {
-    hls = new Hls({ enableWorker: true, maxBufferLength: 60 });
+    const hls = new Hls({ enableWorker: true, maxBufferLength: 60 });
     hls.on(Hls.Events.ERROR, (e, data) => {
-      if (data.fatal) onAudioError(new Error('поток HLS: ' + data.details));
+      if (data.fatal && el === audio) onAudioError(new Error('поток HLS: ' + data.details));
     });
     hls.loadSource(url);
-    hls.attachMedia(audio);
+    hls.attachMedia(el);
+    hlsOf.set(el, hls);
   } else {
-    audio.src = url;
+    el.src = url;
   }
+}
+
+// ---------- плавный переход между треками ----------
+// Кривые «равной мощности»: сумма громкостей на слух ровная, без провала посередине
+const FADE_STEPS = 64;
+const FADE_IN = Float32Array.from({ length: FADE_STEPS }, (_, i) => Math.sin((i / (FADE_STEPS - 1)) * Math.PI / 2));
+const FADE_OUT = Float32Array.from({ length: FADE_STEPS }, (_, i) => Math.cos((i / (FADE_STEPS - 1)) * Math.PI / 2));
+const MANUAL_FADE = 1.2; // с — когда трек сменили сами, переход короткий
+
+function deckGain(el, v) {
+  const g = fx.deck?.get(el)?.gain;
+  if (!g) return;
+  g.cancelScheduledValues(ctx.currentTime);
+  g.setValueAtTime(v, ctx.currentTime);
+}
+
+// Сколько длится переход к следующему треку: 0 — сразу (выключено или ничего не играет)
+function fadeLength() {
+  const cf = +state.cfg.crossfade || 0;
+  const auto = autoFade;
+  autoFade = 0;
+  if (!cf || !ctx || audio.paused || locked()) return 0;
+  return auto ? Math.max(0.5, Math.min(cf, auto)) : Math.min(cf, MANUAL_FADE);
+}
+
+// Текущий трек становится хвостом, следующий пойдёт во второй элемент (пока беззвучно)
+function handOff() {
+  const dur = fadeLength();
+  if (!dur) return;
+  killTail();
+  const old = audio;
+  audio = decks.find((d) => d !== old);
+  tail = { el: old, dur, timer: 0 };
+  deckGain(audio, 0);
+}
+
+// Новый трек зазвучал — хвост затихает, новый нарастает. Не зазвучал — хвост просто быстро гаснет.
+function startFade() {
+  if (!tail || tail.timer) return;
+  const playing = !audio.paused;
+  const dur = playing ? tail.dur : 0.3;
+  const t = ctx.currentTime;
+  const gOld = fx.deck.get(tail.el).gain;
+  gOld.cancelScheduledValues(t);
+  gOld.setValueCurveAtTime(FADE_OUT.map((v) => v * gOld.value), t, dur);
+  const gNew = fx.deck.get(audio).gain;
+  gNew.cancelScheduledValues(t);
+  if (playing) gNew.setValueCurveAtTime(FADE_IN, t, dur);
+  else gNew.setValueAtTime(1, t);
+  tail.timer = setTimeout(killTail, dur * 1000 + 80);
+}
+
+function killTail() {
+  if (!tail) return;
+  clearTimeout(tail.timer);
+  const el = tail.el;
+  tail = null;
+  el.pause();
+  dropHls(el);
+  el.removeAttribute('src');
+  el.load();
+  deckGain(el, 1);
+}
+
+for (const el of decks) el.addEventListener('ended', () => { if (tail?.el === el) killTail(); });
+
+// Есть ли куда переходить: иначе трек доигрывает до конца как обычно
+function hasNext() {
+  if (!state.queue.length || state.cfg.repeat === 'one') return false;
+  return state.cfg.repeat === 'all' || state.pos + 1 < state.order.length;
+}
+
+// Раз в timeupdate: пора ли начинать переход к следующему треку
+function maybeAutoFade() {
+  const cf = +state.cfg.crossfade || 0;
+  if (!cf || tail || seeking || audio.paused || !hasNext() || Together.waitsOnEnd()) return;
+  const d = audio.duration;
+  if (!isFinite(d) || d < cf * 3) return; // короткие треки и превью — без перехода
+  const left = d - audio.currentTime;
+  if (left > cf || left < 0.4) return;
+  autoFade = left;
+  next(true);
 }
 
 // quiet — при восстановлении после перезапуска: без уведомлений и автоперехода, если поток не получен.
@@ -334,12 +444,14 @@ async function loadTrack(track, { autoplay = true, startAt = 0, quiet = false } 
   showNow(track, null);
   markPlaying();
   Together.beforeLoad();
+  handOff();
   audio.pause();
   let stream;
   try {
     stream = await (track.shared ? api.together.stream(track) : api.stream(track));
   } catch (e) {
     Together.loadFailed();
+    if (seq === loadSeq) startFade(); // хвост не должен играть вечно
     if (seq !== loadSeq || quiet) return;
     if (track.shared) { toast(`${track.title}: ${e.message}`, 'err'); return; } // трек друга: ждём следующий от него
     failStreak++;
@@ -353,11 +465,13 @@ async function loadTrack(track, { autoplay = true, startAt = 0, quiet = false } 
   showNow(track, stream);
   ensureGraph();
   if (ctx.state === 'suspended') ctx.resume();
+  if (!tail) deckGain(audio, 1);
   attach(stream.url, stream.hls);
   if (startAt) audio.addEventListener('loadedmetadata', () => { audio.currentTime = typeof startAt === 'function' ? startAt() : startAt; }, { once: true });
   if (autoplay) {
     try { await audio.play(); failStreak = 0; } catch (e) { if (e.name !== 'AbortError') onAudioError(e); }
   }
+  if (seq === loadSeq) startFade();
   if (seq === loadSeq && !quiet) Together.afterLoad(track);
 }
 
@@ -375,22 +489,22 @@ function onAudioError(err) {
   if (++failStreak < 5 && state.queue.length > 1) setTimeout(() => next(true), 600);
 }
 
-audio.addEventListener('error', () => {
-  if (hls) return; // ошибки HLS обрабатывает hls.js
+onAudio('error', () => {
+  if (hlsOf.has(audio)) return; // ошибки HLS обрабатывает hls.js
   const code = audio.error?.code;
   onAudioError(new Error(code === 4 ? 'формат не поддерживается' : code === 2 ? 'ошибка сети' : 'ошибка декодирования'));
 });
-audio.addEventListener('playing', () => { retried = false; });
-audio.addEventListener('play', updatePlayState);
-audio.addEventListener('pause', updatePlayState);
-audio.addEventListener('ended', () => {
+onAudio('playing', () => { retried = false; });
+onAudio('play', updatePlayState);
+onAudio('pause', updatePlayState);
+onAudio('ended', () => {
   if (Together.waitsOnEnd()) return; // вместе трек переключает ведущий
   if (state.cfg.repeat === 'one') { audio.currentTime = 0; audio.play(); return; }
   next(true);
 });
-audio.addEventListener('timeupdate', () => { if (!seeking) renderProgress(); });
-audio.addEventListener('durationchange', renderProgress);
-audio.addEventListener('progress', renderProgress);
+onAudio('timeupdate', () => { if (!seeking) { renderProgress(); maybeAutoFade(); } });
+onAudio('durationchange', renderProgress);
+onAudio('progress', renderProgress);
 
 function renderProgress() {
   const d = audio.duration || state.track?.duration || 0;
@@ -426,9 +540,10 @@ function togglePlay() {
   if (audio.paused) {
     ensureGraph();
     ctx.resume();
-    if (!audio.src && !hls) loadTrack(state.track);
+    if (!audio.src && !hlsOf.has(audio)) loadTrack(state.track);
     else audio.play().catch(() => {});
   } else {
+    killTail(); // пауза посреди перехода — тишина сразу, без доигрывающего хвоста
     audio.pause();
   }
 }
@@ -490,6 +605,7 @@ function prev() {
 // ---------- сейчас играет ----------
 
 function showNow(track, stream) {
+  state.via = stream?.via || null;
   $('#now-title').textContent = track.title;
   $('#btn-now-album').disabled = false;
   $('#now-artist').innerHTML = track.artist ? artistLinks(track.artist) : 'Исполнитель неизвестен'; // имя — ссылка на артиста
@@ -1363,6 +1479,8 @@ function rangeField(key, label, min, max, step) {
     <span class="val" data-val="${key}">${SHOW[key](v)}</span></div></div>`;
 }
 
+const fadeLabel = (v) => (+v ? `${+v} с` : 'выкл');
+
 async function renderSettings() {
   const c = state.cfg;
   const d = c.duck;
@@ -1373,12 +1491,16 @@ async function renderSettings() {
   } catch {}
   const barrel = d.effect !== 'volume';
   state.account = await api.account.status().catch(() => state.account);
+  await refreshDiscordStatus();
 
   $('#settings-body').innerHTML = `
     ${accountSection()}
     <section class="sec" data-sec="ui">
       <h3 class="sec-title">Вид</h3>
       <p class="sec-desc">Интерфейс написан строчными буквами. Названия треков, артистов и тексты песен тоже, но их можно оставить как есть.</p>
+      <div class="field"><label for="crossfade">Плавный переход</label><div class="ctl">
+        <input id="crossfade" type="range" min="0" max="12" step="1" value="${+c.crossfade || 0}">
+        <span class="val" id="crossfade-val">${fadeLabel(c.crossfade)}</span></div></div>
       <div class="field"><label>Названия треков как есть</label><div class="ctl"><label class="switch"><input type="checkbox" id="keep-titles" ${c.ui?.keepTitles ? 'checked' : ''} aria-label="Названия треков как есть"><span></span></label></div></div>
     </section>
 
@@ -1421,6 +1543,8 @@ async function renderSettings() {
       ${rangeField('micSensitivity', 'Чувствительность', 0, 1, 0.01)}
     </section>
 ${censorSettingsHtml()}
+
+    ${discordSection()}
 
     <section class="sec" data-sec="ym">
       <h3 class="sec-title">Яндекс Музыка<span class="state ${c.has['ym.token'] ? 'ok' : ''}">${c.has['ym.token'] ? 'подключена' : 'не подключена'}</span></h3>
@@ -1471,8 +1595,14 @@ ${censorSettingsHtml()}
 
   const body = $('#settings-body');
   bindAccount(body);
+  bindDiscord(body);
 
   $$('[data-ext]', body).forEach((a) => { a.onclick = (e) => { e.preventDefault(); api.openExternal(a.dataset.ext); }; });
+  $('#crossfade', body).oninput = (e) => {
+    state.cfg.crossfade = +e.target.value;
+    $('#crossfade-val', body).textContent = fadeLabel(+e.target.value);
+  };
+  $('#crossfade', body).onchange = (e) => saveCfg({ crossfade: +e.target.value });
   $('#keep-titles', body).onchange = (e) => {
     document.body.classList.toggle('keep-titles', e.target.checked);
     saveCfg({ ui: { keepTitles: e.target.checked } });

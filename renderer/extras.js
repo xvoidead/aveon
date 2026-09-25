@@ -161,8 +161,8 @@ async function restoreSession() {
   $('#time-cur').textContent = fmt(s.position || 0);
 }
 
-audio.addEventListener('pause', () => saveSession());
-audio.addEventListener('seeked', () => { if (Date.now() - resume.lastSave > 1000) saveSession(); });
+onAudio('pause', () => saveSession());
+onAudio('seeked', () => { if (Date.now() - resume.lastSave > 1000) saveSession(); });
 setInterval(() => { if (!audio.paused) saveSession(); }, 5000);
 window.addEventListener('beforeunload', () => { saveSession(true); saveStats(true); });
 
@@ -223,7 +223,7 @@ function statsOnTrack(track) {
   stats.cur = track ? { id: track.id, listened: 0, counted: false } : null;
   stats.lastTime = null;
 }
-audio.addEventListener('ended', () => { if (state.track) statsOnTrack(state.track); });
+onAudio('ended', () => { if (state.track) statsOnTrack(state.track); });
 
 // Раз в секунду: сколько реально проиграно (перемотка не считается)
 setInterval(() => {
@@ -690,7 +690,7 @@ $('#lyrics-body').addEventListener('click', (e) => {
 for (const ev of ['wheel', 'touchmove', 'pointerdown']) {
   $('#lyrics-body').addEventListener(ev, () => { ly.userScrollAt = performance.now(); }, { passive: true });
 }
-audio.addEventListener('seeked', () => { if (lyricsOpen()) { ly.userScrollAt = 0; syncLyrics(true); } });
+onAudio('seeked', () => { if (lyricsOpen()) { ly.userScrollAt = 0; syncLyrics(true); } });
 $('#btn-lyrics').onclick = () => (lyricsOpen() ? closeLyrics() : openLyrics());
 $('#lyrics-close').onclick = closeLyrics;
 
