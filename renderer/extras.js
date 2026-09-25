@@ -549,7 +549,8 @@ function replaceTrackEverywhere(t) {
 
 // ---------- текст песни (LRCLIB) ----------
 
-const ly = { track: null, lines: [], active: -1, userScrollAt: 0, raf: 0, seq: 0 };
+const ly = { track: null, lines: [], active: -1, sung: -1, userScrollAt: 0, raf: 0, seq: 0 };
+const LYRICS_FROM = { musixmatch: 'Musixmatch', lrclib: 'LRCLIB' };
 
 function parseLRC(text) {
   let offset = 0;
@@ -592,19 +593,30 @@ async function loadLyrics(track) {
   ly.track = track;
   ly.lines = [];
   ly.active = -1;
-  $('#lyrics-meta').textContent = `${track.title}${track.artist ? ` — ${track.artist}` : ''}`;
+  ly.sung = -1;
+  const meta = `${track.title}${track.artist ? ` — ${track.artist}` : ''}`;
+  $('#lyrics-meta').textContent = meta;
   $('#lyrics-body').innerHTML = '<div class="lyrics-empty"><div class="spinner"></div></div>';
   let res;
   try {
     res = await api.lyrics(track);
   } catch (e) {
-    if (seq === ly.seq) renderLyricsEmpty('LRCLIB не ответил', `Проверь интернет и открой текст ещё раз. ${e.message}`);
+    if (seq === ly.seq) renderLyricsEmpty('Текст не загрузился', `Проверь интернет и открой текст ещё раз. ${e.message}`);
     return;
   }
   if (seq !== ly.seq) return;
   const body = $('#lyrics-body');
   body.classList.remove('lyrics-plain');
-  if (res.synced) {
+  if (res.from) $('#lyrics-meta').textContent = `${meta} · текст: ${LYRICS_FROM[res.from]}`;
+  if (res.words?.length) {
+    // Musixmatch знает время каждого слова: слова загораются по одному, как в караоке
+    // Musixmatch режет «пиф-пау» на «пиф-» и «пау» — после дефиса пробел не ставим
+    const gap = (words, i) => (i && !words[i - 1].text.endsWith('-') ? ' ' : '');
+    ly.lines = res.words.map((l) => ({ t: l.ts, words: l.words }));
+    body.innerHTML = ly.lines.map((l, i) => `<button class="lyric karaoke" data-l="${i}">${l.words.map((w, j) => `${gap(l.words, j)}<span class="w">${esc(w.text)}</span>`).join('')}</button>`).join('');
+    body.scrollTop = 0;
+    syncLyrics(true);
+  } else if (res.synced) {
     ly.lines = parseLRC(res.synced);
     body.innerHTML = ly.lines.map((l, i) => `<button class="lyric${l.text ? '' : ' gap'}" data-l="${i}">${l.text ? esc(l.text) : '♪ ♪ ♪'}</button>`).join('');
     body.scrollTop = 0;
@@ -616,19 +628,35 @@ async function loadLyrics(track) {
   } else if (res.instrumental) {
     renderLyricsEmpty('Здесь без слов', 'В LRCLIB этот трек отмечен как инструментальный.');
   } else {
-    renderLyricsEmpty('Текст не нашёлся', `В LRCLIB нет текста для «${track.title}». Если это свой файл, поправь название и исполнителя в тегах и открой текст снова.`);
+    renderLyricsEmpty('Текст не нашёлся', `Ни в Musixmatch, ни в LRCLIB нет текста для «${track.title}». Если это свой файл, поправь название и исполнителя в тегах и открой текст снова.`);
   }
 }
 
 // Подсветка текущей строки и плавная прокрутка к ней
+// Слова активной строки: спетые подсвечиваются. Меняем DOM, только когда спето новое слово
+function syncWords(force) {
+  const l = ly.lines[ly.active];
+  if (!l?.words) return;
+  const t = audio.currentTime + 0.05;
+  let n = 0;
+  while (n < l.words.length && l.words[n].t <= t) n++;
+  if (n === ly.sung && !force) return;
+  ly.sung = n;
+  $$('.w', $(`.lyric[data-l="${ly.active}"]`, $('#lyrics-body'))).forEach((w, i) => w.classList.toggle('sung', i < n));
+}
+
 function syncLyrics(force = false) {
   if (!ly.lines.length) return;
   const t = audio.currentTime + 0.2; // небольшой запас, чтобы строка загоралась вместе с голосом
   let idx = -1;
   for (let i = 0; i < ly.lines.length && ly.lines[i].t <= t; i++) idx = i;
-  if (idx === ly.active && !force) return;
+  if (idx === ly.active && !force) {
+    syncWords(false);
+    return;
+  }
   ly.active = idx;
   const nodes = $$('.lyric', $('#lyrics-body'));
+  syncWords(true);
   nodes.forEach((n, i) => {
     n.classList.toggle('active', i === idx);
     n.classList.toggle('past', i < idx);
@@ -673,6 +701,7 @@ function onTrackShown(track) {
   applyThemeFrom(track.cover);
   if (stats.cur?.id !== track.id) statsOnTrack(track);
   if (lyricsOpen() && ly.track?.id !== track.id) loadLyrics(track);
+  if (cz.trackId !== track.id) censorLoad(track); // censor.js
   const editable = track.source === 'local';
   $('#now-cover').classList.toggle('editable', editable);
   $('#now-title').classList.toggle('editable', editable);

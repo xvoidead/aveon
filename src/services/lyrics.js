@@ -72,4 +72,4 @@ async function find(track) {
   return result;
 }
 
-module.exports = { find };
+module.exports = { find, cleanTitle, firstArtist };

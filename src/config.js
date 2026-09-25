@@ -42,6 +42,21 @@ const DEFAULTS = {
     micSensitivity: 0.5, // 0…1, чувствительность детектора речи
     targets: [], // по желанию: внешние процессы (chrome, spotify…), которые тоже приглушать
   },
+  censor: {
+    enabled: false,
+    profanity: true, // мат
+    drugs: true, // упоминания наркотиков
+    scope: 'word', // word — только слово; line — вся строка
+    effect: 'warble', // barrel — только бочка; warble — плывёт; robot — робот; bleep — пик; mute — тишина
+    custom: [], // свои слова: всё, что начинается с них
+  },
+  eq: {
+    enabled: true,
+    preset: 'flat', // см. EQ_PRESETS в renderer/eq.js; custom — полосы двигали вручную
+    gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // дБ для 32 Гц … 16 кГц
+    preamp: 0, // дБ
+  },
+  mxm: { token: '' }, // токен Musixmatch: выдаётся редко, поэтому храним
 };
 
 let file;
