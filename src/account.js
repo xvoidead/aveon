@@ -143,13 +143,13 @@ async function remove(password) {
 
 // Какие настройки общие для всех компьютеров: микрофон у каждого свой
 function syncedSettings() {
-  const { ui, duck } = config.get();
+  const { ui, duck, crossfade } = config.get();
   const { micDevice, ...rest } = duck;
-  return { ui, duck: rest };
+  return { ui, duck: rest, crossfade };
 }
 
 function settingsChanged(patch) {
-  if (!patch || !(patch.ui || (patch.duck && Object.keys(patch.duck).some((k) => k !== 'micDevice')))) return;
+  if (!patch || !(patch.ui || 'crossfade' in patch || (patch.duck && Object.keys(patch.duck).some((k) => k !== 'micDevice')))) return;
   config.set({ account: { settingsAt: Date.now() } });
   schedule();
 }
@@ -183,7 +183,10 @@ async function syncSettings(remote, changed) {
     const mine = acc().settingsAt;
     if (theirs && theirs.at >= mine) {
       if (theirs.at > mine) {
-        config.set({ ui: theirs.ui, duck: { ...theirs.duck, micDevice: config.get().duck.micDevice }, account: { settingsAt: theirs.at } });
+        config.set({
+          ui: theirs.ui, duck: { ...theirs.duck, micDevice: config.get().duck.micDevice }, account: { settingsAt: theirs.at },
+          ...(theirs.crossfade != null ? { crossfade: theirs.crossfade } : {}),
+        });
         changed.settings = true;
       }
       return undefined;
