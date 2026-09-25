@@ -3,7 +3,7 @@ const { app, safeStorage } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
-const SECRET_KEYS = ['sc.token', 'ym.token', 'sp.refresh', 'sp.access'];
+const SECRET_KEYS = ['sc.token', 'ym.token', 'sp.refresh', 'sp.access', 'acc.token'];
 
 const DEFAULTS = {
   volume: 0.8,
@@ -15,6 +15,15 @@ const DEFAULTS = {
   sc: { clientId: '', profile: '' },
   ym: {},
   sp: { clientId: '', expires: 0 },
+  // Аккаунт авеона: адрес сервера и кто вошёл. Токен лежит в секретах (acc.token)
+  account: {
+    server: '',
+    login: '',
+    name: '',
+    device: '', // id этого компьютера, создаётся при первом запуске
+    lastSync: 0,
+    settingsAt: 0, // когда здесь последний раз меняли синхронизируемые настройки
+  },
   duck: {
     enabled: true,
     mode: 'voice', // voice — когда кто-то говорит; call — весь звонок

@@ -11,6 +11,7 @@ const SHORT = { local: 'файл', ym: 'Яндекс', sc: 'SoundCloud', sp: 'Sp
 const state = {
   cfg: null,
   sp: { connected: false },
+  account: { loggedIn: false }, // вход в аккаунт авеона
   view: 'local',
   sub: null,
   shown: [],             // треки, которые сейчас в списке
@@ -129,7 +130,7 @@ window.addEventListener('resize', closeMenu);
 
 // ---------- диалог: ввод названия или подтверждение ----------
 
-function ask({ title, text = '', value = '', ok, input = true, danger = false }) {
+function ask({ title, text = '', value = '', ok, input = true, danger = false, password = false }) {
   const dlg = $('#dialog');
   const field = $('#dialog-input');
   $('#dialog-title').textContent = title;
@@ -138,6 +139,7 @@ function ask({ title, text = '', value = '', ok, input = true, danger = false })
   $('#dialog-ok').classList.toggle('danger', danger);
   $('#dialog-ok').classList.toggle('primary', !danger);
   field.hidden = !input;
+  field.type = password ? 'password' : 'text';
   field.value = value;
   dlg.hidden = false;
   (input ? field : $('#dialog-ok')).focus();
@@ -154,7 +156,7 @@ function ask({ title, text = '', value = '', ok, input = true, danger = false })
     $('#dialog-form').onsubmit = (e) => {
       e.preventDefault();
       if (input && !field.value.trim()) { field.focus(); return; }
-      done(input ? field.value.trim() : true);
+      done(input ? (password ? field.value : field.value.trim()) : true);
     };
     $('#dialog-cancel').onclick = () => done(null);
     dlg.onpointerdown = (e) => { if (e.target === dlg) done(null); };
@@ -288,18 +290,24 @@ function attach(url, isHls) {
   }
 }
 
-// quiet — при восстановлении после перезапуска: без уведомлений и автоперехода, если поток не получен
+// quiet — при восстановлении после перезапуска: без уведомлений и автоперехода, если поток не получен.
+// startAt — секунды или функция (для «Слушать вместе»: позиция считается в момент, когда поток готов).
+// track.shared — трек, который включил друг: поток ищется через together (свой сервис или подбор).
 async function loadTrack(track, { autoplay = true, startAt = 0, quiet = false } = {}) {
+  if (locked()) autoplay = false;
   const seq = ++loadSeq;
   state.track = track;
   showNow(track, null);
   markPlaying();
+  Together.beforeLoad();
   audio.pause();
   let stream;
   try {
-    stream = await api.stream(track);
+    stream = await (track.shared ? api.together.stream(track) : api.stream(track));
   } catch (e) {
+    Together.loadFailed();
     if (seq !== loadSeq || quiet) return;
+    if (track.shared) { toast(`${track.title}: ${e.message}`, 'err'); return; } // трек друга: ждём следующий от него
     failStreak++;
     toast(`${track.title}: ${e.message}`, 'err');
     if (failStreak < 5 && state.queue.length > 1) setTimeout(() => next(true), 600);
@@ -307,14 +315,16 @@ async function loadTrack(track, { autoplay = true, startAt = 0, quiet = false } 
     return;
   }
   if (seq !== loadSeq) return;
+  if (track.shared && !track.cover && stream.cover) track.cover = stream.cover; // у файла друга обложки нет — берём у найденного
   showNow(track, stream);
   ensureGraph();
   if (ctx.state === 'suspended') ctx.resume();
   attach(stream.url, stream.hls);
-  if (startAt) audio.addEventListener('loadedmetadata', () => { audio.currentTime = startAt; }, { once: true });
+  if (startAt) audio.addEventListener('loadedmetadata', () => { audio.currentTime = typeof startAt === 'function' ? startAt() : startAt; }, { once: true });
   if (autoplay) {
     try { await audio.play(); failStreak = 0; } catch (e) { if (e.name !== 'AbortError') onAudioError(e); }
   }
+  if (seq === loadSeq && !quiet) Together.afterLoad(track);
 }
 
 function onAudioError(err) {
@@ -340,6 +350,7 @@ audio.addEventListener('playing', () => { retried = false; });
 audio.addEventListener('play', updatePlayState);
 audio.addEventListener('pause', updatePlayState);
 audio.addEventListener('ended', () => {
+  if (Together.waitsOnEnd()) return; // вместе трек переключает ведущий
   if (state.cfg.repeat === 'one') { audio.currentTime = 0; audio.play(); return; }
   next(true);
 });
@@ -371,6 +382,7 @@ function updatePlayState() {
 }
 
 function togglePlay() {
+  if (locked()) return; // до входа в аккаунт не играем
   if (!state.track) {
     const list = state.shown.length ? state.shown : state.local;
     if (list.length) playFrom(list, 0);
@@ -450,7 +462,7 @@ function showNow(track, stream) {
   const via = $('#now-via');
   if (stream?.via) {
     via.hidden = false;
-    via.textContent = `Из Spotify, звучит через ${NAMES[stream.via.source]}`;
+    via.textContent = stream.via.label || `Из Spotify, звучит через ${NAMES[stream.via.source]}`;
   } else if (stream?.preview) {
     via.hidden = false;
     via.textContent = 'Только 30 секунд: для полного трека нужна подписка';
@@ -1316,8 +1328,10 @@ async function renderSettings() {
     mics = (await navigator.mediaDevices.enumerateDevices()).filter((x) => x.kind === 'audioinput' && x.deviceId !== 'communications');
   } catch {}
   const barrel = d.effect !== 'volume';
+  state.account = await api.account.status().catch(() => state.account);
 
   $('#settings-body').innerHTML = `
+    ${accountSection()}
     <section class="sec" data-sec="ui">
       <h3 class="sec-title">Вид</h3>
       <p class="sec-desc">Интерфейс написан строчными буквами. Названия треков, артистов и тексты песен тоже, но их можно оставить как есть.</p>
@@ -1411,8 +1425,9 @@ async function renderSettings() {
     </section>`;
 
   const body = $('#settings-body');
+  bindAccount(body);
 
-  $$('[data-ext]', body).forEach((a) => { a.onclick = (e) => { e.preventDefault(); api.openExternal(a.dataset.ext); }; });
+  $('[data-ext]', body).forEach((a) => { a.onclick = (e) => { e.preventDefault(); api.openExternal(a.dataset.ext); }; });
   $('#keep-titles', body).onchange = (e) => {
     document.body.classList.toggle('keep-titles', e.target.checked);
     saveCfg({ ui: { keepTitles: e.target.checked } });
@@ -1526,6 +1541,262 @@ async function renderSettings() {
   if (rescan) rescan.onclick = () => scanLocal(true);
 }
 
+// ---------- аккаунт авеона ----------
+
+function syncedAgo(ts) {
+  if (!ts) return 'ещё не было';
+  const min = Math.round((Date.now() - ts) / 60000);
+  if (min < 1) return 'только что';
+  if (min < 60) return `${min} мин назад`;
+  return new Date(ts).toLocaleString('ru', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
+}
+
+function accountSection() {
+  const a = state.account;
+  const desc = 'Альбомы, настройки бочки и статистика будут одинаковыми на всех твоих компьютерах. Токены сервисов, папки с музыкой и микрофон остаются только здесь.';
+  if (!a.loggedIn) return ''; // без входа вместо плеера экран входа
+  return `<section class="sec" data-sec="account">
+    <h3 class="sec-title">Аккаунт<span class="state ok">${esc(a.name || a.login)}</span></h3>
+    <p class="sec-desc">${desc}<br><br>Логин <code>${esc(a.login)}</code> на <code>${esc(a.server)}</code>. Синхронизация: ${a.syncing ? 'идёт…' : syncedAgo(a.lastSync)}.${a.error ? `<br>Последняя попытка не удалась: ${esc(a.error)}` : ''}</p>
+    <div class="field"><label for="acc-name">Имя</label><div class="ctl">
+      <input class="input" id="acc-name" value="${esc(a.name || '')}" maxlength="64" spellcheck="false">
+      <button class="btn" id="acc-name-save">Сохранить</button>
+    </div></div>
+    <div class="row-actions">
+      <button class="btn primary" id="acc-sync"><svg><use href="#i-refresh"/></svg>Синхронизировать</button>
+      <button class="btn" id="acc-password">Сменить пароль</button>
+      <button class="btn" id="acc-logout-all">Выйти на других устройствах</button>
+      <button class="btn" id="acc-logout">Выйти</button>
+      <button class="btn danger" id="acc-delete">Удалить аккаунт</button>
+    </div>
+  </section>`;
+}
+
+// Что поменялось после синхронизации — перерисовываем только это
+function applySynced(changed) {
+  if (!changed) return;
+  if (changed.albums) {
+    refreshAlbums();
+    if (state.view === 'albums' && state.album) openView('albums', state.album.id);
+  }
+  if (changed.settings) {
+    api.config.get().then((cfg) => {
+      state.cfg = cfg;
+      document.body.classList.toggle('keep-titles', !!cfg.ui?.keepTitles);
+      syncDuckSwitch();
+      if (!$('#settings').hidden) renderSettings();
+    });
+  }
+  if (changed.stats) loadRemoteStats().then(() => { if (!$('#stats').hidden) renderStats(); });
+}
+
+// ---------- экран входа: без аккаунта плеер закрыт ----------
+
+const LOCAL_SERVER = /^http:\/\/(localhost|127\.|192\.168\.|10\.)/i;
+const authEl = $('#auth');
+let authMode = 'login';
+
+const locked = () => !authEl.hidden;
+
+// После входа бочка с экрана входа переезжает на своё место в плеере (FLIP):
+// форма уходит, фон растворяется, бочка летит в позицию #barrel и подменяется настоящей
+async function leaveAuth() {
+  const fly = $('.auth-barrel', authEl);
+  const target = $('#barrel');
+  const from = fly.getBoundingClientRect();
+  const to = target.getBoundingClientRect();
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (still || !from.width || !to.width) { authEl.hidden = true; return; }
+
+  const dx = to.left + to.width / 2 - (from.left + from.width / 2);
+  const dy = to.top + to.height / 2 - (from.top + from.height / 2);
+  const s = to.width / from.width;
+  target.style.visibility = 'hidden';
+  authEl.classList.add('leaving');
+  const move = fly.animate(
+    [{ transform: 'none' }, { transform: `translate(${dx}px, ${dy}px) scale(${s})` }],
+    { duration: 800, delay: 120, easing: 'cubic-bezier(.65, 0, .2, 1)', fill: 'forwards' },
+  );
+  // Страховка: если окно не рисуется (свёрнуто), анимация стоит — экран входа всё равно убираем
+  await Promise.race([move.finished.catch(() => {}), new Promise((r) => setTimeout(r, 1500))]);
+
+  target.style.visibility = '';
+  authEl.hidden = true;
+  authEl.classList.remove('leaving');
+  move.cancel();
+  // в пустом иллюминаторе экрана входа была нота — обложку проявляем мягко
+  $('#now-cover').animate([{ opacity: 0 }, { opacity: 1 }], { duration: 350, easing: 'ease-out' });
+}
+
+const AUTH_TEXT = {
+  login: {
+    title: 'вход', sub: 'Войди, чтобы слушать. Альбомы, настройки и статистика подтянутся с сервера.',
+    go: 'Войти', busy: 'Вхожу…', ask: 'Нет аккаунта?', other: 'Зарегистрироваться',
+  },
+  register: {
+    title: 'регистрация', sub: 'Один аккаунт на все компьютеры: альбомы, настройки бочки и статистика будут везде одинаковыми.',
+    go: 'Создать аккаунт', busy: 'Создаю…', ask: 'Уже есть аккаунт?', other: 'Войти',
+  },
+};
+
+function setAuthMode(mode) {
+  authMode = mode;
+  const t = AUTH_TEXT[mode];
+  const reg = mode === 'register';
+  $('#auth-title').textContent = t.title;
+  $('#auth-sub').textContent = t.sub;
+  $('#auth-go').textContent = t.go;
+  $('#auth-switch-text').textContent = t.ask;
+  $('#auth-switch').textContent = t.other;
+  $('#auth-password2-field').hidden = !reg;
+  $('#auth-password').autocomplete = reg ? 'new-password' : 'current-password';
+  $('#auth-password').placeholder = reg ? 'не короче 8 символов' : '';
+  $('#auth-error').textContent = '';
+}
+
+// Адрес сервера: вшитый — не показываем; уже известный — одной строкой с «изменить»; иначе поле
+function showServer(edit) {
+  const a = state.account;
+  const known = a.server || a.defaultServer;
+  const field = !a.defaultServer && (edit || !known);
+  $('#auth-server-field').hidden = !field;
+  $('#auth-server-line').hidden = field || !!a.defaultServer;
+  $('#auth-server-host').textContent = (known || '').replace(/^https?:\/\//, '');
+  if (field) $('#auth-server').value = (a.server || '').replace(/^https?:\/\//, '');
+}
+
+function showAuth(message = '') {
+  if (!audio.paused) togglePlay();
+  closeSettings();
+  closeMenu();
+  const a = state.account;
+  showServer(false);
+  $('#auth-login').value = a.login || $('#auth-login').value;
+  $('#auth-password').value = $('#auth-password2').value = '';
+  setAuthMode(authMode);
+  $('#auth-error').textContent = message;
+  authEl.hidden = false;
+  const first = !$('#auth-server-field').hidden && !$('#auth-server').value ? '#auth-server'
+    : $('#auth-login').value ? '#auth-password' : '#auth-login';
+  $(first).focus();
+}
+
+$('#auth-switch').onclick = () => {
+  setAuthMode(authMode === 'login' ? 'register' : 'login');
+  $('#auth-login').focus();
+};
+$('#auth-server-edit').onclick = () => {
+  showServer(true);
+  $('#auth-server').focus();
+};
+
+$('#auth-form').onsubmit = async (e) => {
+  e.preventDefault();
+  const err = $('#auth-error');
+  const server = $('#auth-server-field').hidden ? state.account.server || '' : $('#auth-server').value.trim();
+  const login = $('#auth-login').value.trim();
+  const password = $('#auth-password').value;
+  const register = authMode === 'register';
+  const fail = (msg, field) => { err.textContent = msg; if (field) $(field).focus(); };
+  if (!$('#auth-server-field').hidden && !server) return fail('Укажи адрес сервера', '#auth-server');
+  if (!login) return fail('Введи логин', '#auth-login');
+  if (!password) return fail('Введи пароль', '#auth-password');
+  if (register && password.length < 8) return fail('Пароль должен быть не короче 8 символов', '#auth-password');
+  if (register && password !== $('#auth-password2').value) return fail('Пароли не совпадают', '#auth-password2');
+
+  const go = $('#auth-go');
+  go.disabled = true;
+  go.textContent = AUTH_TEXT[authMode].busy;
+  err.textContent = '';
+  try {
+    const r = register
+      ? await api.account.register(server, login, password, '')
+      : await api.account.login(server, login, password);
+    state.account = r.status;
+    leaveAuth();
+    if (/^http:\/\//i.test(r.status.server) && !LOCAL_SERVER.test(r.status.server)) {
+      toast('Сервер без https: пароль идёт по сети открытым текстом', 'err');
+    }
+    toast(register ? `Аккаунт создан, привет, ${r.status.name || r.status.login}` : `С возвращением, ${r.status.name || r.status.login}`);
+    applySynced(r.changed);
+  } catch (ex) {
+    fail(ex.message, '#auth-password');
+  }
+  go.disabled = false;
+  go.textContent = AUTH_TEXT[authMode].go;
+};
+
+function bindAccount(body) {
+  if (!$('#acc-name-save', body)) return;
+
+  $('#acc-name-save', body).onclick = async () => {
+    try {
+      state.account = await api.account.rename($('#acc-name', body).value.trim());
+      toast('Имя сохранено');
+      renderSettings();
+    } catch (err) { toast(err.message, 'err'); }
+  };
+  $('#acc-sync', body).onclick = async (e) => {
+    e.currentTarget.disabled = true;
+    try {
+      await api.account.sync();
+      toast('Синхронизировано');
+    } catch (err) { toast(err.message, 'err'); }
+    renderSettings();
+  };
+  $('#acc-password', body).onclick = async () => {
+    const old = await ask({ title: 'Смена пароля', text: 'Текущий пароль', ok: 'Дальше', password: true });
+    if (!old) return;
+    const next = await ask({
+      title: 'Смена пароля',
+      text: 'Новый пароль, не короче 8 символов. На других устройствах нужно будет войти заново.',
+      ok: 'Сменить', password: true,
+    });
+    if (!next) return;
+    try {
+      await api.account.password(old, next);
+      toast('Пароль изменён');
+    } catch (err) { toast(err.message, 'err'); }
+  };
+  $('#acc-logout-all', body).onclick = async () => {
+    try {
+      const r = await api.account.logoutAll();
+      toast(r.closed ? `Закрыто сессий: ${r.closed}` : 'Других сессий нет');
+    } catch (err) { toast(err.message, 'err'); }
+  };
+  $('#acc-logout', body).onclick = async () => {
+    state.account = await api.account.logout();
+    showAuth();
+    toast('Выход выполнен. Альбомы и статистика остались на этом компьютере');
+  };
+  $('#acc-delete', body).onclick = async () => {
+    const password = await ask({
+      title: 'Удалить аккаунт?',
+      text: 'С сервера пропадут альбомы, настройки и статистика. На этом компьютере всё останется. Введи пароль, чтобы подтвердить.',
+      ok: 'Удалить', danger: true, password: true,
+    });
+    if (!password) return;
+    try {
+      state.account = await api.account.remove(password);
+      setAuthMode('register');
+      showAuth();
+      toast('Аккаунт удалён');
+    } catch (err) { toast(err.message, 'err'); }
+  };
+}
+
+api.account.onEvent((ev) => {
+  if (ev.status) state.account = ev.status;
+  if (ev.status && !ev.status.loggedIn) {
+    if (!locked()) showAuth(ev.error || '');
+    return;
+  }
+  if (ev.error) toast(ev.error, 'err');
+  applySynced(ev.changed);
+  // не перерисовываем настройки, пока в них что-то печатают
+  if (!$('#settings').hidden && !document.activeElement?.closest('#settings-body')) renderSettings();
+});
+
 function afterServiceChange(src) {
   for (const k of Object.keys(state.cache)) if (k.startsWith(`${src}:`) || k.startsWith('sp:')) delete state.cache[k];
   delete state.collections[src];
@@ -1608,6 +1879,7 @@ if ('mediaSession' in navigator) {
 }
 
 document.addEventListener('keydown', (e) => {
+  if (locked()) return; // горячие клавиши плеера не работают под экраном входа
   const typing = e.target.matches('input, textarea, select');
   if (e.key === 'Escape') {
     if (!menuEl.hidden) { closeMenu(); return; }
@@ -1639,6 +1911,8 @@ $$('[data-win]').forEach((b) => { b.onclick = () => api.win.action(b.dataset.win
 
 async function init() {
   state.cfg = await api.config.get();
+  state.account = await api.account.status().catch(() => state.account);
+  if (!state.account.loggedIn) showAuth();
   document.body.classList.toggle('keep-titles', !!state.cfg.ui?.keepTitles);
   syncDuckSwitch();
   renderModes();

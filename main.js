@@ -12,6 +12,8 @@ const sp = require('./src/services/spotify');
 const albums = require('./src/albums');
 const store = require('./src/store');
 const lyrics = require('./src/services/lyrics');
+const account = require('./src/account');
+const together = require('./src/together');
 
 const SOURCES = { sc, ym, sp };
 const MIME = {
@@ -222,6 +224,27 @@ async function resolveStream(track) {
   return svc.stream(track);
 }
 
+// Трек, который включил друг в «Слушать вместе». Если у нас подключён тот же сервис — играем
+// напрямую; иначе (или это его локальный файл) ищем тот же трек в Яндекс Музыке / SoundCloud.
+const FROM = { local: 'из своего файла', ym: 'из Яндекс Музыки', sc: 'из SoundCloud', sp: 'из Spotify' };
+const NAMES_RU = { ym: 'Яндекс Музыку', sc: 'SoundCloud' };
+
+async function sharedStream(track) {
+  const direct = (track.source === 'ym' && config.getSecret('ym.token')) || (track.source === 'sc' && config.get().sc.clientId);
+  if (direct) {
+    try { return await resolveStream(track); } catch {}
+  }
+  let m;
+  try {
+    m = await matchTrack(track);
+  } catch (e) {
+    if (/подключи/i.test(e.message)) throw new Error('Чтобы слушать вместе, подключи Яндекс Музыку или SoundCloud — через них плеер находит трек друга');
+    throw e;
+  }
+  const st = await SOURCES[m.source].stream(m);
+  return { ...st, cover: m.cover, via: { source: m.source, title: m.title, artist: m.artist, label: `У друга ${FROM[track.source] || ''}, звучит через ${NAMES_RU[m.source]}` } };
+}
+
 // ---- IPC ----
 
 // Ошибки отдаём как { error }, чтобы в окне был понятный текст без «Error invoking remote method»
@@ -236,6 +259,7 @@ function registerIpc() {
   handle('cfg:set', (patch) => {
     config.set(patch);
     if (patch.duck?.targets) duck.setTargets(config.get().duck.targets);
+    account.settingsChanged(patch);
     return config.publicView();
   });
   handle('cfg:secret', (key, value) => {
@@ -317,6 +341,26 @@ function registerIpc() {
 
   handle('lyrics:get', (track) => lyrics.find(track));
 
+  // Аккаунт и синхронизация
+  handle('acc:status', () => account.status());
+  handle('acc:register', (server, login, password, name) => account.register(server, login, password, name));
+  handle('acc:login', (server, login, password) => account.login(server, login, password));
+  handle('acc:logoutAll', () => account.logoutAll());
+  handle('acc:me', () => account.me());
+  handle('acc:rename', (name) => account.rename(name));
+  handle('acc:password', (old, next) => account.changePassword(old, next));
+  handle('acc:delete', (password) => account.remove(password));
+  handle('acc:sync', () => account.sync());
+  handle('acc:logout', async () => { together.leave(); return account.logout(); });
+
+  // Слушать вместе
+  handle('tg:create', () => together.create());
+  handle('tg:join', (code) => together.join(code));
+  handle('tg:leave', () => together.leave());
+  handle('tg:status', () => together.status());
+  handle('tg:stream', (track) => sharedStream(track));
+  ipcMain.on('tg:send', (e, state, beat) => together.send(state, beat));
+
   // Где остановился и статистика прослушивания
   handle('store:get', (name) => {
     const data = store.read(name);
@@ -359,6 +403,12 @@ app.whenReady().then(() => {
   createWindow();
   duck.setTargets(config.get().duck.targets);
   duck.start((m) => send('duck:meter', m), (s) => send('duck:status', s));
+  together.init((ev) => send('together:event', ev));
+  account.init((ev) => {
+    if (ev.changed?.albums) local.allowFiles(albums.localPaths());
+    if (ev.changed?.settings) duck.setTargets(config.get().duck.targets);
+    send('account:event', ev);
+  });
 });
 
 app.on('window-all-closed', () => {

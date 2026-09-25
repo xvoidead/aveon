@@ -1,9 +1,10 @@
-// Простые JSON-хранилища в userData: где остановился (session) и статистика прослушивания (stats).
+// Простые JSON-хранилища в userData: где остановился (session), статистика прослушивания (stats)
+// и статистика с других компьютеров аккаунта (statsRemote: id устройства → данные).
 const { app } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
-const NAMES = new Set(['session', 'stats']);
+const NAMES = new Set(['session', 'stats', 'statsRemote']);
 const cache = new Map();
 
 function fileOf(name) {
