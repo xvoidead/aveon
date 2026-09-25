@@ -1,0 +1,22 @@
+{
+  "name": "aveon",
+  "productName": "авеон",
+  "version": "1.0.0",
+  "description": "Музыкальный плеер: когда в звонке Discord говорят, музыка уходит «в бочку»",
+  "main": "main.js",
+  "private": true,
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^44.4.5"
+  },
+  "dependencies": {
+    "@fontsource/onest": "^5.3.1",
+    "@fontsource/unbounded": "^5.3.0",
+    "hls.js": "^1.7.3",
+    "music-metadata": "^11.16.1"
+  }
+}

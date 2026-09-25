@@ -1,0 +1,223 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' https: data: blob: media:; media-src 'self' https: blob: media: mediastream:; connect-src 'self' https: blob: media:; worker-src 'self' blob:">
+  <title>авеон</title>
+  <link rel="stylesheet" href="../node_modules/@fontsource/unbounded/500.css">
+  <link rel="stylesheet" href="../node_modules/@fontsource/unbounded/700.css">
+  <link rel="stylesheet" href="../node_modules/@fontsource/onest/400.css">
+  <link rel="stylesheet" href="../node_modules/@fontsource/onest/500.css">
+  <link rel="stylesheet" href="../node_modules/@fontsource/onest/600.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></symbol>
+    <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="13.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 6.8v10.4a.8.8 0 0 0 1.25.66l7.6-5.2a.8.8 0 0 0 0-1.32l-7.6-5.2A.8.8 0 0 0 6 6.8z" fill="currentColor"/><rect x="16.5" y="6" width="2.2" height="12" rx="1.1" fill="currentColor"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M18 6.8v10.4a.8.8 0 0 1-1.25.66l-7.6-5.2a.8.8 0 0 1 0-1.32l7.6-5.2A.8.8 0 0 1 18 6.8z" fill="currentColor"/><rect x="5.3" y="6" width="2.2" height="12" rx="1.1" fill="currentColor"/></symbol>
+    <symbol id="i-shuffle" viewBox="0 0 24 24"><path d="M4 7h3.5c2 0 3.2 1 4.3 2.7l.4.6M4 17h3.5c2 0 3.2-1 4.3-2.7l2.4-3.6C15.3 9 16.5 7.9 18.5 7.9H20M16.8 5.2 19.8 8l-3 2.8M16.8 13.2l3 2.8-3 2.8M14.5 15.4c1 1.3 2 1.7 4 1.7H20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-repeat" viewBox="0 0 24 24"><path d="M17 3.5 20 6.5l-3 3M20 6.5H8a4 4 0 0 0-4 4v1M7 20.5l-3-3 3-3M4 17.5h12a4 4 0 0 0 4-4v-1" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-vol" viewBox="0 0 24 24"><path d="M4 9.5v5a1 1 0 0 0 1 1h3l4.3 3.6a.8.8 0 0 0 1.3-.6V5.5a.8.8 0 0 0-1.3-.6L8 8.5H5a1 1 0 0 0-1 1z" fill="currentColor"/><path d="M16.5 8.5a5 5 0 0 1 0 7M19 6a8.5 8.5 0 0 1 0 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-mute" viewBox="0 0 24 24"><path d="M4 9.5v5a1 1 0 0 0 1 1h3l4.3 3.6a.8.8 0 0 0 1.3-.6V5.5a.8.8 0 0 0-1.3-.6L8 8.5H5a1 1 0 0 0-1 1z" fill="currentColor"/><path d="m17 9.5 5 5m0-5-5 5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m16 16 4 4" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 7h9M17 7h3M4 17h3M11 17h9" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="15" cy="7" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/><circle cx="9" cy="17" r="2.2" fill="none" stroke="currentColor" stroke-width="1.8"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.5 6.5 11 11m0-11-11 11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-folder" viewBox="0 0 24 24"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v7.5a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="18" cy="12" r="1.7" fill="currentColor"/></symbol>
+    <symbol id="i-album-add" viewBox="0 0 24 24"><path d="M4 6.5h11M4 11.5h11M4 16.5h6" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M17.5 13v7M14 16.5h7" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M5 19l1-4 9.5-9.5a2.1 2.1 0 0 1 3 3L9 18z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-grip" viewBox="0 0 24 24"><circle cx="9" cy="7" r="1.4" fill="currentColor"/><circle cx="15" cy="7" r="1.4" fill="currentColor"/><circle cx="9" cy="12" r="1.4" fill="currentColor"/><circle cx="15" cy="12" r="1.4" fill="currentColor"/><circle cx="9" cy="17" r="1.4" fill="currentColor"/><circle cx="15" cy="17" r="1.4" fill="currentColor"/></symbol>
+    <symbol id="i-lyrics" viewBox="0 0 24 24"><path d="M4 6h10M4 10.5h13M4 15h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M16.5 20a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm2-2v-6.5l2.5.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-stats" viewBox="0 0 24 24"><path d="M5 19V11M10 19V5M15 19v-7M20 19V9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-chevron-l" viewBox="0 0 24 24"><path d="m14.5 6-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-chevron-r" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-min" viewBox="0 0 24 24"><path d="M6 12h12" stroke="currentColor" stroke-width="1.3"/></symbol>
+    <symbol id="i-max" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
+  </svg>
+
+  <header class="titlebar">
+    <div class="win-buttons">
+      <button data-win="min" aria-label="Свернуть"><svg><use href="#i-min"/></svg></button>
+      <button data-win="max" aria-label="Развернуть"><svg><use href="#i-max"/></svg></button>
+      <button data-win="close" class="win-close" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button>
+    </div>
+  </header>
+
+  <!-- Бочка: сейчас играет. Обручи, обложка и спектр реагируют на силу эффекта (--m) -->
+  <section class="stage" id="stage">
+    <div class="brand">авеон</div>
+
+    <div class="barrel" id="barrel">
+      <canvas id="viz" class="viz"></canvas>
+      <svg class="hoops" viewBox="0 0 320 320" aria-hidden="true">
+        <circle cx="160" cy="160" r="150" class="hoop hoop-outer"/>
+        <circle cx="160" cy="160" r="138" class="hoop"/>
+        <circle cx="160" cy="160" r="104" class="hoop hoop-inner"/>
+      </svg>
+      <div class="porthole" id="now-cover"><span class="porthole-empty">♪</span></div>
+      <div class="in-barrel" id="in-barrel">в бочке</div>
+    </div>
+
+    <div class="now">
+      <div class="now-title" id="now-title">Ничего не играет</div>
+      <div class="now-artist" id="now-artist">Выбери трек в библиотеке справа</div>
+      <div class="now-via" id="now-via" hidden></div>
+    </div>
+
+    <div class="progress-row">
+      <span class="time" id="time-cur">0:00</span>
+      <div class="slider progress" id="progress"><div class="slider-buf" id="progress-buf"></div><div class="slider-fill" id="progress-fill"></div><div class="slider-knob"></div></div>
+      <span class="time" id="time-dur">0:00</span>
+    </div>
+
+    <div class="controls">
+      <button class="icon-btn toggle" id="btn-shuffle" aria-label="Перемешать"><svg><use href="#i-shuffle"/></svg></button>
+      <button class="icon-btn" id="btn-prev" aria-label="Предыдущий трек"><svg><use href="#i-prev"/></svg></button>
+      <button class="play-btn" id="btn-play" aria-label="Играть"><svg><use href="#i-play"/></svg></button>
+      <button class="icon-btn" id="btn-next" aria-label="Следующий трек"><svg><use href="#i-next"/></svg></button>
+      <button class="icon-btn toggle" id="btn-repeat" aria-label="Повтор"><svg><use href="#i-repeat"/></svg><i class="repeat-one">1</i></button>
+    </div>
+
+    <div class="volume-row">
+      <button class="icon-btn small" id="btn-mute" aria-label="Выключить звук"><svg><use href="#i-vol"/></svg></button>
+      <div class="slider volume" id="volume"><div class="slider-fill" id="volume-fill"></div><div class="slider-knob"></div></div>
+      <button class="icon-btn small" id="btn-lyrics" aria-label="Текст песни" title="Текст песни (L)" aria-pressed="false"><svg><use href="#i-lyrics"/></svg></button>
+      <button class="icon-btn small" id="btn-now-album" aria-label="Добавить в альбом" title="Добавить в альбом" disabled><svg><use href="#i-album-add"/></svg></button>
+    </div>
+
+    <div class="call" id="discord">
+      <div class="call-head">
+        <span class="call-state" id="duck-chip">Discord запускается</span>
+        <label class="switch" title="Эффект в звонке">
+          <input type="checkbox" id="duck-enabled" aria-label="Эффект в звонке"><span></span>
+        </label>
+      </div>
+      <div class="meters">
+        <span class="meter-label">Собеседники</span>
+        <div class="meter" id="meter" title="Нажми, чтобы задать порог">
+          <div class="meter-fill" id="meter-fill"></div>
+          <div class="meter-threshold" id="meter-threshold"></div>
+        </div>
+        <span class="meter-label">Ты</span>
+        <div class="meter mic" id="mic-meter" title="Твой голос после шумоподавления">
+          <div class="meter-fill" id="mic-fill"></div>
+          <div class="meter-threshold" id="mic-threshold"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <main class="library" id="content">
+    <div class="lib-top">
+      <nav class="sources" id="sources">
+        <button class="source" data-view="local">Мои файлы</button>
+        <button class="source" data-view="albums">Альбомы</button>
+        <button class="source" data-view="ym">Яндекс Музыка</button>
+        <button class="source" data-view="sc">SoundCloud</button>
+        <button class="source" data-view="sp">Spotify</button>
+      </nav>
+      <button class="icon-btn" id="open-stats" aria-label="Статистика" title="Статистика"><svg><use href="#i-stats"/></svg></button>
+      <button class="icon-btn" id="open-settings" aria-label="Настройки"><svg><use href="#i-settings"/></svg></button>
+    </div>
+
+    <form class="search" id="search-form" autocomplete="off">
+      <svg><use href="#i-search"/></svg>
+      <input id="search" type="search" placeholder="Поиск" spellcheck="false">
+    </form>
+
+    <div class="collections" id="collections"></div>
+
+    <div class="lib-head">
+      <div>
+        <h1 id="view-title">Мои файлы</h1>
+        <p id="view-sub" class="muted"></p>
+      </div>
+      <div class="head-actions" id="head-actions"></div>
+    </div>
+
+    <div class="tracklist" id="tracklist"></div>
+    <div class="empty" id="empty" hidden></div>
+
+    <section class="stats" id="stats" hidden aria-label="Статистика"></section>
+
+    <section class="lyrics" id="lyrics" hidden aria-label="Текст песни">
+      <div class="lyrics-head">
+        <div class="lyrics-meta" id="lyrics-meta"></div>
+        <button class="icon-btn" id="lyrics-close" aria-label="Закрыть текст"><svg><use href="#i-close"/></svg></button>
+      </div>
+      <div class="lyrics-body" id="lyrics-body"></div>
+    </section>
+  </main>
+
+  <div class="modal" id="settings" hidden>
+    <div class="sheet" role="dialog" aria-label="Настройки">
+      <div class="sheet-head">
+        <h2>Настройки</h2>
+        <button class="icon-btn" id="close-settings" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button>
+      </div>
+      <div class="sheet-body" id="settings-body"></div>
+    </div>
+  </div>
+
+  <div class="modal" id="editor" hidden>
+    <form class="sheet editor" id="editor-form" role="dialog" aria-labelledby="editor-title" autocomplete="off">
+      <div class="sheet-head">
+        <h2 id="editor-title">Теги трека</h2>
+        <button type="button" class="icon-btn" id="editor-close" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button>
+      </div>
+      <div class="editor-body">
+        <div class="editor-cover">
+          <button type="button" class="editor-art" id="editor-art" aria-label="Сменить обложку"></button>
+          <div class="editor-art-actions">
+            <button type="button" class="btn" id="editor-pick">Выбрать картинку</button>
+            <button type="button" class="btn" id="editor-nocover">Без обложки</button>
+          </div>
+        </div>
+        <div class="editor-fields">
+          <label>Название<input class="input" id="ed-title" spellcheck="false" maxlength="200" required></label>
+          <label>Исполнитель<input class="input" id="ed-artist" spellcheck="false" maxlength="200"></label>
+          <label>Альбом<input class="input" id="ed-album" spellcheck="false" maxlength="200"></label>
+          <p class="editor-file" id="editor-file"></p>
+        </div>
+      </div>
+      <div class="editor-lookup">
+        <button type="button" class="btn" id="editor-find"><svg><use href="#i-search"/></svg>Найти теги и обложку в интернете</button>
+        <div class="lookup-results" id="lookup-results"></div>
+      </div>
+      <div class="editor-foot">
+        <button type="button" class="btn" id="editor-reset">Вернуть теги из файла</button>
+        <span class="spacer"></span>
+        <button type="button" class="btn" id="editor-cancel">Отмена</button>
+        <button type="submit" class="btn primary" id="editor-save">Сохранить</button>
+      </div>
+    </form>
+  </div>
+
+  <div class="menu" id="menu" role="menu" hidden></div>
+
+  <div class="modal" id="dialog" hidden>
+    <form class="sheet dialog" id="dialog-form" role="dialog" aria-labelledby="dialog-title">
+      <h2 id="dialog-title"></h2>
+      <p class="sec-desc" id="dialog-text"></p>
+      <input class="input" id="dialog-input" spellcheck="false" maxlength="80">
+      <div class="dialog-actions">
+        <button type="button" class="btn" id="dialog-cancel">Отмена</button>
+        <button type="submit" class="btn primary" id="dialog-ok"></button>
+      </div>
+    </form>
+  </div>
+
+  <div class="toasts" id="toasts" aria-live="polite"></div>
+  <div class="drop-hint" id="drop-hint" hidden>Отпусти файлы, чтобы включить</div>
+
+  <audio id="audio" crossorigin="anonymous" preload="auto"></audio>
+  <script src="../node_modules/hls.js/dist/hls.light.min.js"></script>
+  <script src="app.js"></script>
+  <script src="extras.js"></script>
+</body>
+</html>
