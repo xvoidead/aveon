@@ -116,7 +116,7 @@ function slimTrack(t) {
   if (!t) return null;
   const ref = { ...t.ref };
   if (t.source === 'sc') { delete ref.transcodings; delete ref.auth; } // протухают, поток получим заново
-  return { id: t.id, source: t.source, title: t.title, artist: t.artist, album: t.album, duration: t.duration, cover: t.cover, link: t.link, playable: t.playable !== false, preview: !!t.preview, ref };
+  return { id: t.id, source: t.source, title: t.title, artist: t.artist, album: t.album, duration: t.duration, cover: t.cover, link: t.link, playable: t.playable !== false, preview: !!t.preview, ref, ...(t.shared ? { shared: true } : {}) };
 }
 
 // ---------- где остановился ----------
@@ -168,7 +168,8 @@ window.addEventListener('beforeunload', () => { saveSession(true); saveStats(tru
 
 // ---------- статистика ----------
 
-const stats = { data: { v: 1, days: {}, tracks: {} }, dirty: false, cur: null, lastTime: null, month: null };
+// data — статистика этого компьютера, remote — других компьютеров аккаунта (id устройства → данные)
+const stats = { data: { v: 1, days: {}, tracks: {} }, remote: {}, dirty: false, cur: null, lastTime: null, month: null };
 
 const pad2 = (n) => String(n).padStart(2, '0');
 const dayKey = (d = new Date()) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
@@ -179,6 +180,35 @@ async function loadStats() {
     const d = await api.store.get('stats');
     if (d?.days && d?.tracks) stats.data = d;
   } catch {}
+  await loadRemoteStats();
+}
+
+async function loadRemoteStats() {
+  try { stats.remote = (await api.store.get('statsRemote')) || {}; } catch { stats.remote = {}; }
+}
+
+// Статистика для показа: этот компьютер плюс остальные компьютеры аккаунта
+function statsAll() {
+  const others = Object.values(stats.remote).filter((d) => d?.days && d?.tracks);
+  if (!others.length) return stats.data;
+  const days = { ...stats.data.days };
+  const tracks = {};
+  const addTrack = (id, rec) => {
+    const have = tracks[id] || (tracks[id] = { t: rec.t, sec: 0, plays: 0, m: {} });
+    have.sec += rec.sec || 0;
+    have.plays += rec.plays || 0;
+    for (const [mk, rm] of Object.entries(rec.m || {})) {
+      const hm = have.m[mk] || (have.m[mk] = { sec: 0, plays: 0 });
+      hm.sec += rm.sec || 0;
+      hm.plays += rm.plays || 0;
+    }
+  };
+  for (const [id, rec] of Object.entries(stats.data.tracks)) addTrack(id, rec);
+  for (const d of others) {
+    for (const [k, v] of Object.entries(d.days)) days[k] = (days[k] || 0) + v;
+    for (const [id, rec] of Object.entries(d.tracks)) addTrack(id, rec);
+  }
+  return { days, tracks };
 }
 
 function saveStats(sync = false) {
@@ -243,12 +273,13 @@ function splitArtists(s) {
 function monthData(mk) {
   const [y, m] = mk.split('-').map(Number);
   const daysIn = new Date(y, m, 0).getDate();
-  const days = Array.from({ length: daysIn }, (_, i) => stats.data.days[`${mk}-${pad2(i + 1)}`] || 0);
+  const all = statsAll();
+  const days = Array.from({ length: daysIn }, (_, i) => all.days[`${mk}-${pad2(i + 1)}`] || 0);
   const total = days.reduce((a, b) => a + b, 0);
   const tracks = [];
   const artists = new Map();
   let plays = 0;
-  for (const rec of Object.values(stats.data.tracks)) {
+  for (const rec of Object.values(all.tracks)) {
     const rm = rec.m?.[mk];
     if (!rm || rm.sec < 1) continue;
     plays += rm.plays;
@@ -261,7 +292,7 @@ function monthData(mk) {
 }
 
 function monthRange() {
-  const keys = Object.keys(stats.data.days).map((k) => k.slice(0, 7)).sort();
+  const keys = Object.keys(statsAll().days).map((k) => k.slice(0, 7)).sort();
   return { first: keys[0] || monthKey(), last: monthKey() };
 }
 
@@ -287,7 +318,7 @@ let statsTopList = [];
 
 function renderStats() {
   const box = $('#stats');
-  const allTime = Object.values(stats.data.days).reduce((a, b) => a + b, 0);
+  const allTime = Object.values(statsAll().days).reduce((a, b) => a + b, 0);
   if (allTime < 1) {
     box.innerHTML = `<div class="stats-empty"><h3>Статистика пока пустая</h3><p>Включи любой трек. Время, артисты и топ треков месяца начнут считаться с первой минуты.</p></div>`;
     return;

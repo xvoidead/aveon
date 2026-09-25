@@ -36,6 +36,8 @@
     <symbol id="i-eq" viewBox="0 0 24 24"><path d="M6 4v16M12 4v16M18 4v16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".45"/><path d="M3.8 14h4.4M9.8 8h4.4M15.8 12h4.4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
     <symbol id="i-lyrics" viewBox="0 0 24 24"><path d="M4 6h10M4 10.5h13M4 15h8" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M16.5 20a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm2-2v-6.5l2.5.8" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-stats" viewBox="0 0 24 24"><path d="M5 19V11M10 19V5M15 19v-7M20 19V9" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
+    <symbol id="i-together" viewBox="0 0 24 24"><circle cx="9" cy="8.5" r="3.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M3.5 19c.6-3 2.8-4.6 5.5-4.6s4.9 1.6 5.5 4.6" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/><path d="M15.2 5.6a3.2 3.2 0 0 1 0 5.8M17.3 14.6c1.7.6 2.8 2 3.2 4.4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8.5" y="8.5" width="11" height="11" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M15.5 8.5V6.7a2.2 2.2 0 0 0-2.2-2.2H6.7a2.2 2.2 0 0 0-2.2 2.2v6.6a2.2 2.2 0 0 0 2.2 2.2h1.8" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
     <symbol id="i-chevron-l" viewBox="0 0 24 24"><path d="m14.5 6-6 6 6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-chevron-r" viewBox="0 0 24 24"><path d="m9.5 6 6 6-6 6" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-min" viewBox="0 0 24 24"><path d="M6 12h12" stroke="currentColor" stroke-width="1.3"/></symbol>
@@ -70,6 +72,8 @@
       <div class="now-artist" id="now-artist">Выбери трек в библиотеке справа</div>
       <div class="now-via" id="now-via" hidden></div>
     </div>
+
+    <button class="together-chip" id="together-chip" hidden><i class="together-dot"></i><span id="together-chip-text"></span></button>
 
     <div class="progress-row">
       <span class="time" id="time-cur">0:00</span>
@@ -125,6 +129,7 @@
         <button class="source" data-view="sc">SoundCloud</button>
         <button class="source" data-view="sp">Spotify</button>
       </nav>
+      <button class="icon-btn" id="open-together" aria-label="Слушать вместе" title="Слушать вместе" aria-expanded="false"><svg><use href="#i-together"/></svg><i class="badge" id="together-badge" hidden></i></button>
       <button class="icon-btn" id="open-stats" aria-label="Статистика" title="Статистика"><svg><use href="#i-stats"/></svg></button>
       <button class="icon-btn" id="open-settings" aria-label="Настройки"><svg><use href="#i-settings"/></svg></button>
     </div>
@@ -252,6 +257,9 @@
 
   <div class="menu" id="menu" role="menu" hidden></div>
 
+  <!-- Слушать вместе: комната по коду, содержимое рисует together.js -->
+  <section class="together" id="together" role="dialog" aria-label="Слушать вместе" hidden></section>
+
   <div class="modal" id="dialog" hidden>
     <form class="sheet dialog" id="dialog-form" role="dialog" aria-labelledby="dialog-title">
       <h2 id="dialog-title"></h2>
@@ -264,6 +272,46 @@
     </form>
   </div>
 
+  <!-- Вход в аккаунт: без него плеер закрыт. Та же раскладка, что у плеера: слева пустая бочка, справа форма -->
+  <div class="auth" id="auth" hidden>
+    <aside class="auth-stage" aria-hidden="true">
+      <div class="brand">авеон</div>
+      <div class="barrel auth-barrel">
+        <svg class="hoops" viewBox="0 0 320 320">
+          <circle cx="160" cy="160" r="150" class="hoop hoop-outer"/>
+          <circle cx="160" cy="160" r="138" class="hoop"/>
+          <circle cx="160" cy="160" r="104" class="hoop hoop-inner"/>
+        </svg>
+        <div class="porthole"><span class="porthole-empty">♪</span></div>
+      </div>
+      <p class="auth-tagline">музыка уходит в бочку,<br>когда в discord говорят</p>
+    </aside>
+
+    <main class="auth-main">
+      <form class="auth-form" id="auth-form" autocomplete="off" novalidate>
+        <h1 class="auth-title" id="auth-title">вход</h1>
+        <p class="auth-sub" id="auth-sub"></p>
+
+        <div class="auth-server" id="auth-server-line" hidden>
+          <span>сервер <b id="auth-server-host"></b></span>
+          <button type="button" class="auth-link" id="auth-server-edit">изменить</button>
+        </div>
+        <label class="auth-field" id="auth-server-field">адрес сервера
+          <input class="input" id="auth-server" placeholder="1.2.3.4:8787" spellcheck="false"></label>
+        <label class="auth-field">логин
+          <input class="input" id="auth-login" spellcheck="false" maxlength="32" autocomplete="username"></label>
+        <label class="auth-field">пароль
+          <input class="input" id="auth-password" type="password" maxlength="256"></label>
+        <label class="auth-field" id="auth-password2-field">пароль ещё раз
+          <input class="input" id="auth-password2" type="password" maxlength="256"></label>
+
+        <p class="auth-error" id="auth-error" role="alert"></p>
+        <button class="btn primary auth-go" type="submit" id="auth-go"></button>
+        <p class="auth-switch"><span id="auth-switch-text"></span> <button type="button" class="auth-link" id="auth-switch"></button></p>
+      </form>
+    </main>
+  </div>
+
   <div class="toasts" id="toasts" aria-live="polite"></div>
   <div class="drop-hint" id="drop-hint" hidden>Отпусти файлы, чтобы включить</div>
 
@@ -274,5 +322,6 @@
   <script src="eq.js"></script>
   <script src="fullscreen.js"></script>
   <script src="censor.js"></script>
+  <script src="together.js"></script>
 </body>
 </html>

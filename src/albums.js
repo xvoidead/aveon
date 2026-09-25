@@ -6,18 +6,37 @@ const path = require('path');
 
 let file;
 let albums = [];
+// id удалённого альбома → когда удалён. Нужно для синхронизации: иначе альбом, удалённый
+// на одном компьютере, вернулся бы с другого. Храним полгода.
+let deleted = {};
+const TOMBSTONE_TTL = 180 * 24 * 3600 * 1000;
+let changed = () => {};
+
+function readJson(p, fallback) {
+  try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return fallback; }
+}
+
+function writeJson(p, data) {
+  fs.mkdirSync(path.dirname(p), { recursive: true });
+  const tmp = p + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(data, null, 1));
+  fs.renameSync(tmp, p); // атомарно: при сбое не потеряем все альбомы
+}
+
+const deletedFile = () => path.join(path.dirname(file), 'albums-deleted.json');
 
 function load() {
   file = path.join(app.getPath('userData'), 'albums.json');
-  try { albums = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { albums = []; }
+  albums = readJson(file, []);
   if (!Array.isArray(albums)) albums = [];
+  deleted = readJson(deletedFile(), {});
+  if (!deleted || typeof deleted !== 'object') deleted = {};
 }
 
-function save() {
-  fs.mkdirSync(path.dirname(file), { recursive: true });
-  const tmp = file + '.tmp';
-  fs.writeFileSync(tmp, JSON.stringify(albums, null, 1));
-  fs.renameSync(tmp, file); // атомарно: при сбое не потеряем все альбомы
+function save(a) {
+  if (a) a.updated = Date.now();
+  writeJson(file, albums);
+  changed();
 }
 
 // Сохраняем только то, что нужно для показа и воспроизведения. У SoundCloud ссылки на потоки
@@ -48,7 +67,7 @@ function get(id) { return find(id); }
 function create(title) {
   title = String(title || '').trim();
   if (!title) throw new Error('Название альбома не может быть пустым');
-  const a = { id: crypto.randomUUID(), title, created: Date.now(), tracks: [] };
+  const a = { id: crypto.randomUUID(), title, created: Date.now(), updated: Date.now(), tracks: [] };
   albums.push(a);
   save();
   return summary(a);
@@ -57,13 +76,16 @@ function create(title) {
 function rename(id, title) {
   title = String(title || '').trim();
   if (!title) throw new Error('Название альбома не может быть пустым');
-  find(id).title = title;
-  save();
+  const a = find(id);
+  a.title = title;
+  save(a);
   return list();
 }
 
 function remove(id) {
   albums = albums.filter((a) => a.id !== id);
+  deleted[id] = Date.now();
+  writeJson(deletedFile(), deleted);
   save();
   return list();
 }
@@ -79,7 +101,7 @@ function addTracks(id, tracks) {
     have.add(t.id);
     added++;
   }
-  save();
+  if (added) save(a);
   return { added, album: summary(a) };
 }
 
@@ -87,7 +109,7 @@ function removeTracks(id, trackIds) {
   const a = find(id);
   const drop = new Set(trackIds);
   a.tracks = a.tracks.filter((t) => !drop.has(t.id));
-  save();
+  save(a);
   return a;
 }
 
@@ -97,7 +119,7 @@ function moveTrack(id, from, to) {
   to = Math.max(0, Math.min(a.tracks.length - 1, to));
   const [t] = a.tracks.splice(from, 1);
   a.tracks.splice(to, 0, t);
-  save();
+  save(a);
   return a;
 }
 
@@ -105,4 +127,44 @@ function localPaths() {
   return albums.flatMap((a) => a.tracks.filter((t) => t.source === 'local').map((t) => t.ref.path));
 }
 
-module.exports = { load, list, get, create, rename, remove, addTracks, removeTracks, moveTrack, localPaths };
+// ---- синхронизация с аккаунтом ----
+
+function snapshot() {
+  const now = Date.now();
+  for (const [id, at] of Object.entries(deleted)) if (now - at > TOMBSTONE_TTL) delete deleted[id];
+  return { albums, deleted };
+}
+
+// Слияние двух копий: по каждому альбому побеждает более свежая правка,
+// удаление побеждает правки, сделанные до него. Порядок — как у нас, новые с сервера в конце.
+function merge(mine, theirs) {
+  const del = { ...mine.deleted };
+  for (const [id, at] of Object.entries(theirs?.deleted || {})) del[id] = Math.max(del[id] || 0, at);
+  const stamp = (a) => a.updated || a.created || 0;
+  const byId = new Map();
+  for (const a of [...mine.albums, ...(theirs?.albums || [])]) {
+    const have = byId.get(a.id);
+    if (!have || stamp(a) > stamp(have)) byId.set(a.id, a);
+  }
+  const order = [...new Set([...mine.albums, ...(theirs?.albums || [])].map((a) => a.id))];
+  const out = order.map((id) => byId.get(id)).filter((a) => !(del[a.id] >= stamp(a)));
+  return { albums: out, deleted: del };
+}
+
+// Подставить слитую версию. Возвращает true, если у нас что-то поменялось.
+function replace(next) {
+  const before = JSON.stringify(albums);
+  albums = next.albums;
+  deleted = next.deleted;
+  writeJson(deletedFile(), deleted);
+  if (JSON.stringify(albums) === before) return false;
+  writeJson(file, albums);
+  return true;
+}
+
+function onChange(cb) { changed = cb; }
+
+module.exports = {
+  load, list, get, create, rename, remove, addTracks, removeTracks, moveTrack, localPaths,
+  snapshot, merge, replace, onChange,
+};

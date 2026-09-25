@@ -151,6 +151,7 @@ $('#btn-eq').onclick = () => (eqOpen() ? closeEq() : openEq());
 $('#eq-close').onclick = closeEq;
 eqEl.addEventListener('pointerdown', (e) => { if (e.target === eqEl) closeEq(); }); // клик мимо окна
 document.addEventListener('keydown', (e) => {
+  if (locked()) return; // под экраном входа (app.js) клавиши плеера не работают
   if (e.key === 'Escape' && eqOpen()) { e.stopPropagation(); closeEq(); return; }
   if (e.target.matches('input, textarea, select') || e.ctrlKey || e.altKey) return;
   if (!$('#editor').hidden || !$('#dialog').hidden || !$('#settings').hidden) return;

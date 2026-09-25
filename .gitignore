@@ -5,3 +5,7 @@ out/
 *.exe
 .DS_Store
 Thumbs.db
+__pycache__/
+.venv/
+server/*.db
+server/*.db-*

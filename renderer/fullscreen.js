@@ -109,6 +109,7 @@ for (const ev of ['pointermove', 'pointerdown', 'wheel']) fsEl.addEventListener(
 api.win.onState((s) => { if (s?.fullscreen === false) exitFs(true); });
 
 document.addEventListener('keydown', (e) => {
+  if (locked()) return; // под экраном входа (app.js) клавиши плеера не работают
   if (e.target.matches('input, textarea, select') || e.ctrlKey || e.altKey) return;
   const modal = ['#settings', '#eq', '#editor', '#dialog'].some((id) => !$(id).hidden);
   if (e.code === 'KeyF' && !modal) { fsOpen() ? exitFs() : enterFs(); return; }

@@ -420,7 +420,9 @@ body.keep-titles :is(.t-title, .t-artist, .t-album, .now-title, .now-artist, .fs
 }
 .lyrics-body::-webkit-scrollbar { display: none; }
 .lyric {
-  display: block; width: 100%; text-align: left; padding: 7px 0; max-width: 34ch;
+  /* активная строка увеличена на 4% от левого края — ширина с запасом, иначе правый край обрезается */
+  display: block; width: 100%; text-align: left; padding: 7px 0; max-width: min(34ch, calc(100% / 1.04));
+  overflow-wrap: break-word;
   font: 700 clamp(22px, 2.6vw, 34px)/1.22 var(--display); letter-spacing: -0.02em;
   color: var(--text-3); opacity: .45; transform-origin: left center;
   transition: opacity .35s ease, color .35s ease, transform .35s cubic-bezier(.2, .8, .2, 1), filter .35s ease;
@@ -571,3 +573,121 @@ body.keep-titles :is(.t-title, .t-artist, .t-album, .now-title, .now-artist, .fs
 .fs :is(.fs-exit, .fs-seek, .fs-controls) { transition: opacity .4s ease; }
 .fs.idle { cursor: none; }
 .fs.idle :is(.fs-exit, .fs-seek, .fs-controls) { opacity: 0; }
+
+/* ---------- вход в аккаунт ---------- */
+/* Та же сетка, что у плеера: слева сцена с пустой бочкой, справа форма на месте библиотеки.
+   Цвета фирменные (дуб и янтарь), палитра обложки последнего трека сюда не протекает.
+   Под заголовком окна (z-index 10): кнопки «свернуть/закрыть» остаются доступны. */
+.auth {
+  --oak: #1b1411; --oak-2: #231a16; --rivet: #2a201b; --rivet-2: #33271f;
+  --hoop: #7c7a78; --hoop-dim: #4a4340;
+  --text: #f1e6d6; --text-2: #bfae99; --text-3: #8a7a68; --amber: #f0a63a;
+  --m: 0;
+  position: fixed; inset: 0; z-index: 9;
+  display: grid; grid-template-columns: minmax(340px, 400px) 1fr;
+  background: var(--oak); color: var(--text);
+}
+.auth-stage {
+  -webkit-app-region: drag;
+  display: flex; flex-direction: column; align-items: center; gap: 22px;
+  padding: 18px 28px 32px; overflow: hidden; position: relative; isolation: isolate;
+}
+/* фон — отдельным слоем: градиент нельзя плавно растворить, а слой можно */
+.auth-stage::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  background: radial-gradient(120% 60% at 50% 42%, color-mix(in srgb, var(--amber) 13%, transparent), transparent 70%), var(--oak-2);
+  border-right: 1px solid var(--rivet-2);
+  transition: opacity .5s ease .15s;
+}
+.auth-barrel { margin: auto 0 0; }
+.auth-barrel .hoop-inner { animation: hoop-turn 40s linear infinite; transform-box: fill-box; transform-origin: center; }
+@keyframes hoop-turn { to { transform: rotate(360deg); } }
+.auth-tagline { margin: 0 0 auto; color: var(--text-3); text-align: center; line-height: 1.55; }
+
+.auth-main { -webkit-app-region: drag; display: grid; place-items: center; overflow-y: auto; padding: 56px 32px 40px; }
+.auth-form { -webkit-app-region: no-drag; width: min(360px, 100%); display: flex; flex-direction: column; gap: 14px; animation: rise .25s cubic-bezier(.2, .9, .3, 1.1); }
+.auth-title { margin: 0; font: 700 34px/1.05 var(--display); letter-spacing: -0.03em; }
+.auth-sub { margin: -4px 0 10px; color: var(--text-2); line-height: 1.5; }
+
+.auth-field { display: flex; flex-direction: column; gap: 7px; color: var(--text-2); font-size: 13px; }
+.auth-field .input { flex: none; height: 42px; padding: 0 14px; border-radius: 10px; font-size: 15px; background: var(--oak-2); }
+.auth-field .input:focus { border-color: var(--amber); }
+
+.auth-server { display: flex; align-items: baseline; gap: 10px; color: var(--text-3); font-size: 13px; }
+.auth-server b { color: var(--text-2); font-weight: 500; }
+.auth-link { color: var(--amber); font-size: 13px; }
+.auth-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.auth-error { margin: 0; color: var(--danger); font-size: 13px; line-height: 1.45; }
+.auth-error:empty { display: none; }
+.auth-go { height: 44px; margin-top: 6px; justify-content: center; border-radius: 12px; font-size: 15px; }
+.auth-go:disabled { opacity: .6; cursor: default; }
+.auth-switch { margin: 2px 0 0; color: var(--text-3); font-size: 13px; text-align: center; }
+
+@media (max-width: 860px) {
+  .auth { grid-template-columns: 1fr; }
+  .auth-stage { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .auth-barrel .hoop-inner, .auth-form { animation: none; }
+}
+
+/* Уход с экрана входа: форма уезжает, фон растворяется и открывает плеер, бочку двигает leaveAuth() */
+.auth { transition: background-color .5s ease .15s; }
+.auth-main, .auth-tagline, .auth-stage .brand { transition: opacity .3s ease, transform .35s cubic-bezier(.4, 0, 1, 1); }
+.auth.leaving { background-color: transparent; pointer-events: none; }
+.auth.leaving .auth-stage::before { opacity: 0; }
+.auth.leaving .auth-main { opacity: 0; transform: translateX(24px); }
+.auth.leaving .auth-tagline { opacity: 0; transform: translateY(8px); }
+.auth.leaving .auth-stage .brand { opacity: 0; }
+.auth-barrel { will-change: transform; }
+
+/* ---------- слушать вместе ---------- */
+.icon-btn .badge { position: absolute; top: 6px; right: 6px; width: 7px; height: 7px; border-radius: 50%; background: var(--voice); box-shadow: 0 0 0 2px var(--oak); }
+
+.together {
+  position: fixed; top: 84px; right: 28px; z-index: 35; width: 320px;
+  display: flex; flex-direction: column; gap: 12px; padding: 20px;
+  background: var(--oak-2); border: 1px solid var(--rivet-2); border-radius: 16px;
+  box-shadow: 0 24px 60px rgb(0 0 0 / 0.5); animation: rise .16s ease;
+}
+.together-title { margin: 0; font: 700 18px var(--display); letter-spacing: -0.02em; }
+.together-desc { margin: -4px 0 2px; color: var(--text-2); font-size: 13px; line-height: 1.5; }
+.together-note { margin: 0; color: var(--text-3); font-size: 12px; line-height: 1.5; }
+.together-note.warn { color: var(--amber); }
+.together-wide { width: 100%; height: 40px; justify-content: center; }
+.together-or { display: flex; align-items: center; gap: 10px; color: var(--text-3); font-size: 12px; }
+.together-or::before, .together-or::after { content: ""; flex: 1; height: 1px; background: var(--rivet-2); }
+.together-join { display: flex; gap: 8px; }
+.together-code-input { height: 40px; font: 600 15px var(--display); letter-spacing: .12em; text-transform: uppercase; }
+.together-code-input::placeholder { letter-spacing: .06em; font: 500 12px var(--ui); }
+
+.together-code {
+  display: flex; align-items: center; justify-content: center; gap: 12px; height: 64px; border-radius: 12px;
+  background: var(--oak); border: 1px dashed var(--hoop-dim); color: var(--text);
+  font: 700 28px var(--display); letter-spacing: .16em; text-transform: none;
+}
+.together-code:hover { border-color: var(--amber); }
+.together-code svg { width: 18px; height: 18px; color: var(--text-3); }
+.together-members { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.together-members li { display: flex; align-items: center; gap: 10px; }
+.together-avatar {
+  width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; flex: none;
+  background: var(--rivet-2); color: var(--text); font: 600 12px var(--display);
+}
+.together-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: none; }
+.together-name em { font-style: normal; color: var(--text-3); font-size: 12px; margin-left: 4px; }
+.together-lead { color: var(--voice); font-size: 12px; }
+
+/* плашка на сцене под «сейчас играет» */
+.together-chip {
+  display: inline-flex; align-items: center; gap: 8px; max-width: 100%; margin-top: -6px;
+  padding: 5px 12px; border-radius: 99px; background: color-mix(in srgb, var(--voice) 14%, transparent);
+  color: var(--voice); font-size: 12px; font-weight: 500;
+}
+.together-chip span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.together-chip:hover { background: color-mix(in srgb, var(--voice) 22%, transparent); }
+.together-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; flex: none; animation: tg-pulse 2s ease-in-out infinite; }
+.together-chip.offline { color: var(--amber); background: color-mix(in srgb, var(--amber) 12%, transparent); }
+@keyframes tg-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) { .together-dot { animation: none; } }
