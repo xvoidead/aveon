@@ -56,6 +56,10 @@ contextBridge.exposeInMainWorld('tishe', {
     sync: () => call('acc:sync'),
     onEvent: (cb) => on('account:event', cb),
   },
+  discord: {
+    update: (p) => ipcRenderer.send('discord:update', p),
+    status: () => call('discord:status'),
+  },
   together: {
     create: () => call('tg:create'),
     join: (code) => call('tg:join', code),

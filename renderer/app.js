@@ -605,6 +605,7 @@ function prev() {
 // ---------- сейчас играет ----------
 
 function showNow(track, stream) {
+  state.via = stream?.via || null;
   $('#now-title').textContent = track.title;
   $('#btn-now-album').disabled = false;
   $('#now-artist').textContent = track.artist || 'Исполнитель неизвестен';
@@ -1483,6 +1484,7 @@ async function renderSettings() {
   } catch {}
   const barrel = d.effect !== 'volume';
   state.account = await api.account.status().catch(() => state.account);
+  await refreshDiscordStatus();
 
   $('#settings-body').innerHTML = `
     ${accountSection()}
@@ -1535,6 +1537,8 @@ async function renderSettings() {
     </section>
 ${censorSettingsHtml()}
 
+    ${discordSection()}
+
     <section class="sec" data-sec="ym">
       <h3 class="sec-title">Яндекс Музыка<span class="state ${c.has['ym.token'] ? 'ok' : ''}">${c.has['ym.token'] ? 'подключена' : 'не подключена'}</span></h3>
       <p class="sec-desc">Нужен OAuth-токен аккаунта. Открой <a data-ext="https://oauth.yandex.ru/authorize?response_type=token&client_id=23cabbbdc6cd418abb4b39c32c41195d">страницу входа Яндекса</a> и войди. После перехода скопируй из адресной строки значение <code>access_token</code>, от <code>=</code> до <code>&amp;</code>. Полные треки доступны с Плюсом, без него играют 30 секунд.</p>
@@ -1584,6 +1588,7 @@ ${censorSettingsHtml()}
 
   const body = $('#settings-body');
   bindAccount(body);
+  bindDiscord(body);
 
   $$('[data-ext]', body).forEach((a) => { a.onclick = (e) => { e.preventDefault(); api.openExternal(a.dataset.ext); }; });
   $('#crossfade', body).oninput = (e) => {

@@ -10,6 +10,7 @@ const DEFAULTS = {
   shuffle: false,
   repeat: 'off', // off | all | one
   view: 'local',
+  discord: { enabled: true }, // статус «Слушает» в Discord
   crossfade: 6, // с — плавный переход между треками, 0 — выключен
   ui: { keepTitles: false }, // true — названия треков без строчного стиля
   localFolders: [],
