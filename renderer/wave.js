@@ -402,11 +402,13 @@ function closeWavePop() {
 function openWavePop(key, anchor) {
   closeWavePop();
   const { cur, opts } = waveChoice(key);
-  const el = document.createElement('div');
-  el.className = `wave-pop${key === 'dj' || key === 'voice' ? ' dj' : ''}`;
+  // та же панель, что у «Друзей» и румы (.together): заголовок и варианты строками, у выбранного — галочка
+  const el = document.createElement('section');
+  el.className = `together wave-pop${key === 'dj' || key === 'voice' ? ' dj' : ''}`;
   el.setAttribute('role', 'menu');
-  el.innerHTML = `<div class="wave-pop-title">${esc(WAVE_TITLES[key] || '')}</div>
-    <div class="wave-pop-opts">${opts.map(([v, t], i) => `<button role="menuitemradio" aria-checked="${v === cur}" class="${v === cur ? 'on' : ''}" data-v="${esc(v)}" style="--i:${i}">${esc(t)}</button>`).join('')}</div>`;
+  el.innerHTML = `<h2 class="together-title">${esc(WAVE_TITLES[key] || '')}</h2>
+    <div class="wave-pop-opts">${opts.map(([v, t]) => `<button role="menuitemradio" aria-checked="${v === cur}" class="${v === cur ? 'on' : ''}" data-v="${esc(v)}">
+      <span>${esc(t)}</span><svg><use href="#i-check"/></svg></button>`).join('')}</div>`;
   document.body.append(el);
   wavePop = el;
   anchor.setAttribute('aria-expanded', 'true');
@@ -414,9 +416,8 @@ function openWavePop(key, anchor) {
   const r = anchor.getBoundingClientRect();
   const w = el.offsetWidth, h = el.offsetHeight, edge = 12;
   el.style.left = `${Math.min(Math.max(edge, r.left + r.width / 2 - w / 2), innerWidth - w - edge)}px`;
-  const below = r.bottom + 10;
+  const below = r.bottom + 16; // ниже волнистого подчёркивания (оно на 6 px под словом)
   el.style.top = `${below + h > innerHeight - edge ? Math.max(edge, r.top - 10 - h) : below}px`;
-  el.style.setProperty('--ox', `${r.left + r.width / 2 - parseFloat(el.style.left)}px`);
   el.querySelectorAll('button').forEach((b) => {
     b.onclick = () => { closeWavePop(); setWave(key, b.dataset.v); };
   });

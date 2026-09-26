@@ -4,7 +4,10 @@
 // перетаскивания окно движение мыши не получает — поэтому курсор ещё и проверяем отсюда, по часам.
 const { screen } = require('electron');
 
-const EVERY = 60;
+const EVERY = 30;
+// запас у края: зайти — на 4 px от панели, уйти — только отойдя на 16 px (чтобы у края не мигало)
+const MARGIN_IN = 4;
+const MARGIN_OUT = 16;
 const watched = new Map(); // BrowserWindow → { rect: {x, y, w, h} | null, hovered, on, inside, onInside }
 let timer = null;
 
@@ -14,7 +17,8 @@ function apply(win, s) {
     const p = screen.getCursorScreenPoint();
     const b = win.getContentBounds();
     const x = p.x - b.x, y = p.y - b.y;
-    inside = x >= s.rect.x && x < s.rect.x + s.rect.w && y >= s.rect.y && y < s.rect.y + s.rect.h;
+    const m = s.inside ? MARGIN_OUT : MARGIN_IN;
+    inside = x >= s.rect.x - m && x < s.rect.x + s.rect.w + m && y >= s.rect.y - m && y < s.rect.y + s.rect.h + m;
   }
   if (inside !== s.inside) { s.inside = inside; s.onInside?.(inside); }
   const on = s.hovered || inside;
