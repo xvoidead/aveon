@@ -1740,7 +1740,7 @@ ${censorSettingsHtml()}
   const body = $('#settings-body');
   renderSettingsNav();
   bindDiscord(body);
-  $('#set-open-eq', body).onclick = () => { closeSettings(); openEq(); };
+  $('#set-open-eq', body).onclick = () => { closeSettings(); toggleEq(); }; // eq.js: встроенный или стеклянный
 
   $$('[data-ext]', body).forEach((a) => { a.onclick = (e) => { e.preventDefault(); api.openExternal(a.dataset.ext); }; });
   $('#crossfade', body).oninput = (e) => {

@@ -1007,3 +1007,18 @@ body.liquid-glass .modal { background: rgb(10 7 5 / .3); }
   font: 600 12px var(--ui); color: #fff; background: rgb(0 0 0 / .45); opacity: 0; transition: opacity .15s ease;
 }
 .pf-avatar:hover::after, .pf-avatar[aria-expanded="true"]::after, .pf-avatar:focus-visible::after { opacity: 1; }
+
+/* ---------- эквалайзер в своём окне поверх нативного стекла (eqpop.html) ---------- */
+/* Окно прозрачное: преломлённый фон рисует стеклянная панель под ним, здесь — подложка, обод и ручки */
+body.eqpop { display: block; height: 100vh; background: transparent; overflow: hidden; }
+body.eqpop .eq-sheet.lg {
+  position: fixed; inset: 0; width: auto; max-height: none; border-radius: 16px;
+  --lg-tint: 54%; box-shadow: none !important; animation: none;
+}
+body.eqpop .eq-sheet.appear { animation: eqpop-in .18s cubic-bezier(.2, .9, .3, 1.1); }
+@keyframes eqpop-in { from { opacity: 0; transform: scale(.98); } }
+body.eqpop .eq-panel { height: auto; flex: 1; min-height: 0; }
+body.eqpop .eq-body { height: calc(100% - 58px); }
+.eq-name { display: flex; gap: 8px; margin-top: -6px; }
+.eq-name .input { height: 32px; }
+

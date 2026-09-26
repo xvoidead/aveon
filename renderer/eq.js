@@ -321,7 +321,34 @@ $('#eq-reset').onclick = () => {
   eqTransition(() => Object.assign(state.cfg.eq, { preset: 'flat', gains: EQ_FREQS.map(() => 0), preamp: 0 }));
 };
 
-$('#btn-eq').onclick = () => (eqOpen() ? closeEq() : openEq());
+// Стеклянный эквалайзер в своём окне (src/eqpop.js): когда включено liquid glass и Windows умеет
+// нативное стекло. Иначе — встроенный попап этого окна
+let eqNative = false;
+api.eqpop.supported().then((v) => { eqNative = !!v; }).catch(() => {});
+const eqUseNative = () => eqNative && !!state.cfg.ui?.glass;
+
+function toggleEq() {
+  if (!eqUseNative()) { eqOpen() ? closeEq() : openEq(); return; }
+  const r = $('#btn-eq').getBoundingClientRect();
+  const cs = getComputedStyle(document.documentElement);
+  const theme = Object.fromEntries(THEME_VARS.map((k) => [k, cs.getPropertyValue(k).trim()])); // extras.js
+  $('#btn-eq').setAttribute('aria-pressed', 'true');
+  api.eqpop.toggle({ left: r.left, top: r.top, right: r.right, bottom: r.bottom }, { theme });
+}
+
+// Попап поменял эквалайзер — применяем к звуку здесь; сохранил он сам
+api.eqpop.onLive((eq) => {
+  const { _glide, ...rest } = eq;
+  state.cfg.eq = rest;
+  eqApply(!!_glide);
+});
+api.eqpop.onClosed(() => $('#btn-eq').setAttribute('aria-pressed', 'false'));
+api.eqpop.onAction((a) => {
+  if (a?.type === 'share' && a.preset) shareEqPreset(a.preset); // share.js
+  if (a?.type === 'paste') openShareCode();
+});
+
+$('#btn-eq').onclick = toggleEq;
 $('#eq-close').onclick = closeEq;
 // Клик мимо панели закрывает её; меню пресетов и диалоги (свой пресет, код) — не «мимо»
 document.addEventListener('pointerdown', (e) => {
@@ -334,7 +361,7 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && eqOpen()) { e.stopPropagation(); closeEq(); return; }
   if (e.target.matches('input, textarea, select') || e.ctrlKey || e.altKey) return;
   if (!$('#editor').hidden || !$('#dialog').hidden || !$('#settings').hidden) return;
-  if (e.code === 'KeyE') (eqOpen() ? closeEq() : openEq());
+  if (e.code === 'KeyE') toggleEq();
 });
 
 // ---------- кривая АЧХ ----------
