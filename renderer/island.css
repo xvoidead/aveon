@@ -167,16 +167,3 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 .pill.notice .label b { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.22; font-size: 12.5px; }
 .pill.notice .label small { font-size: 10.5px; }
 .label img.emoji { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: -0.24em; margin: 0 .03em; }
-
-/* строка друзей в раскрытом острове: кнопки справа, аватарки кликабельны */
-.friends span { flex: 1; min-width: 0; }
-.friends i[data-fa] { cursor: pointer; transition: transform .12s ease; }
-.friends i[data-fa]:hover { transform: scale(1.12); z-index: 1; }
-.fbtns { flex: none; display: flex; gap: 4px; }
-.fbtns button {
-  height: 24px; padding: 0 10px; border-radius: 99px; background: rgb(255 255 255 / .1); color: #f4f1ec;
-  font: 600 11px "Onest", "Segoe UI", sans-serif; white-space: nowrap; transition: background .12s ease, transform .1s ease;
-}
-.fbtns button:hover { background: rgb(255 255 255 / .18); }
-.fbtns button:active { transform: scale(.95); }
-.fbtns button.primary { background: var(--voice); color: #000; }
