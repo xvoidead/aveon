@@ -317,7 +317,7 @@ $('#profile-close').onclick = closeProfile;
 // иначе обработчик app.js успел бы закрыть настройки, и тот же Esc закрыл бы и профиль
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape' || !profileOpen() || locked()) return;
-  if (['#settings', '#editor', '#dialog', '#fs'].some((id) => !$(id).hidden) || !$('#menu').hidden || !$('#together').hidden) return;
+  if (['#settings', '#editor', '#dialog', '#fs'].some((id) => !$(id).hidden) || !$('#menu').hidden || !$('#together').hidden || !$('#friends').hidden) return;
   closeProfile();
 }, true);
 window.addEventListener('resize', () => { if (profileOpen()) renderStats(); });

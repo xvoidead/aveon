@@ -113,6 +113,7 @@
     if (visible('#editor')) { closeEditor(); return; }
     if (visible('#settings')) { closeSettings(); return; }
     if (visible('#together')) { closeTogether(); return; }
+    if (visible('#friends')) { closeFriends(); return; }
     if (visible('#fs')) { exitFs(); return; }
     if (nowOpen()) { closeNow(); return; }
     if (visible('#lyrics')) { closeLyrics(); return; }

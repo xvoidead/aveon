@@ -1,5 +1,5 @@
-// «Слушать вместе»: комната на сервере авеона (server/aveon_api/together.py) через WebSocket.
-// Здесь только связь: соединение, вход в комнату, сверка часов и переподключение.
+// «Слушать вместе»: рума на сервере авеона (server/aveon_api/together.py) через WebSocket.
+// Здесь только связь: соединение, вход в руму, сверка часов и переподключение.
 // Что и когда играть, решает окно (renderer/together.js).
 const config = require('./config');
 
@@ -51,7 +51,7 @@ function onMessage(m) {
       retry = 0;
       pending?.resolve(status());
       pending = null;
-      // состояние комнаты на момент входа: сколько ему уже лет по серверным часам
+      // состояние румы на момент входа: сколько ему уже лет по серверным часам
       if (m.state) emit({ type: 'state', state: m.state, age: m.now - m.state.at, driver: m.driver, initial: true });
       else emit({ type: 'room' });
       break;
@@ -113,11 +113,11 @@ function open(first) {
   });
 }
 
-// Связь пропала — пробуем вернуться в ту же комнату, пока она жива
+// Связь пропала — пробуем вернуться в ту же руму, пока она жива
 function reconnect() {
   if (++retry > RETRIES) {
     room = null;
-    emit({ type: 'closed', error: 'Связь с комнатой потеряна' });
+    emit({ type: 'closed', error: 'Связь с румой потеряна' });
     return;
   }
   emit({ type: 'reconnecting' });
@@ -126,7 +126,7 @@ function reconnect() {
     open({ t: 'join', code: room.code }).catch((e) => {
       if (/не найдена/.test(e.message)) {
         room = null;
-        emit({ type: 'closed', error: 'Комната закрылась' });
+        emit({ type: 'closed', error: 'Рума закрылась' });
       } else if (!ws) reconnect();
     });
   }, Math.min(1000 * retry, 5000));
@@ -154,7 +154,7 @@ const create = () => enter({ t: 'create' });
 
 function join(code) {
   code = String(code || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (code.length !== 6) return Promise.reject(new Error('Код комнаты — 6 символов'));
+  if (code.length !== 6) return Promise.reject(new Error('Код румы — 6 символов'));
   return enter({ t: 'join', code });
 }
 

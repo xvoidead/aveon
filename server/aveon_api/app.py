@@ -118,9 +118,11 @@ Me = Annotated[Auth, Depends(auth)]
 from .together import router as together_router  # noqa: E402 — модулю нужен auth выше
 
 from .share import router as share_router  # noqa: E402
+from .friends import router as friends_router  # noqa: E402
 
 app.include_router(together_router)
 app.include_router(share_router)
+app.include_router(friends_router)
 
 
 def user_view(row) -> dict:

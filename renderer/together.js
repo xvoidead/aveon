@@ -1,7 +1,7 @@
 'use strict';
 
 // ---------- слушать вместе ----------
-// Комната на сервере авеона. Кто включил трек, поставил паузу или перемотал — отправляет состояние
+// Рума на сервере авеона. Кто включил трек, поставил паузу или перемотал — отправляет состояние
 // { track, playing, pos }, остальные подстраиваются. Ведущий (последний, кто сменил трек) переключает
 // трек, когда тот заканчивается, и раз в несколько секунд напоминает, где он сейчас, — так у всех
 // одно и то же место даже после подвисаний сети.
@@ -20,7 +20,7 @@ const Together = {
 
   active() { return !!this.room && this.room.members.length > 0; },
   isDriver() { return !!this.room && this.lead() === this.room.you; },
-  // Ведущий ушёл — ведёт тот, кто в комнате дольше всех
+  // Ведущий ушёл — ведёт тот, кто в руме дольше всех
   lead() { return this.room?.driver || this.room?.members[0]?.id || null; },
   hold(ms) { this.holdUntil = Math.max(this.holdUntil, performance.now() + ms); },
   quiet() { return this.applying || performance.now() < this.holdUntil; },
@@ -59,7 +59,7 @@ function shareable(t) {
   return s;
 }
 
-// Свои действия с плеером → в комнату
+// Свои действия с плеером → в руму
 for (const ev of ['play', 'pause', 'seeked']) {
   onAudio(ev, () => {
     if (!Together.room || Together.quiet() || !state.track) return;
@@ -154,7 +154,7 @@ api.together.onEvent((ev) => {
     }
     case 'members':
       if (ev.joined) toast(`${firstName(ev.joined)} теперь слушает с тобой`);
-      if (ev.left) toast(`${firstName(ev.left)} вышел из комнаты`);
+      if (ev.left) toast(`${firstName(ev.left)} вышел из румы`);
       // новенькому сразу показываем, что играет у нас
       if (ev.joined && T.isDriver() && state.track) T.send();
       break;
@@ -162,7 +162,7 @@ api.together.onEvent((ev) => {
       break;
     case 'closed':
       T.remote = null;
-      if (was) toast(ev.error || 'Ты вышел из комнаты', ev.error ? 'err' : '');
+      if (was) toast(ev.error || 'Ты вышел из румы', ev.error ? 'err' : '');
       break;
     case 'error':
       toast(ev.error, 'err');
@@ -174,9 +174,11 @@ api.together.onEvent((ev) => {
 });
 
 // ---------- панель «Слушать вместе» ----------
+// Рума живёт на сцене, под «сейчас играет»: плашка всегда на виду (без румы — «слушать вместе»),
+// панель открывается прямо под ней. Рума — про текущий трек, поэтому и место рядом с ним.
 
 const togetherEl = $('#together');
-const togetherBtn = $('#open-together');
+const togetherBtn = $('#together-chip');
 
 function memberNames(exceptMe = true) {
   const r = Together.room;
@@ -186,31 +188,38 @@ function memberNames(exceptMe = true) {
 
 function renderTogetherChip() {
   const r = Together.room;
-  const chip = $('#together-chip');
-  $('#together-badge').hidden = !r;
-  togetherBtn.classList.toggle('on', !!r);
-  if (!r) { chip.hidden = true; return; }
+  requestAnimationFrame(placeTogether); // плашка поменяла ширину — панель снова по центру
+  const chip = togetherBtn;
+  chip.classList.toggle('idle', !r);
+  if (!r) {
+    chip.classList.remove('offline');
+    $('#together-chip-faces').innerHTML = '';
+    $('#together-chip-text').textContent = 'слушать вместе';
+    chip.title = 'Создать руму или войти по коду друга';
+    return;
+  }
   const others = memberNames();
   loadAvatars();
-  chip.hidden = false;
+  chip.title = `Рума ${r.code}`;
   const faces = r.members.filter((m) => m.id !== r.you).slice(0, 3);
   $('#together-chip-faces').innerHTML = faces.map((m) => avatarHtml(m, 'together-face')).join('');
   chip.classList.toggle('offline', !r.connected);
-  $('#together-chip-text').textContent = !r.connected ? 'связь с комнатой…'
-    : others.length ? `слушаете вместе · ${others.join(', ')}` : `комната ${r.code} · ждём друга`;
+  $('#together-chip-text').textContent = !r.connected ? 'связь с румой…'
+    : others.length ? `слушаете вместе · ${others.join(', ')}` : `рума ${r.code} · ждём друга`;
 }
 
 function renderTogether() {
   if (togetherEl.hidden) return;
+  requestAnimationFrame(placeTogether);
   const r = Together.room;
   if (!r) {
     togetherEl.innerHTML = `
       <h2 class="together-title">Слушать вместе</h2>
-      <p class="together-desc">Создай комнату и отправь код другу. Трек, пауза и перемотка будут у вас общими.</p>
-      <button class="btn primary together-wide" id="tg-create">Создать комнату</button>
+      <p class="together-desc">Создай руму и отправь код другу. Трек, пауза и перемотка будут у вас общими.</p>
+      <button class="btn primary together-wide" id="tg-create">Создать руму</button>
       <div class="together-or"><span>или</span></div>
       <form class="together-join" id="tg-join-form" autocomplete="off">
-        <input class="input together-code-input" id="tg-code" placeholder="КОД ДРУГА" maxlength="7" spellcheck="false" aria-label="Код комнаты">
+        <input class="input together-code-input" id="tg-code" placeholder="КОД ДРУГА" maxlength="7" spellcheck="false" aria-label="Код румы">
         <button class="btn" type="submit">Войти</button>
       </form>
       <p class="together-note">У друга трек играет через его Яндекс Музыку или SoundCloud. Свои файлы плеер находит там же по названию.</p>`;
@@ -226,7 +235,7 @@ function renderTogether() {
   }
   const lead = Together.lead();
   togetherEl.innerHTML = `
-    <h2 class="together-title">Комната</h2>
+    <h2 class="together-title">Рума</h2>
     <button class="together-code" id="tg-copy" title="Скопировать код">
       <span>${esc(r.code)}</span><svg><use href="#i-copy"/></svg>
     </button>
@@ -237,9 +246,9 @@ function renderTogether() {
         ${m.id === lead && r.members.length > 1 ? '<span class="together-lead">ведёт</span>' : ''}</li>`).join('')}
     </ul>
     ${r.connected ? '' : '<p class="together-note warn">Связь пропала, переподключаюсь…</p>'}
-    <button class="btn danger together-wide" id="tg-leave">Выйти из комнаты</button>`;
+    <button class="btn danger together-wide" id="tg-leave">Выйти из румы</button>`;
   $('#tg-copy').onclick = async () => {
-    if (await copyText(r.code)) toast('Код скопирован'); else toast(`Код комнаты: ${r.code}`); // share.js
+    if (await copyText(r.code)) toast('Код скопирован'); else toast(`Код румы: ${r.code}`); // share.js
   };
   $('#tg-leave').onclick = async () => {
     await api.together.leave();
@@ -256,7 +265,7 @@ async function enterRoom(fn) {
   $$('button', togetherEl).forEach((b) => { b.disabled = true; });
   try {
     Together.room = await fn();
-    // создали комнату и уже что-то играет — сразу сообщаем, что
+    // создали руму и уже что-то играет — сразу сообщаем, что
     if (Together.room && !Together.room.driver && state.track) Together.send();
   } catch (e) {
     toast(e.message, 'err');
@@ -266,7 +275,21 @@ async function enterRoom(fn) {
   renderTogetherChip();
 }
 
+// Панель — под плашкой на сцене, по центру от неё; не влезает вниз — встаёт над плашкой
+function placeTogether() {
+  if (togetherEl.hidden) return;
+  const r = togetherBtn.getBoundingClientRect();
+  const w = togetherEl.offsetWidth, h = togetherEl.offsetHeight, gap = 10, edge = 12;
+  const left = Math.min(Math.max(edge, r.left + r.width / 2 - w / 2), innerWidth - w - edge);
+  let top = r.bottom + gap;
+  if (top + h > innerHeight - edge) top = Math.max(edge, r.top - gap - h);
+  togetherEl.style.left = `${left}px`;
+  togetherEl.style.top = `${top}px`;
+}
+window.addEventListener('resize', placeTogether);
+
 function openTogether() {
+  if (typeof closeFriends === 'function') closeFriends(); // friends.js
   togetherEl.hidden = false;
   togetherBtn.setAttribute('aria-expanded', 'true');
   renderTogether();
@@ -279,13 +302,13 @@ function closeTogether() {
 }
 
 togetherBtn.onclick = () => (togetherEl.hidden ? openTogether() : closeTogether());
-$('#together-chip').onclick = openTogether;
 document.addEventListener('pointerdown', (e) => {
-  if (!togetherEl.hidden && !togetherEl.contains(e.target) && !togetherBtn.contains(e.target) && !$('#together-chip').contains(e.target)) closeTogether();
+  if (!togetherEl.hidden && !togetherEl.contains(e.target) && !togetherBtn.contains(e.target)) closeTogether();
 });
 document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && !togetherEl.hidden) { e.stopPropagation(); closeTogether(); }
 }, true);
 
-// после перезапуска окна (dev) — вернуть состояние комнаты
+// после перезапуска окна (dev) — вернуть состояние румы
+renderTogetherChip();
 api.together.status().then((r) => { Together.room = r; renderTogetherChip(); }).catch(() => {});

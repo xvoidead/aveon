@@ -1,14 +1,14 @@
-"""Совместное прослушивание: комнаты на WebSocket.
+"""Совместное прослушивание: румы (комнаты) на WebSocket.
 
-Один создаёт комнату и получает код, друзья входят по коду. Сервер хранит последнее
+Один создаёт руму и получает код, друзья входят по коду. Сервер хранит последнее
 состояние (трек, играет/пауза, позиция и серверное время этой позиции) и пересылает
 его остальным. Звук сервер не передаёт — каждый плеер играет трек сам.
 
 Протокол — JSON-сообщения с полем "t":
   клиент → сервер
     hello  {token}                   первым сообщением, иначе соединение закрывается
-    create {}                        создать комнату
-    join   {code}                    войти в комнату
+    create {}                        создать руму
+    join   {code}                    войти в руму
     state  {state, beat?}            новое состояние; отправитель становится ведущим
     ping   {c}                       сверка часов: c — время клиента
     leave  {}
@@ -154,11 +154,11 @@ async def together(ws: WebSocket):
                     code = str(msg.get("code", "")).strip().upper()
                     room = ROOMS.get(code)
                     if not room:
-                        await send(member, {"t": "error", "error": "Комната не найдена. Проверь код"})
+                        await send(member, {"t": "error", "error": "Рума не найдена. Проверь код"})
                         continue
                     if len(room.members) >= MAX_MEMBERS:
                         room = None
-                        await send(member, {"t": "error", "error": "В комнате уже 10 человек"})
+                        await send(member, {"t": "error", "error": "В руме уже 10 человек"})
                         continue
                 room.members[member.id] = member
                 await send(member, room_msg(room, member))

@@ -11,6 +11,7 @@ const store = require('../../src/store');
 const albums = require('../../src/albums');
 const account = require('../../src/account');
 const together = require('../../src/together');
+const friends = require('../../src/friends');
 const censor = require('../../src/censor');
 const texts = require('../../src/services/texts');
 const sc = require('../../src/services/soundcloud');
@@ -58,6 +59,7 @@ const ready = (async () => {
 
 ready.then(() => {
   together.init((ev) => send('together:event', ev));
+  friends.init();
   account.init((ev) => send('account:event', ev));
   startDuck();
 }).catch((e) => console.error('bridge start:', e));
@@ -174,6 +176,7 @@ const api = {
     set: call((patch) => {
       config.set(patch);
       account.settingsChanged(patch);
+      if (patch.friends) friends.settingsChanged();
       if (pop.open && patch.eq) popEmit('eqpop:refresh');
       return config.publicView();
     }),
@@ -220,15 +223,15 @@ const api = {
   },
   account: {
     status: call(() => account.status()),
-    register: call((server, login, password, name) => account.register(server, login, password, name)),
-    login: call((server, login, password) => account.login(server, login, password)),
-    logout: call(async () => { together.leave(); return account.logout(); }),
+    register: call((server, login, password, name) => { friends.reset(); return account.register(server, login, password, name); }),
+    login: call((server, login, password) => { friends.reset(); return account.login(server, login, password); }),
+    logout: call(async () => { together.leave(); await friends.offline(); return account.logout(); }),
     logoutAll: call(() => account.logoutAll()),
     me: call(() => account.me()),
     rename: call((name) => account.rename(name)),
     avatar: call((dataUrl) => account.setAvatar(dataUrl)),
     password: call((old, next) => account.changePassword(old, next)),
-    remove: call((password) => account.remove(password)),
+    remove: call((password) => { friends.reset(); return account.remove(password); }),
     sync: call(() => account.sync()),
     onEvent: (cb) => on('account:event', cb),
   },
@@ -250,6 +253,14 @@ const api = {
     avatar: call((userId, at) => account.avatarOf(userId, at)),
     send: (state, beat) => { ready.then(() => together.send(clone(state), beat)); },
     onEvent: (cb) => on('together:event', cb),
+  },
+  friends: {
+    list: call(() => friends.list()),
+    add: call((login) => friends.add(login)),
+    accept: call((id) => friends.accept(id)),
+    remove: call((id) => friends.remove(id)),
+    avatar: call((userId, at) => account.avatarOf(userId, at)),
+    now: (p) => { ready.then(() => friends.now(clone(p))); },
   },
   store: {
     get: call((name) => store.read(name)),

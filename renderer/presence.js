@@ -7,7 +7,7 @@
 let presenceTimer = null;
 let discordStatus = { enabled: false, connected: false };
 
-// «Слушать вместе» в статусе: (2 из 10). Код комнаты не светим — только его отпечаток
+// «Слушать вместе» в статусе: (2 из 10). Код румы не светим — только его отпечаток
 function partyId(code) {
   let h = 0;
   for (const c of `aveon:${code}`) h = (h * 31 + c.charCodeAt(0)) | 0;

@@ -152,6 +152,9 @@ html.mobile .together {
   top: auto; left: 0; right: 0; bottom: 0; width: auto; border-radius: 20px 20px 0 0;
   padding: 20px 20px calc(20px + var(--sab)); animation: sheet-up .24s cubic-bezier(.2, .9, .3, 1);
 }
+/* «слушать вместе» встаёт под плашкой на сцене (together.js ставит left/top) — на телефоне это шторка */
+html.mobile .together.on-stage { left: 0 !important; top: auto !important; z-index: 35; }
+html.mobile .friends { width: auto; max-height: calc(100vh - var(--sat) - 40px); }
 html.mobile .toasts { left: 16px; right: 16px; bottom: calc(var(--mini-h) + var(--sab) + 20px); align-items: stretch; }
 html.mobile .toast { max-width: none; }
 

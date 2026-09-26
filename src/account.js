@@ -185,7 +185,7 @@ async function syncAvatar(changed) {
   changed.avatar = true;
 }
 
-// Аватар участника комнаты: at — когда он его менял, по нему же и кэш
+// Аватар участника румы: at — когда он его менял, по нему же и кэш
 const avatars = new Map();
 
 async function avatarOf(userId, at) {
@@ -345,5 +345,5 @@ function init(onEvent) {
 
 module.exports = {
   init, status, register, login, logout, logoutAll, me, rename, changePassword, remove, sync, settingsChanged,
-  sharePut, shareGet, avatarOf, setAvatar,
+  sharePut, shareGet, avatarOf, setAvatar, api,
 };
