@@ -77,6 +77,7 @@ function createWindow() {
     frame: false,
     backgroundColor: '#1b1411',
     title: 'авеон',
+    icon: path.join(__dirname, 'renderer', 'assets', 'icon.png'), // панель задач и Alt+Tab (и при npm start)
     show: false,
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
