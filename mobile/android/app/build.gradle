@@ -1,4 +1,6 @@
 apply plugin: 'com.android.application'
+apply plugin: 'org.jetbrains.kotlin.android'
+apply plugin: 'org.jetbrains.kotlin.plugin.compose'
 
 android {
     namespace = "com.aveon.player"
@@ -15,6 +17,9 @@ android {
              // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
+    }
+    buildFeatures {
+        compose = true
     }
     buildTypes {
         release {
@@ -38,6 +43,15 @@ dependencies {
     implementation project(':capacitor-android')
     implementation "androidx.media:media:1.7.1"
     implementation "com.squareup.okhttp3:okhttp:4.12.0"
+    // Compose-интерфейс и виджеты
+    implementation platform('androidx.compose:compose-bom:2025.08.00')
+    implementation 'androidx.compose.ui:ui'
+    implementation 'androidx.compose.ui:ui-graphics'
+    implementation 'androidx.compose.foundation:foundation'
+    implementation 'androidx.compose.animation:animation'
+    implementation 'androidx.activity:activity-compose:1.11.0'
+    implementation 'androidx.glance:glance-appwidget:1.1.1'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2'
     testImplementation "junit:junit:$junitVersion"
     androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
     androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
@@ -53,4 +67,10 @@ try {
     }
 } catch(Exception e) {
     logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}
+
+tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile).configureEach {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_21)
+    }
 }

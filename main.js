@@ -549,6 +549,8 @@ app.whenReady().then(() => {
     island: toggleIsland,
     volUp: () => send('island:action', { type: 'volume', delta: 0.05 }),
     volDown: () => send('island:action', { type: 'volume', delta: -0.05 }),
+    // остальное делает сам плеер (renderer/app.js → onThumb)
+    ...Object.fromEntries(['seekFwd', 'seekBack', 'mute', 'shuffle', 'repeat', 'wave', 'like', 'karaoke', 'sleep'].map((a) => [a, () => send('thumb', a)])),
   });
   account.init((ev) => {
     if (ev.changed?.albums) local.allowFiles(albums.localPaths());

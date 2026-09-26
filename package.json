@@ -47,7 +47,8 @@
       "src/**/*",
       "native/**/*",
       "renderer/**/*",
-      "!renderer/mobile.*"
+      "!renderer/mobile.*",
+      "!renderer/native.js"
     ],
     "asarUnpack": [
       "native/**/*"

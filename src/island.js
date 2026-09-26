@@ -117,7 +117,7 @@ function ensure() {
   });
   // заход курсора на капсулу решает главный процесс: события мыши в прозрачном окне врут при
   // переключении «пропускать клики / ловить» (ложный mouseleave — капсула закрывалась и клики уходили)
-  hoverWatch.watch(win, { onInside: (on) => { if (ready && !win.isDestroyed()) win.webContents.send('island:pointer', on); } });
+  hoverWatch.watch(win, { leaveDelay: 350, onInside: (on) => { if (ready && !win.isDestroyed()) win.webContents.send('island:pointer', on); } });
   level();
   win.loadFile(path.join(__dirname, '..', 'renderer', 'island.html'));
   win.webContents.once('did-finish-load', () => {
@@ -141,6 +141,7 @@ function level() {
 // окно не нарисовать никак — там помогает только режим «оконный без рамки» в самой игре
 setInterval(() => {
   if (!win || win.isDestroyed() || !win.isVisible()) return;
+  if (hoverWatch.isInside(win)) return; // курсор на острове — не трогаем окно, чтобы не сорвать клик
   if (display().id !== placedOn) place(); // курсор ушёл на другой монитор — остров за ним
   win.setAlwaysOnTop(true, 'screen-saver');
   win.moveTop();

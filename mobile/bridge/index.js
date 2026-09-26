@@ -94,6 +94,7 @@ function pushMedia(patch) {
 }
 Aveon.addListener('media', ({ action, pos }) => {
   if (action === 'barrel') { setManual(!call$.manual); return; }
+  if (action === 'wave') { window.dispatchEvent(new CustomEvent('aveon-wave')); return; } // виджет «Волна» → renderer/native.js
   if (action === 'seek') { window.dispatchEvent(new CustomEvent('aveon-seek', { detail: pos })); return; }
   send('thumb', action === 'play' || action === 'pause' ? 'toggle' : action);
 });

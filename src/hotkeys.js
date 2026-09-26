@@ -12,10 +12,19 @@ const DEFAULTS = {
   show: 'CommandOrControl+Alt+A',
   mini: 'CommandOrControl+Alt+M',
   island: 'CommandOrControl+Alt+I',
-  volUp: '',
-  volDown: '',
+  volUp: 'CommandOrControl+Alt+Up',
+  volDown: 'CommandOrControl+Alt+Down',
+  seekFwd: 'CommandOrControl+Alt+Shift+Right',
+  seekBack: 'CommandOrControl+Alt+Shift+Left',
+  mute: 'CommandOrControl+Alt+0',
+  shuffle: 'CommandOrControl+Alt+S',
+  repeat: 'CommandOrControl+Alt+R',
+  wave: 'CommandOrControl+Alt+W',
+  like: 'CommandOrControl+Alt+L',
+  karaoke: 'CommandOrControl+Alt+K',
+  sleep: 'CommandOrControl+Alt+Z',
 };
-const ACTIONS = ['play', 'next', 'prev', 'barrel', 'show', 'mini', 'island', 'volUp', 'volDown'];
+const ACTIONS = Object.keys(DEFAULTS).filter((k) => k !== 'enabled');
 
 let handlers = {};
 let failed = [];

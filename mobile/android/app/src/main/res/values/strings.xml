@@ -4,4 +4,12 @@
     <string name="title_activity_main">авеон</string>
     <string name="package_name">com.aveon.player</string>
     <string name="custom_url_scheme">com.aveon.player</string>
+    <string name="widget_now">Сейчас играет: обложка, пауза и переключение треков</string>
+    <string name="widget_wave">Волна: включить одним нажатием</string>
+    <string name="widget_barrel">Бочка: музыка глухо, как из-за стенки</string>
+    <string name="widget_stats">Статистика: сколько музыки сегодня и за месяц</string>
+    <string name="widget_now_label">Сейчас играет</string>
+    <string name="widget_wave_label">Волна</string>
+    <string name="widget_barrel_label">Бочка</string>
+    <string name="widget_stats_label">Статистика</string>
 </resources>

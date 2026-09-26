@@ -14,11 +14,13 @@ function applyKaraoke() {
   fx.kBass.gain.setTargetAtTime(on ? 0.9 : 0, t, 0.08);
 }
 
-function toggleKaraoke(force) {
+// screen: false — только убрать голос, без экрана с текстом (горячая клавиша из другого окна)
+function toggleKaraoke(force, { screen = true } = {}) {
   karaoke.on = typeof force === 'boolean' ? force : !karaoke.on;
   ensureGraph();
   applyKaraoke();
   document.documentElement.classList.toggle('karaoke-on', karaoke.on);
+  if (!screen) return;
   if (karaoke.on) {
     enterFs(); // fullscreen.js: обложка и текст на весь экран
     toast('Караоке: голос убран, пой! Выйти — K или Esc');

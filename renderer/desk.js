@@ -19,12 +19,24 @@ const HOTKEYS = [
   ['island', 'Остров вкл / выкл'],
   ['volUp', 'Громче'],
   ['volDown', 'Тише'],
+  ['seekFwd', 'Вперёд на 10 секунд'],
+  ['seekBack', 'Назад на 10 секунд'],
+  ['mute', 'Без звука / со звуком'],
+  ['shuffle', 'Перемешать вкл / выкл'],
+  ['repeat', 'Повтор: выкл → список → трек'],
+  ['wave', 'Волна: включить / пауза'],
+  ['like', 'Нравится (в волне)'],
+  ['karaoke', 'Караоке: убрать голос'],
+  ['sleep', 'Таймер сна на 30 минут / выключить'],
 ];
 
 const HK_DEFAULTS = {
   play: 'CommandOrControl+Alt+Space', next: 'CommandOrControl+Alt+Right', prev: 'CommandOrControl+Alt+Left',
   barrel: 'CommandOrControl+Alt+B', show: 'CommandOrControl+Alt+A', mini: 'CommandOrControl+Alt+M',
-  island: 'CommandOrControl+Alt+I', volUp: '', volDown: '',
+  island: 'CommandOrControl+Alt+I', volUp: 'CommandOrControl+Alt+Up', volDown: 'CommandOrControl+Alt+Down',
+  seekFwd: 'CommandOrControl+Alt+Shift+Right', seekBack: 'CommandOrControl+Alt+Shift+Left', mute: 'CommandOrControl+Alt+0',
+  shuffle: 'CommandOrControl+Alt+S', repeat: 'CommandOrControl+Alt+R', wave: 'CommandOrControl+Alt+W',
+  like: 'CommandOrControl+Alt+L', karaoke: 'CommandOrControl+Alt+K', sleep: 'CommandOrControl+Alt+Z',
 };
 
 let desk = null; // ответ desk:status
@@ -110,7 +122,7 @@ function deskSection() {
 
   <section class="sec" data-sec="hotkeys">
     <h3 class="sec-title">Горячие клавиши на всю систему</h3>
-    <p class="sec-desc">Работают, даже когда плеер свёрнут или открыта игра. Нажми на сочетание и зажми новое; Backspace — убрать.</p>
+    <p class="sec-desc">Работают в любом окне — когда плеер свёрнут, спрятан в трей или открыта игра. Что поменялось, покажет остров. Нажми на сочетание и зажми новое; Backspace — убрать.</p>
     <div class="field"><label>Включены</label><div class="ctl"><label class="switch"><input type="checkbox" id="hk-enabled" ${hk.enabled ? 'checked' : ''} aria-label="Горячие клавиши"><span></span></label></div></div>
     <div class="sub-fields" ${hk.enabled ? '' : 'data-off'}>
       ${HOTKEYS.map(([id, label]) => `<div class="field"><label>${label}</label><div class="ctl">

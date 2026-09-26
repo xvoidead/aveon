@@ -274,8 +274,9 @@ function tick() {
 }
 requestAnimationFrame(tick);
 
-// Наведение: капсула раскрывается. Зашёл ли курсор и ушёл ли, говорит главный процесс (src/hover.js):
-// свои mouseenter/mouseleave здесь врут, когда окно переключается «пропускать клики / ловить»
+// Наведение: капсула раскрывается. Зашёл ли курсор и ушёл ли, решает только главный процесс
+// (src/hover.js, по часам и с задержкой на уход): mouseleave и :hover здесь врут, когда окно
+// переключается «пропускать клики / ловить», — капсула сворачивалась под курсором, и кнопки не нажимались
 function pointerIn() {
   api.island.log?.('pointerIn', pill.className);
   clearTimeout(leaveTimer);
@@ -286,29 +287,20 @@ function pointerIn() {
   fitWidth();
   window.sendPillRect?.(); // сразу, не дожидаясь кадра
   requestAnimationFrame(fitLyricLine); // строку текста меряем, когда у неё появилась ширина
-  // Пока остров раскрыт, окно ловит мышь целиком (src/hover.js → setHover), а ушёл ли курсор,
-  // решаем здесь по :hover. Раньше решал главный процесс по границе капсулы — она отставала,
-  // пока капсула росла вниз, и остров сворачивался, едва курсор доходил до кнопок ленты
   api.island.hover(true);
 }
 function pointerOut() {
   api.island.log?.('pointerOut', pill.className, 'hover', pill.matches(':hover'));
   clearTimeout(leaveTimer);
-  leaveTimer = setTimeout(() => {
-    if (pill.matches(':hover')) return; // курсор всё-таки на капсуле
-    pill.classList.remove('open');
-    api.island.hover(false);
-    renderLabel();
-    // уведомление, пришедшее под курсором, — сейчас, если ещё свежее
-    const p = pendingNotice;
-    pendingNotice = null;
-    if (p && Date.now() - p.at < 8000) notice(p.text, p.av, p.kind);
-  }, 220);
+  pill.classList.remove('open');
+  renderLabel();
+  // уведомление, пришедшее под курсором, — сейчас, если ещё свежее
+  const p = pendingNotice;
+  pendingNotice = null;
+  if (p && Date.now() - p.at < 8000) notice(p.text, p.av, p.kind);
 }
 pill.addEventListener('mouseenter', pointerIn); // быстрее часов главного процесса, если событие пришло
-pill.addEventListener('mouseleave', () => { if (is('open')) pointerOut(); });
-document.addEventListener('mouseleave', () => { if (is('open')) pointerOut(); });
-// главный процесс: зашёл — раскрыть; «ушёл» у раскрытого проверяем по :hover (окно в это время ловит мышь)
+// главный процесс: зашёл — раскрыть, ушёл (уже с задержкой) — свернуть
 api.island.onPointer((on) => {
   api.island.log?.('onPointer', on);
   if (on === 'reset') { // окно прячут: свернуться сразу, без задержки и без проверки :hover
@@ -318,7 +310,7 @@ api.island.onPointer((on) => {
     renderLabel();
     return;
   }
-  if (on) pointerIn(); else if (!pill.matches(':hover')) pointerOut();
+  if (on) pointerIn(); else pointerOut();
 });
 
 const act = (type, extra) => api.island.action({ type, ...extra });

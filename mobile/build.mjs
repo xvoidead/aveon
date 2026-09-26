@@ -67,7 +67,10 @@ function page(name, extraHead, beforeScripts) {
 }
 page('index.html', '<link rel="stylesheet" href="mobile.css">', '<script src="bridge.js"></script>');
 const index = path.join(www, 'renderer', 'index.html');
-fs.writeFileSync(index, fs.readFileSync(index, 'utf8').replace('<script src="presence.js"></script>', '<script src="presence.js"></script>\n  <script src="mobile.js"></script>'));
+fs.writeFileSync(index, fs.readFileSync(index, 'utf8')
+  .replace('<script src="presence.js"></script>', '<script src="presence.js"></script>\n  <script src="mobile.js"></script>')
+  // мост к Compose-интерфейсу (renderer/native.js) — последним: ему нужны все остальные
+  .replace('</body>', '  <script src="native.js"></script>\n</body>'));
 // Эквалайзер открывается шторкой в iframe и пользуется тем же мостом, что и плеер
 page('eqpop.html', '<link rel="stylesheet" href="mobile.css">', '<script>window.tishe = parent.tishe;</script>');
 
