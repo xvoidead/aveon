@@ -85,7 +85,10 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 .friends { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgb(255 255 255 / .08); font-size: 12px; color: rgb(244 241 236 / .65); }
 .friends i { width: 22px; height: 22px; margin-left: -6px; border-radius: 50%; display: grid; place-items: center; font: 600 11px "Onest", sans-serif; font-style: normal; color: #000; background: var(--voice); box-shadow: 0 0 0 2px #000; }
 .friends i:first-child { margin-left: 0; }
-.friends span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* не влезает — строка катается влево-вправо: сдвиг = ширина строки (100cqw) − ширина текста, для короткой он 0 */
+.friends span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; container-type: inline-size; }
+.friends span em { display: inline-block; width: max-content; font-style: normal; animation: sway 7s ease-in-out infinite alternate; }
+@keyframes sway { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(min(0px, calc(100cqw - 100%))); } }
 .dot { position: absolute; left: 26px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--voice); box-shadow: 0 0 0 2px #000; display: none; }
 .pill.friend-live:not(.open) .dot { display: block; }
 

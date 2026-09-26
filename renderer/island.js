@@ -187,10 +187,14 @@ function renderFriends(f) {
   const parts = [];
   if (f.count) parts.push(f.count === 1 ? `${esc(f.live[0].name)} слушает «${esc(f.live[0].title)}»` : `${f.count} ${plural(f.count, 'друг слушает', 'друга слушают', 'друзей слушают')} музыку`);
   if (f.room) parts.push(`вместе: ${f.room}`);
-  box.innerHTML = `${f.live.map((x) => {
+  const html = `${f.live.map((x) => {
     const bg = avatarCss(x.av);
     return `<i title="${esc(x.name)} — ${esc(x.title)}"${bg ? ` class="pic" style='background-image:${bg}'` : ''}>${bg ? '' : esc(x.letter)}</i>`;
-  }).join('')}<span>${parts.join(' · ')}</span>`;
+  }).join('')}<span><em>${parts.join(' · ')}</em></span>`;
+  // перерисовка на каждом тике сбрасывала бы бегущую строку — меняем, только если что-то поменялось
+  if (html === box._html) return;
+  box._html = html;
+  box.innerHTML = html;
 }
 
 // Новый трек — капсула на пару секунд показывает, что заиграло
