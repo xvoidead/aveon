@@ -28,6 +28,7 @@ import okhttp3.ResponseBody;
  * Что в Electron делают протокол media:// и allowCors() в main.js:
  *  - /_media/local?p=content://…  — свой файл с перемоткой (Range);
  *  - /_media/cover?p=…, /_media/art?f=… — обложка из тегов и своя обложка;
+ *  - /_media/cache?f=… — трек из кэша (src/cache.js);
  *  - картинки, аудио и HLS-сегменты с чужих сайтов качаются здесь и получают
  *    Access-Control-Allow-Origin — без него Web Audio (бочка, эквалайзер, спектр) слышит тишину,
  *    а палитра не может прочитать обложку.
@@ -76,6 +77,11 @@ public class AveonWebViewClient extends BridgeWebViewClient {
                 if (!LocalMedia.allowed(p)) return status(403, "Forbidden");
                 return file(Uri.parse(p), header(req, "Range"));
             }
+            case "cache": {
+                File f = AveonPlugin.cacheFile(ctx, url.getQueryParameter("f"));
+                if (f == null || !f.isFile() || f.getName().endsWith(".part")) return status(404, "Not Found");
+                return file(Uri.fromFile(f), header(req, "Range"));
+            }
             case "cover": {
                 byte[] b = LocalMedia.cover(ctx, url.getQueryParameter("p"));
                 if (b == null) return status(404, "Not Found");
@@ -96,7 +102,7 @@ public class AveonWebViewClient extends BridgeWebViewClient {
     }
 
     private WebResourceResponse file(Uri uri, String range) throws IOException {
-        String type = ctx.getContentResolver().getType(uri);
+        String type = "file".equals(uri.getScheme()) ? byExt(uri.getPath()) : ctx.getContentResolver().getType(uri);
         if (type == null || !type.startsWith("audio")) {
             String ext = MimeTypeMap.getFileExtensionFromUrl(uri.toString());
             String guess = ext == null ? null : MimeTypeMap.getSingleton().getMimeTypeFromExtension(ext.toLowerCase(Locale.ROOT));
@@ -133,6 +139,18 @@ public class AveonWebViewClient extends BridgeWebViewClient {
         }
         h.put("Content-Length", String.valueOf(size));
         return new WebResourceResponse(type, null, 200, "OK", h, in);
+    }
+
+    // Файлы кэша: тип по расширению — таблица Android путает m4a и aac
+    private static String byExt(String path) {
+        if (path == null) return null;
+        if (path.endsWith(".mp3")) return "audio/mpeg";
+        if (path.endsWith(".m4a")) return "audio/mp4";
+        if (path.endsWith(".aac")) return "audio/aac";
+        if (path.endsWith(".ogg")) return "audio/ogg";
+        if (path.endsWith(".webm")) return "audio/webm";
+        if (path.endsWith(".flac")) return "audio/flac";
+        return null;
     }
 
     // ---- чужие сайты: с CORS ----

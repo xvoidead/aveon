@@ -64,6 +64,7 @@ const DEFAULTS = {
     preamp: 0, // дБ
     custom: [], // свои пресеты: { id: 'u:…', name, gains, preamp }
   },
+  cache: { keep: true, limitMb: 2048 }, // треки сохраняются сами, пока их слушаешь (src/cache.js)
   mxm: { token: '' }, // токен Musixmatch: выдаётся редко, поэтому храним
 };
 

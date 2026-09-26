@@ -1065,3 +1065,15 @@ button.fr-main:not(:disabled):hover { background: var(--rivet); }
 html.mobile .desktop-only { display: none !important; }
 .duck-manual { padding: 5px 12px; font-size: 12px; margin-left: auto; }
 .duck-manual[aria-pressed="true"] { background: var(--voice); color: var(--oak); border-color: transparent; }
+
+/* ---------- кэш (renderer/cache.js) ---------- */
+.cache-meter { margin: 14px 0 6px; }
+.cache-bar { height: 8px; border-radius: 8px; background: var(--rivet); overflow: hidden; }
+.cache-bar i { display: block; height: 100%; min-width: 2px; border-radius: 8px; background: var(--amber); transition: width .4s ease; }
+.cache-legend { display: flex; align-items: baseline; gap: 6px; margin-top: 8px; color: var(--text-3); font-size: 13px; }
+.cache-legend b { color: var(--text); font: 600 15px var(--ui); }
+.cache-dl { margin-left: auto; color: var(--amber); font-size: 12px; }
+.cache-rows { display: flex; flex-direction: column; margin: 8px 0 4px; }
+.cache-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--rivet-2); }
+.cache-row b { display: block; font-weight: 500; }
+.cache-row small { color: var(--text-3); font-size: 12px; }

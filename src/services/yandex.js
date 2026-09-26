@@ -123,7 +123,7 @@ async function streamClassic(trackId) {
   const d = await request(infoUrl, { headers: headers() });
   const info = typeof d === 'string' ? parseXmlInfo(d) : d;
   const sign = crypto.createHash('md5').update(SIGN_SALT + info.path.slice(1) + info.s).digest('hex');
-  return { url: `https://${info.host}/get-mp3/${sign}/${info.ts}${info.path}`, hls: false, preview: !!mp3.preview };
+  return { url: `https://${info.host}/get-mp3/${sign}/${info.ts}${info.path}`, hls: false, preview: !!mp3.preview, mime: 'audio/mpeg' };
 }
 
 function parseXmlInfo(xml) {
@@ -142,7 +142,7 @@ async function streamFileInfo(trackId) {
   const res = await api('/get-file-info', { ts, trackId, quality, codecs: codecs.join(','), transports, sign });
   const info = res.downloadInfo || res.download_info;
   if (!info?.url) throw new Error('get-file-info не вернул ссылку');
-  return { url: info.url, hls: false };
+  return { url: info.url, hls: false, mime: info.codec ? `audio/${info.codec}` : '' };
 }
 
 async function stream(track) {

@@ -4,6 +4,8 @@ const config = require('./config');
 const sc = require('./services/soundcloud');
 const ym = require('./services/yandex');
 const sp = require('./services/spotify');
+const texts = require('./services/texts');
+const cache = require('./cache');
 
 const SOURCES = { sc, ym, sp };
 let local = null; // services/local.js на Windows, mobile/bridge/local.js на Android
@@ -62,8 +64,22 @@ async function matchTrack(track) {
   return best.r;
 }
 
+// Трек уже в кэше — играем с диска; иначе берём поток сервиса и докачиваем его в кэш вместе с текстом
 async function resolveStream(track) {
   if (track.source === 'local') return { url: local.streamUrl(track.ref.path), hls: false };
+  const hit = cache.cachedStream(track);
+  if (hit) return hit;
+  const s = await serviceStream(track);
+  keep(track, s);
+  return s;
+}
+
+function keep(track, s) {
+  cache.remember(track, s);
+  if (!s.preview) texts.find(track).catch(() => {});
+}
+
+async function serviceStream(track) {
   if (track.source === 'sp') {
     const m = await matchTrack(track);
     const s = await SOURCES[m.source].stream(m);
@@ -84,6 +100,8 @@ async function sharedStream(track) {
   if (direct) {
     try { return await resolveStream(track); } catch {}
   }
+  const hit = cache.cachedStream(track);
+  if (hit) return hit;
   let m;
   try {
     m = await matchTrack(track);
@@ -92,7 +110,9 @@ async function sharedStream(track) {
     throw e;
   }
   const st = await SOURCES[m.source].stream(m);
-  return { ...st, cover: m.cover, via: { source: m.source, title: m.title, artist: m.artist, label: `У друга ${FROM[track.source] || ''}, звучит через ${NAMES_RU[m.source]}` } };
+  const out = { ...st, cover: m.cover, via: { source: m.source, title: m.title, artist: m.artist, label: `У друга ${FROM[track.source] || ''}, звучит через ${NAMES_RU[m.source]}` } };
+  keep(track, out);
+  return out;
 }
 
 module.exports = { init, resolveStream, sharedStream, matchCache, SOURCES };

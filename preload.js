@@ -88,6 +88,11 @@ contextBridge.exposeInMainWorld('tishe', {
     avatar: (userId, at) => call('fr:avatar', userId, at),
     now: (p) => ipcRenderer.send('fr:now', p),
   },
+  cache: {
+    info: () => call('cache:info'),
+    clear: (kind) => call('cache:clear', kind),
+    onChange: (cb) => on('cache:changed', cb),
+  },
   store: {
     get: (name) => call('store:get', name),
     set: (name, data) => call('store:set', name, data),

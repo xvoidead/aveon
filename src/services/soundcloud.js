@@ -128,7 +128,7 @@ async function stream(track) {
     if (auth) u.searchParams.set('track_authorization', auth);
     try {
       const res = await request(u, { headers: headers() });
-      if (res?.url) return { url: res.url, hls: pick.format.protocol === 'hls', preview: !!pick.snipped };
+      if (res?.url) return { url: res.url, hls: pick.format.protocol === 'hls', preview: !!pick.snipped, mime: pick.format.mime_type || '' };
     } catch (e) {
       lastErr = e;
     }
