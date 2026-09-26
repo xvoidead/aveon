@@ -604,6 +604,32 @@ function prev() {
 
 // ---------- сейчас играет ----------
 
+// Какой трек заиграет следующим: с учётом перемешивания, повтора и недоступных треков
+function upNextTrack() {
+  if (!state.queue.length || state.cfg.repeat === 'one') return null;
+  const n = state.order.length;
+  for (let step = 1; step < n || (step === n && state.cfg.repeat === 'all'); step++) {
+    const p = state.pos + step;
+    if (p >= n && state.cfg.repeat !== 'all') return null;
+    const t = state.queue[state.order[p % n]];
+    if (t?.playable !== false) return t.id === state.track?.id ? null : t;
+  }
+  return null;
+}
+
+function renderUpNext() {
+  const t = Together.active() && Together.room.members.length > 1 ? null : upNextTrack(); // вместе трек выбирает ведущий
+  const el = $('#up-next');
+  el.hidden = !t;
+  if (!t || el.dataset.id === t.id) return;
+  el.dataset.id = t.id;
+  $('#up-next-pic').innerHTML = t.cover ? `<img src="${esc(t.cover)}" alt="" loading="lazy">` : esc(initialOf(t.title));
+  $('#up-next-title').textContent = t.title;
+  $('#up-next-artist').textContent = t.artist || '';
+}
+const initialOf = (s) => (String(s || '♪').trim()[0] || '♪').toUpperCase();
+$('#up-next').onclick = () => next();
+
 function showNow(track, stream) {
   state.via = stream?.via || null;
   $('#now-title').textContent = track.title;
@@ -631,6 +657,7 @@ function showNow(track, stream) {
     });
   }
   renderProgress();
+  renderUpNext();
   onTrackShown(track); // extras.js: палитра, статистика, текст песни
 }
 
@@ -2076,12 +2103,14 @@ function toggleShuffle() {
   saveCfg({ shuffle: state.cfg.shuffle });
   if (state.queue.length) buildOrder(state.order[state.pos]);
   renderModes();
+  renderUpNext();
 }
 
 function cycleRepeat() {
   state.cfg.repeat = { off: 'all', all: 'one', one: 'off' }[state.cfg.repeat];
   saveCfg({ repeat: state.cfg.repeat });
   renderModes();
+  renderUpNext();
 }
 
 function renderModes() {
@@ -2126,6 +2155,17 @@ makeSlider($('#progress'), {
   },
 });
 makeSlider($('#volume'), { onInput: (f) => setVolume(f, false), onChange: (f) => setVolume(f, true) });
+
+// Над полосой прогресса — время в точке под курсором
+$('#progress').addEventListener('pointermove', (e) => {
+  const el = $('#progress');
+  const r = el.getBoundingClientRect();
+  const f = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  const d = audio.duration || state.track?.duration || 0;
+  const tip = $('#seek-tip');
+  tip.textContent = fmt(f * d);
+  tip.style.left = `${Math.min(r.width - tip.offsetWidth / 2, Math.max(tip.offsetWidth / 2, f * r.width))}px`;
+});
 $('#volume').addEventListener('wheel', (e) => {
   e.preventDefault();
   setVolume(Math.min(1, Math.max(0, state.cfg.volume - Math.sign(e.deltaY) * 0.05)), true);

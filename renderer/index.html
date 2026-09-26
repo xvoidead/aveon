@@ -95,7 +95,7 @@
 
     <div class="progress-row">
       <span class="time" id="time-cur">0:00</span>
-      <div class="slider progress" id="progress"><div class="slider-buf" id="progress-buf"></div><div class="slider-fill" id="progress-fill"></div><div class="slider-knob"></div></div>
+      <div class="slider progress" id="progress"><div class="slider-buf" id="progress-buf"></div><div class="slider-fill" id="progress-fill"></div><div class="slider-knob"></div><span class="seek-tip" id="seek-tip">0:00</span></div>
       <span class="time" id="time-dur">0:00</span>
     </div>
 
@@ -110,11 +110,19 @@
     <div class="volume-row">
       <button class="icon-btn small" id="btn-mute" aria-label="Выключить звук"><svg><use href="#i-vol"/></svg></button>
       <div class="slider volume" id="volume"><div class="slider-fill" id="volume-fill"></div><div class="slider-knob"></div></div>
+      <div class="volume-tools">
       <button class="icon-btn small" id="btn-eq" aria-label="Эквалайзер" title="Эквалайзер (E)" aria-pressed="false"><svg><use href="#i-eq"/></svg></button>
       <button class="icon-btn small" id="btn-lyrics" aria-label="Текст песни" title="Текст песни (L)" aria-pressed="false"><svg><use href="#i-lyrics"/></svg></button>
       <button class="icon-btn small" id="btn-fs" aria-label="Во весь экран" title="Во весь экран (F)"><svg><use href="#i-full"/></svg></button>
       <button class="icon-btn small" id="btn-now-album" aria-label="Добавить в альбом" title="Добавить в альбом" disabled><svg><use href="#i-album-add"/></svg></button>
+      </div>
     </div>
+
+    <button class="up-next" id="up-next" hidden title="Включить следующий трек">
+      <span class="up-next-pic" id="up-next-pic"></span>
+      <span class="up-next-main"><small>дальше</small><b id="up-next-title"></b><span id="up-next-artist"></span></span>
+      <svg><use href="#i-next"/></svg>
+    </button>
 
     <div class="call" id="discord">
       <div class="call-head">
