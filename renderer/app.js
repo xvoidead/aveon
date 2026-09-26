@@ -1567,6 +1567,7 @@ async function renderSettings() {
         <input id="crossfade" type="range" min="0" max="12" step="1" value="${+c.crossfade || 0}">
         <span class="val" id="crossfade-val">${fadeLabel(c.crossfade)}</span></div></div>
       <div class="field"><label>Названия треков как есть</label><div class="ctl"><label class="switch"><input type="checkbox" id="keep-titles" ${c.ui?.keepTitles ? 'checked' : ''} aria-label="Названия треков как есть"><span></span></label></div></div>
+      <div class="field"><label>Прятать кнопки окна</label><div class="ctl"><label class="switch"><input type="checkbox" id="autohide-win" ${c.ui?.autoHideWin !== false ? 'checked' : ''} aria-label="Прятать кнопки окна"><span></span></label></div></div>
     </section>
 
     <section class="sec" data-sec="duck">
@@ -1668,6 +1669,11 @@ ${censorSettingsHtml()}
     $('#crossfade-val', body).textContent = fadeLabel(+e.target.value);
   };
   $('#crossfade', body).onchange = (e) => saveCfg({ crossfade: +e.target.value });
+  $('#autohide-win', body).onchange = (e) => {
+    state.cfg.ui.autoHideWin = e.target.checked;
+    applyWinAutohide();
+    saveCfg({ ui: { autoHideWin: e.target.checked } });
+  };
   $('#keep-titles', body).onchange = (e) => {
     document.body.classList.toggle('keep-titles', e.target.checked);
     saveCfg({ ui: { keepTitles: e.target.checked } });
@@ -1824,6 +1830,7 @@ function applySynced(changed) {
     api.config.get().then((cfg) => {
       state.cfg = cfg;
       document.body.classList.toggle('keep-titles', !!cfg.ui?.keepTitles);
+      applyWinAutohide();
       syncDuckSwitch();
       if (!$('#settings').hidden) renderSettings();
     });
@@ -2146,6 +2153,23 @@ document.addEventListener('keydown', (e) => {
 // ---------- окно ----------
 
 $$('[data-win]').forEach((b) => { b.onclick = () => api.win.action(b.dataset.win); });
+
+// Кнопки окна прячутся и проявляются, когда курсор подходит к правому верхнему углу
+const WIN_ZONE = { w: 240, h: 64 };
+let winHideTimer = 0;
+function setWinReveal(on) {
+  clearTimeout(winHideTimer);
+  if (on) document.body.classList.add('win-reveal');
+  else winHideTimer = setTimeout(() => document.body.classList.remove('win-reveal'), 700);
+}
+document.addEventListener('pointermove', (e) => {
+  if (!document.body.classList.contains('win-autohide')) return;
+  setWinReveal(e.clientY < WIN_ZONE.h && e.clientX > innerWidth - WIN_ZONE.w);
+}, { passive: true });
+document.documentElement.addEventListener('pointerleave', () => setWinReveal(false));
+function applyWinAutohide() {
+  document.body.classList.toggle('win-autohide', state.cfg.ui?.autoHideWin !== false);
+}
 api.win.onThumb((action) => {
   if (locked()) return;
   if (action === 'toggle') togglePlay();
@@ -2161,6 +2185,7 @@ async function init() {
   state.account = await api.account.status().catch(() => state.account);
   if (!state.account.loggedIn) showAuth();
   document.body.classList.toggle('keep-titles', !!state.cfg.ui?.keepTitles);
+  applyWinAutohide();
   syncDuckSwitch();
   renderModes();
   applyVolume();

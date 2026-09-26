@@ -12,7 +12,10 @@ const DEFAULTS = {
   view: 'local',
   discord: { enabled: true }, // статус «Слушает» в Discord
   crossfade: 6, // с — плавный переход между треками, 0 — выключен
-  ui: { keepTitles: false }, // true — названия треков без строчного стиля
+  ui: {
+    keepTitles: false, // true — названия треков без строчного стиля
+    autoHideWin: true, // кнопки окна появляются, только когда к ним подводишь курсор
+  },
   localFolders: [],
   sc: { clientId: '', profile: '' },
   ym: {},

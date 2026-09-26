@@ -50,6 +50,9 @@ svg { width: 18px; height: 18px; flex: none; }
 .win-buttons button:hover { background: var(--rivet-2); color: var(--text); }
 .win-buttons .win-close:hover { background: #b3261e; color: #fff; }
 .win-buttons svg { width: 15px; height: 15px; }
+/* Авто-скрытие: кнопки проявляются, когда курсор у правого верхнего угла (см. app.js) */
+body.win-autohide .win-buttons { opacity: 0; transform: translateY(-8px); transition: opacity .22s ease, transform .22s ease; }
+body.win-autohide.win-reveal .win-buttons, body.win-autohide .win-buttons:focus-within { opacity: 1; transform: none; }
 
 /* ---------- сцена с бочкой ---------- */
 .stage {
