@@ -374,6 +374,8 @@ function registerIpc() {
   // Остров, мини-плеер, трей, горячие клавиши, живые обои — для раздела «Остров и окна»
   handle('desk:status', () => ({ hotkeys: hotkeys.status(), livewall: livewall.status(), mini: mini.isOpen() }));
   handle('mini:toggle', () => { mini.toggle(); return mini.isOpen(); });
+  handle('island:screen', () => island.screenInfo());
+  ipcMain.on('island:preview', () => island.preview());
 
   // Discord: что сейчас играет
   ipcMain.on('discord:update', (e, p) => discord.update(p));
