@@ -36,6 +36,8 @@ const LOOK_DEFAULTS = {
   hidden: [],            // скрытые вкладки
   startView: 'last',     // last — где остановился; иначе id вкладки
   badge: true,           // плашка «в бочке» на обложке
+  vinyl: true,           // обложка крутится как пластинка, пока играет (scratch.js)
+  scratch: true,         // обложку можно схватить и скретчить
   dock: 'left',          // где плеер на компьютере: left | right | bottom | top
   reactGain: 100,        // реакция на звук: чувствительность, % (спектр, остров, обои, пульс)
   reactSmooth: 70,       // плавность: 0 — дёргается за каждым ударом, 90 — течёт медленно
@@ -343,6 +345,8 @@ function lookSection() {
     <div class="sub-fields" ${l.viz ? '' : 'data-off'}>${range('vizPower', 'Длина лучей', 30, 250, 10, l.vizPower, '%')}</div>
     ${sw('spin', 'Обруч крутится, пока играет', l.spin)}
     ${sw('badge', 'Надпись «в бочке»', l.badge)}
+    ${sw('vinyl', 'Обложка крутится как пластинка', l.vinyl)}
+    ${sw('scratch', 'Скретч: схвати обложку и крути', l.scratch)}
   </section>
 
   <section class="sec" data-sec="react">
