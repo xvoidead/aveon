@@ -56,7 +56,11 @@ api.island.onState((s) => {
   pill.classList.toggle('barrel', (s.m || 0) > 0.5);
   pill.classList.toggle('pulse', !!o.pulse);
   pill.classList.toggle('rainbow', !!o.rainbow);
-  pill.classList.toggle('lyric', !!(o.lyrics && s.line && s.playing));
+  const ly = o.lyrics ? s.lyric : null;
+  pill.classList.toggle('lyric', !!ly?.has);
+  // длинная строка — остров становится выше и переносит её на вторую строчку
+  pill.classList.toggle('lyric2', !!ly?.has && (ly.cur || '').length > 44);
+  renderLyr(ly);
   pill.classList.toggle('friend-live', !!s.friends?.count);
   renderFriends(s.friends);
   renderLabel();
@@ -71,8 +75,8 @@ function renderLabel() {
   const title = $('#p-title');
   let text;
   if (expanded()) text = st.title || '';
+  else if (is('lyric')) text = st.lyric?.gap ? '♪ ♪ ♪' : st.lyric?.cur || '';
   else if ((st.m || 0) > 0.5) text = st.manual ? 'в бочке' : 'говорят — в бочке';
-  else if (is('lyric')) text = st.line;
   else text = st.title || '';
   if (title.textContent !== text) {
     title.textContent = text;
@@ -85,6 +89,24 @@ function renderLabel() {
     lastLine = text;
   }
   $('#p-sub').textContent = st.artist || '';
+}
+
+// Раскрытый остров: предыдущая, текущая и следующая строки, как караоке
+function renderLyr(ly) {
+  const box = $('#lyr');
+  const has = !!ly?.has;
+  pill.classList.toggle('has-lyr', has);
+  box.hidden = !has;
+  if (!has) return;
+  const cur = ly.gap ? '♪ ♪ ♪' : ly.cur;
+  if ($('#l-cur').textContent !== cur) {
+    $('#l-prev').textContent = ly.prev;
+    $('#l-cur').textContent = cur;
+    $('#l-next').textContent = ly.next;
+    box.classList.remove('swap');
+    void box.offsetWidth;
+    box.classList.add('swap');
+  }
 }
 
 function renderFriends(f) {
