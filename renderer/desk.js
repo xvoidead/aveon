@@ -77,7 +77,7 @@ function deskSection() {
       <div class="field"><label>Где</label><div class="ctl">${dSeg('island', 'pos', [['top', 'Сверху'], ['left', 'Слева сверху'], ['right', 'Справа сверху'], ['bottom', 'Снизу']], i.pos)}</div></div>
       ${islPlaceHtml(i)}
       ${dSw('island', 'onlyAway', 'Только когда плеер свёрнут или не в фокусе', i.onlyAway)}
-      ${dSw('island', 'hideInGames', 'Прятать, пока запущена игра', i.hideInGames)}
+      ${dSw('island', 'hideInGames', 'Прятать, когда на экране игра', i.hideInGames)}
       ${dSw('island', 'lyrics', 'Строка текста песни, пока играет', i.lyrics)}
       ${dSw('island', 'friends', 'Друзья: кто слушает и кто в комнате', i.friends)}
       ${dSw('island', 'notify', 'Уведомления: заявки, друг включил трек, кто-то зашёл в комнату', i.notify)}

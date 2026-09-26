@@ -1,14 +1,12 @@
-// Запущена ли игра: список запущенных процессов сверяем со списком игр Discord — по нему Discord
+// Игра ли в активном окне: имя его процесса сверяем со списком игр Discord — по нему Discord
 // пишет «Играет в …» (https://discord.com/api/v10/applications/detectable, ~24 тыс. игр).
 // Список качаем раз в неделю и храним сжатым: только «имя exe → название игры» для Windows.
 const { app } = require('electron');
-const { execFile } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 
 const LIST_URL = 'https://discord.com/api/v10/applications/detectable';
 const REFRESH = 7 * 24 * 3600 * 1000;
-const EVERY = 5000;
 // слишком общие имена: так называются и не игры
 const GENERIC = new Set(['launcher.exe', 'client.exe', 'nw.exe', 'autorun.exe', 'java.exe', 'update.exe', 'setup.exe', 'electron.exe', 'start.exe']);
 
@@ -50,39 +48,36 @@ function load() {
   return loading;
 }
 
-// Имена запущенных процессов. tasklist есть в любой Windows, без оболочки и без PowerShell
-function processes() {
-  return new Promise((resolve) => {
-    execFile('tasklist', ['/fo', 'csv', '/nh'], { windowsHide: true, maxBuffer: 8 * 1024 * 1024 }, (err, out) => {
-      if (err) { resolve([]); return; }
-      // "имя","PID","сеанс","№ сеанса","память" — службы (сеанс 0) не игры: lms.exe у Intel — не «Last Man Standing»
-      resolve(out.split(/\r?\n/).map((l) => l.match(/^"([^"]+)","\d+","[^"]*","(\d+)"/)).filter((m) => m && m[2] !== '0').map((m) => m[1].toLowerCase()));
-    });
-  });
-}
+// Активное окно — от DuckMon (native/DuckMon.cs, поле fg: имя процесса без .exe), ~30 раз в секунду.
+// Игра — когда её окно перед глазами: свёрнутая или позади — не считается
+let fgName = null;
+let needed = () => false;
 
-async function check() {
-  if (!names) return;
-  let found = null;
-  for (const exe of await processes()) {
-    if (names[exe]) { found = { exe, name: names[exe] }; break; }
-  }
+function evaluate() {
+  const exe = needed() && names && fgName ? `${fgName}.exe` : '';
+  const found = exe && names[exe] ? { exe, name: names[exe] } : null;
   if ((found?.exe || null) === (current?.exe || null)) return;
   current = found;
   onChange(current);
 }
 
-// Следим, пока нужно (включён остров и «прятать в играх»); needed() спрашиваем каждый раз
-function start(needed, cb) {
+function foreground(name) {
+  name = String(name || '').toLowerCase();
+  if (name === fgName) return;
+  fgName = name;
+  evaluate();
+}
+
+// needed() — нужно ли следить (включён остров и «прятать в играх»); спрашиваем каждый раз.
+// Раз в 5 с: догрузить список и пересчитать — вдруг настройку включили, когда игра уже на экране
+function start(isNeeded, cb) {
+  needed = isNeeded;
   onChange = cb;
   if (timer) return;
   timer = setInterval(() => {
-    if (!needed()) {
-      if (current) { current = null; onChange(null); }
-      return;
-    }
-    load().then(check);
-  }, EVERY);
+    if (needed()) load().then(evaluate);
+    else evaluate();
+  }, 5000);
 }
 
-module.exports = { start, current: () => current };
+module.exports = { start, foreground, current: () => current };

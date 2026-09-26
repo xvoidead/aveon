@@ -1414,3 +1414,9 @@ html.mobile .wave-row > span { width: 100%; }
 .fp-tracks { display: flex; flex-direction: column; gap: 2px; }
 .fp-tracks .fr-track { margin: 0 -4px; }
 .fr-main { cursor: pointer; }
+
+/* имя друга и метка «в руме»: длинное имя режется многоточием, метка всегда целиком */
+.fr-name { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.fr-text b.fr-name, .fp-who h2.fr-name { overflow: visible; white-space: normal; }
+.fr-name > span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fr-name .fr-tag { flex: none; margin-left: 0; line-height: 16px; white-space: nowrap; }

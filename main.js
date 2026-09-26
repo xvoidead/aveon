@@ -16,6 +16,7 @@ const thumbar = require('./src/thumbar');
 const censor = require('./src/censor');
 const account = require('./src/account');
 const together = require('./src/together');
+const games = require('./src/games');
 const friends = require('./src/friends');
 const discord = require('./src/discord');
 const eqpop = require('./src/eqpop');
@@ -495,7 +496,7 @@ app.whenReady().then(() => {
   registerIpc();
   createWindow();
   duck.setTargets(config.get().duck.targets);
-  duck.start((m) => send('duck:meter', m), (s) => send('duck:status', s));
+  duck.start((m) => { games.foreground(m.fg); send('duck:meter', m); }, (s) => send('duck:status', s)); // fg — активное окно (src/games.js)
   together.init((ev) => send('together:event', ev));
   cache.init(cacheFiles, (ev) => send('cache:changed', ev)).catch((e) => console.warn('cache init:', e.message));
   eqpop.init((open) => send('eqpop:shown', open));
