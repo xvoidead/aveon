@@ -4,7 +4,7 @@
 // Общие глобальные из app.js и соседей: state, api, audio, $, $$, esc, togglePlay, next, …
 
 (() => {
-  if (!IS_MOBILE) return;
+  if (!IS_MOBILE || window.AveonUI) return; // Compose-интерфейс (native.js) рисует телефон сам
   const root = document.documentElement;
 
   // ---- мини-плеер ----
