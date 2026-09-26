@@ -125,7 +125,7 @@ function spinFrame(t) {
   const dt = Math.min(0.1, (t - vinyl.lastFrame) / 1000);
   vinyl.lastFrame = t;
   if (!vinyl.held && vinylOn() && !audio.paused && !document.hidden) vinyl.angle += OMEGA * dt;
-  const el = porthole();
+  const el = $('#barrel'); // на бочке: угол наследуют и обложка, и пластинка «Конверта»
   if (el) el.style.setProperty('--spin', `${(vinyl.angle % 360).toFixed(2)}deg`);
   requestAnimationFrame(spinFrame);
 }

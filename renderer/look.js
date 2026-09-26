@@ -5,6 +5,7 @@
 // Общие глобальные из app.js: state, api, $, $$, esc, toast, ask, saveCfg, VIEWS, NAMES, IS_MOBILE, openView.
 
 const LOOK_DEFAULTS = {
+  skin: 'barrel',        // дизайн: barrel — «Бочка»; sleeve — «Конверт» (см. SKINS)
   theme: 'oak',          // см. THEMES; custom — свой оттенок фона
   hue: 25,               // custom: оттенок фона 0…360
   sat: 30,               // custom: насыщенность фона, %
@@ -64,10 +65,18 @@ const THEMES = {
   custom: { name: 'Свой', hue: null, sat: null },
 };
 
+// Дизайны целиком. «Конверт» — печатный: обложка-конверт с пластинкой, заголовки с засечками,
+// тонкие линейки вместо плашек, почти прямые углы и зерно бумаги. Весь вид — в styles.css (html.skin-sleeve)
+const SKINS = {
+  barrel: { name: 'Бочка', desc: 'Круглая обложка в обручах, мягкие плашки' },
+  sleeve: { name: 'Конверт', desc: 'Пластинка в конверте, засечки и линейки, как в журнале' },
+};
+
 const ACCENTS = ['#f0a63a', '#ff7b6b', '#f5d547', '#7ed49a', '#5cc8e8', '#9aa8ff', '#c792ea', '#ff8ac6', '#e8e1d5'];
 
 const FONTS = {
   unbounded: { name: 'Unbounded', css: '"Unbounded", "Segoe UI", sans-serif' },
+  playfair: { name: 'Playfair', css: '"Playfair Display", Georgia, serif' },
   onest: { name: 'Onest', css: '"Onest", "Segoe UI", sans-serif' },
   system: { name: 'Системный', css: 'system-ui, "Segoe UI", Roboto, sans-serif' },
   serif: { name: 'С засечками', css: 'Georgia, "Times New Roman", "Noto Serif", serif' },
@@ -107,7 +116,10 @@ function applyLook() {
   const vars = themeVars(look);
   if (look.accentMode === 'fixed') vars['--amber'] = look.accent;
   if (look.voice) vars['--voice'] = look.voice;
-  vars['--display'] = (FONTS[look.display] || FONTS.unbounded).css;
+  const sleeve = look.skin === 'sleeve';
+  // в «Конверте» заголовки по умолчанию с засечками; свой шрифт из настроек всё равно главнее
+  const display = sleeve && look.display === LOOK_DEFAULTS.display ? 'playfair' : look.display;
+  vars['--display'] = (FONTS[display] || FONTS.unbounded).css;
   vars['--ui'] = (FONTS[look.text] || FONTS.onest).css;
   vars['--lyrics-scale'] = String(look.lyricsSize / 100);
   vars['--wall-blur'] = `${look.wallBlur}px`;
@@ -117,6 +129,7 @@ function applyLook() {
   // Размер интерфейса: CSS zoom масштабирует всё сразу, и раскладка остаётся живой
   root.style.zoom = look.scale === 100 ? '' : String(look.scale / 100);
   const cls = {
+    'skin-sleeve': sleeve,
     'look-compact': look.density === 'compact', 'look-cozy': look.density === 'cozy',
     'look-no-covers': !look.covers, 'look-no-album': !look.albumCol, 'look-no-time': !look.timeCol,
     'look-calm': look.motion === 'calm', 'look-still': look.motion === 'off',
@@ -132,7 +145,7 @@ function applyLook() {
     'dock-right': !IS_MOBILE && look.dock === 'right', 'dock-bottom': !IS_MOBILE && look.dock === 'bottom', 'dock-top': !IS_MOBILE && look.dock === 'top',
   };
   for (const [k, on] of Object.entries(cls)) root.classList.toggle(k, on);
-  applyRadius(look.radius / 100);
+  applyRadius((look.radius / 100) * (sleeve ? 0.3 : 1)); // «Конверт» почти без скруглений
   applySources();
   reapplyTheme?.(); // extras.js: палитра из обложки знает, трогать ли акцент
 }
@@ -284,10 +297,24 @@ function dockSection(l) {
   </section>`;
 }
 
+// Выбор дизайна: две карточки с маленьким макетом каждого
+function skinSection(l) {
+  const mock = (id) => `<span class="skin-mock ${id}" aria-hidden="true">
+    <span class="sm-stage"><span class="sm-disc"></span><span class="sm-cover"></span><span class="sm-t"></span><span class="sm-a"></span><span class="sm-bar"></span></span>
+    <span class="sm-lib"><span class="sm-h"></span>${'<span class="sm-row"><i></i><b></b></span>'.repeat(5)}</span>
+  </span>`;
+  return `<section class="sec" data-sec="skin">
+    <h3 class="sec-title">Дизайн</h3>
+    <p class="sec-desc">Внешний вид всего плеера. Тема, акцент, шрифты и остальное ниже работают в обоих.</p>
+    <div class="look-skins">${Object.entries(SKINS).map(([id, s]) => `<button class="look-skin${l.skin === id ? ' on' : ''}" data-skin="${id}">
+      ${mock(id)}<span class="skin-name">${s.name}</span><small>${s.desc}</small></button>`).join('')}</div>
+  </section>`;
+}
+
 function lookSection() {
   const l = lookCfg();
   const order = sourceOrder();
-  return `${dockSection(l)}
+  return `${skinSection(l)}${dockSection(l)}
 
   <section class="sec" data-sec="theme">
     <h3 class="sec-title">Тема</h3>
@@ -427,9 +454,10 @@ function rerenderLook() {
 }
 
 function bindLook(body) {
-  $$('[data-sec="dock"], [data-sec="theme"], [data-sec="colors"], [data-sec="type"], [data-sec="bg"], [data-sec="barrel"], [data-sec="react"], [data-sec="list"], [data-sec="lyricslook"], [data-sec="fsmode"], [data-sec="motion"]', body)
+  $$('[data-sec="skin"], [data-sec="dock"], [data-sec="theme"], [data-sec="colors"], [data-sec="type"], [data-sec="bg"], [data-sec="barrel"], [data-sec="react"], [data-sec="list"], [data-sec="lyricslook"], [data-sec="fsmode"], [data-sec="motion"]', body)
     .forEach((s) => { s.dataset.lookRoot = '1'; });
 
+  $$('[data-skin]', body).forEach((b) => { b.onclick = async () => { await saveLook({ skin: b.dataset.skin }); rerenderLook(); }; });
   $$('[data-theme]', body).forEach((b) => { b.onclick = async () => { await saveLook({ theme: b.dataset.theme }); rerenderLook(); }; });
   $$('[data-look-seg]', body).forEach((g) => {
     $$('button', g).forEach((b) => { b.onclick = async () => { await saveLook({ [g.dataset.lookSeg]: b.dataset.v }); rerenderLook(); }; });

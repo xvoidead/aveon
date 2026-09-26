@@ -2030,3 +2030,262 @@ html:is(.dock-bottom, .dock-top) .call > .together-chip #together-chip-text { mi
 html:is(.dock-bottom, .dock-top) .call > .call-head { flex: none; }
 html:is(.dock-bottom, .dock-top) .call:has(> .together-chip:not(.idle)) .call-state { display: none; }
 html:is(.dock-bottom, .dock-top) .call:has(> .together-chip:not(.idle)) > .together-chip + .call-head { padding-left: 8px; margin-left: 6px; }
+
+/* ---------- выбор дизайна в настройках (look.js → skinSection) ---------- */
+/* скругления макетов через calc(var()) — applyRadius их не трогает, макет «Бочки» остаётся круглым в любом дизайне */
+.look-skins { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 12px 0 4px; }
+.look-skin {
+  display: flex; flex-direction: column; align-items: stretch; gap: 3px; padding: 8px 8px 12px; text-align: left;
+  border: 1px solid var(--rivet-2); border-radius: calc(var(--u, 1px) * 14); color: var(--text-2);
+  transition: border-color .15s ease, transform .15s ease;
+}
+.look-skin:hover { border-color: var(--hoop-dim); }
+.look-skin:active { transform: scale(.985); }
+.look-skin.on { border-color: var(--amber); color: var(--text); }
+.look-skin .skin-name { margin: 8px 4px 0; font-weight: 600; color: var(--text); }
+.look-skin small { margin: 0 4px; font-size: 12px; color: var(--text-3); line-height: 1.4; }
+.skin-mock {
+  display: grid; grid-template-columns: 40% 1fr; height: 124px; overflow: hidden; pointer-events: none;
+  border-radius: calc(var(--u, 1px) * 9); background: var(--oak); box-shadow: inset 0 0 0 1px var(--rivet-2);
+}
+.sm-stage { position: relative; display: flex; flex-direction: column; align-items: center; gap: 5px; padding: 14px 8px 0; background: var(--oak-2); }
+.sm-lib { display: flex; flex-direction: column; gap: 6px; padding: 14px 12px; min-width: 0; }
+.sm-t { width: 62%; height: 5px; border-radius: 3px; background: var(--text); margin-top: 6px; }
+.sm-a { width: 40%; height: 3px; border-radius: 2px; background: var(--text-3); }
+.sm-bar { width: 78%; height: 3px; margin-top: 6px; border-radius: 2px; background: linear-gradient(90deg, var(--amber) 55%, var(--rivet-2) 55%); }
+.sm-row { display: flex; align-items: center; gap: 6px; height: 13px; }
+.sm-row i { width: 11px; height: 11px; flex: none; background: var(--rivet-2); }
+.sm-row b { height: 4px; flex: 1; max-width: 70%; background: var(--hoop-dim); border-radius: 2px; }
+.sm-row:nth-child(3) b { max-width: 52%; } .sm-row:nth-child(5) b { max-width: 60%; }
+.sm-row:nth-child(4) b { background: var(--amber); }
+.sm-h { margin-bottom: 2px; color: var(--text); white-space: nowrap; }
+/* Бочка */
+.skin-mock.barrel .sm-disc { display: none; }
+.skin-mock.barrel .sm-cover {
+  width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, var(--amber), var(--voice));
+  box-shadow: 0 0 0 5px var(--oak-2), 0 0 0 6px var(--hoop), 0 0 0 11px var(--oak-2), 0 0 0 12px var(--hoop-dim);
+  margin: 6px 0 4px;
+}
+.skin-mock.barrel .sm-h::before { content: "Бочка"; font: 700 12px "Unbounded", sans-serif; letter-spacing: -0.02em; }
+.skin-mock.barrel .sm-row { padding: 0 3px; border-radius: calc(var(--u, 1px) * 4); }
+.skin-mock.barrel .sm-row:nth-child(4) { background: var(--rivet); }
+.skin-mock.barrel .sm-row i { border-radius: calc(var(--u, 1px) * 3); }
+/* Конверт */
+.skin-mock.sleeve { background-image: linear-gradient(90deg, transparent 40%, color-mix(in srgb, var(--text) 8%, transparent) 40% calc(40% + 1px), transparent 0); }
+.skin-mock.sleeve .sm-stage { background: var(--oak-2); box-shadow: inset -1px 0 0 color-mix(in srgb, var(--text) 10%, transparent); }
+.skin-mock.sleeve .sm-cover {
+  position: relative; z-index: 1; width: 50px; height: 50px; margin: 4px 14px 4px 0; border-radius: 1px;
+  background: linear-gradient(150deg, var(--amber), color-mix(in srgb, var(--amber) 30%, var(--oak)));
+  box-shadow: 0 8px 14px -6px rgb(0 0 0 / .8);
+}
+.skin-mock.sleeve .sm-disc {
+  position: absolute; top: 20px; left: calc(50% - 16px); width: 46px; height: 46px; border-radius: 50%;
+  background: radial-gradient(circle, var(--amber) 0 22%, #0c0c0c 23% 26%, transparent 27%), repeating-radial-gradient(circle, #151515 0 1px, #202020 1px 2px);
+}
+.skin-mock.sleeve .sm-t { height: auto; border-radius: 0; background: none; width: auto; margin-top: 2px; }
+.skin-mock.sleeve .sm-t::before { content: "Aa"; display: block; font: italic 500 14px/1 "Playfair Display", Georgia, serif; color: var(--text); }
+.skin-mock.sleeve .sm-a { border-radius: 0; height: 2px; width: 34%; margin-top: 4px; }
+.skin-mock.sleeve .sm-bar { height: 1px; border-radius: 0; }
+.skin-mock.sleeve .sm-h::before { content: "Конверт"; font: 500 16px/1 "Playfair Display", Georgia, serif; letter-spacing: -0.01em; }
+.skin-mock.sleeve .sm-row { gap: 6px; padding-bottom: 4px; height: 15px; box-shadow: inset 0 -1px 0 color-mix(in srgb, var(--text) 9%, transparent); }
+.skin-mock.sleeve .sm-row b { height: 3px; border-radius: 0; }
+.skin-mock.sleeve .sm-row:nth-child(4) { box-shadow: inset 2px 0 0 var(--amber), inset 0 -1px 0 color-mix(in srgb, var(--text) 9%, transparent); padding-left: 5px; }
+.skin-mock.sleeve .sm-row i { border-radius: 0; }
+
+/* пластинка есть в разметке всегда, видна только в «Конверте» */
+.disc { display: none; }
+
+/* =====================================================================================
+   ДИЗАЙН «КОНВЕРТ» (look.js → skin: 'sleeve', класс html.skin-sleeve)
+   Печатный: обложка — конверт, из которого выезжает пластинка; заголовки с засечками,
+   цифры и подписи моноширинные, вместо плашек — тонкие линейки, углы почти прямые, зерно бумаги.
+   Цвета — те же токены темы и акцента, так что темы и «фон в цвет обложки» работают как раньше.
+   Скругления здесь пишем через var(--sr) — applyRadius их не масштабирует.
+   ===================================================================================== */
+html.skin-sleeve {
+  --line: color-mix(in srgb, var(--text) 10%, transparent);
+  --line-2: color-mix(in srgb, var(--text) 18%, transparent);
+  --mono: "JetBrains Mono", "Cascadia Mono", Consolas, monospace;
+  --sr: 2px;
+  --ease-out: cubic-bezier(.2, .8, .2, 1);
+}
+/* зерно бумаги поверх всего: статичная картинка, без смешивания — дёшево для видеокарты */
+html.skin-sleeve body::after {
+  content: ""; position: fixed; inset: 0; z-index: 90; pointer-events: none; opacity: .045;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+html.skin-sleeve :focus-visible { border-radius: var(--sr); }
+html.skin-sleeve ::selection { background: color-mix(in srgb, var(--amber) 40%, transparent); }
+
+/* ---- сцена ---- */
+html.skin-sleeve .stage { background: var(--oak-2); border-color: var(--line); gap: 12px; }
+html.skin-sleeve:not(.look-stage-cover):not(.look-stage-flat) .stage {
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--amber) calc(7% - var(--m) * 5%), transparent), transparent 55%),
+    var(--oak-2);
+}
+html.skin-sleeve.dock-right .stage { border-color: var(--line); }
+
+html.skin-sleeve .barrel { width: min(100%, 300px); }
+html.skin-sleeve .hoops { display: none; }
+html.skin-sleeve .porthole, html.skin-sleeve .disc { grid-area: 1 / 1; }
+/* конверт */
+html.skin-sleeve .porthole {
+  z-index: 1; width: 72%; border-radius: var(--sr); rotate: none;
+  background: var(--rivet);
+  box-shadow: 0 1px 0 rgb(255 255 255 / .07) inset, 0 28px 50px -22px rgb(0 0 0 / .85), 0 3px 8px rgb(0 0 0 / .35);
+  translate: 0 -5%; transition: translate .9s var(--ease-out), box-shadow .3s ease;
+}
+html.skin-sleeve .porthole::before { display: none; }
+html.skin-sleeve .porthole::after {
+  border-radius: var(--sr);
+  background: linear-gradient(125deg, rgb(255 255 255 / .12), transparent 38%), linear-gradient(0deg, rgb(0 0 0 / .18), transparent 30%);
+}
+html.skin-sleeve .porthole-empty { font: italic 500 54px var(--display); color: var(--hoop-dim); }
+/* пластинка: бороздки и блик стоят, крутится только яблоко с обложкой — так вращение видно, а свет не пляшет */
+html.skin-sleeve .disc {
+  display: block; position: relative; width: 66%; aspect-ratio: 1; border-radius: 50%;
+  background:
+    conic-gradient(from 25deg, transparent 0 20deg, rgb(255 255 255 / .09) 45deg, transparent 75deg 200deg, rgb(255 255 255 / .07) 225deg, transparent 255deg),
+    radial-gradient(circle, transparent 0 34%, rgb(255 255 255 / .06) 34.5% 35.5%, transparent 36% 96%, rgb(255 255 255 / .1) 97%, transparent 98%),
+    repeating-radial-gradient(circle, #101010 0 1.2px, #191919 1.2px 2.6px);
+  box-shadow: 0 20px 40px -14px rgb(0 0 0 / .9);
+  translate: 0 -5%; transition: translate .9s var(--ease-out);
+  filter: brightness(calc(1 - var(--m) * .3));
+}
+html.skin-sleeve .disc::after {
+  content: ""; position: absolute; inset: 33%; border-radius: 50%;
+  background: var(--cover-img, none) center / cover no-repeat, var(--amber);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / .35); rotate: var(--spin, 0deg);
+}
+html.skin-sleeve .disc::before {
+  content: ""; position: absolute; z-index: 1; inset: 48.4%; border-radius: 50%; background: var(--oak);
+  box-shadow: 0 0 0 1px rgb(255 255 255 / .12);
+}
+/* играет — пластинка выезжает вправо, конверт отходит влево */
+html.skin-sleeve body:not(.paused) .porthole { translate: -13% -5%; }
+html.skin-sleeve body:not(.paused) .disc { translate: 27% -5%; }
+html.skin-sleeve .porthole.scratching { cursor: grabbing; }
+
+/* спектр — строкой под конвертом (app.js → drawStrip) */
+html.skin-sleeve .viz { inset: auto 4% -3% 4%; width: 92%; height: 11%; }
+/* «в бочке» — штамп на уголке конверта */
+html.skin-sleeve .in-barrel {
+  z-index: 2; top: 6%; bottom: auto; left: 6%; padding: 4px 8px; border-radius: var(--sr);
+  font: 500 10px var(--mono); letter-spacing: .14em; text-transform: uppercase;
+  rotate: -6deg; box-shadow: 0 6px 16px rgb(0 0 0 / .4);
+}
+
+html.skin-sleeve .now { min-height: 70px; }
+html.skin-sleeve .now-title { font: 500 25px/1.14 var(--display); letter-spacing: -0.01em; }
+html.skin-sleeve .now-artist { margin-top: 8px; font: 500 10.5px/1.3 var(--mono); letter-spacing: .14em; text-transform: uppercase; color: var(--text-2); }
+html.skin-sleeve .now-via { font: 11px var(--mono); letter-spacing: .04em; }
+
+html.skin-sleeve .time { font: 11px var(--mono); letter-spacing: .02em; }
+html.skin-sleeve .slider::before { height: 2px; border-radius: 0; background: var(--line-2); }
+html.skin-sleeve :is(.slider-buf, .slider-fill) { height: 2px; border-radius: 0; }
+html.skin-sleeve .slider-knob { width: 2px; height: 14px; margin-left: -1px; border-radius: 0; background: var(--text); }
+html.skin-sleeve .progress .slider-knob { opacity: 1; }
+
+html.skin-sleeve .play-btn {
+  width: 58px; height: 58px; background: var(--text); color: var(--oak);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--amber) 40%, transparent); transition: transform .12s, box-shadow .25s ease;
+}
+html.skin-sleeve .play-btn:hover { transform: none; box-shadow: 0 0 0 6px color-mix(in srgb, var(--amber) 28%, transparent); }
+html.skin-sleeve .icon-btn:hover { background: color-mix(in srgb, var(--text) 7%, transparent); }
+html.skin-sleeve .icon-btn.on::after { width: 10px; height: 1.5px; border-radius: 0; bottom: 4px; }
+html.skin-sleeve .volume-tools { border-color: var(--line); }
+
+html.skin-sleeve .together-chip { border-radius: var(--sr); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--voice) 35%, transparent); background: transparent; }
+html.skin-sleeve .together-chip.idle { box-shadow: inset 0 0 0 1px var(--line-2); }
+html.skin-sleeve .call { background: transparent; border-color: var(--line-2); border-radius: var(--sr); }
+html.skin-sleeve .call-state { font: 500 10.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+html.skin-sleeve .meter-label { font: 10.5px var(--mono); letter-spacing: .08em; text-transform: uppercase; }
+html.skin-sleeve .meter, html.skin-sleeve .meter-fill { height: 3px; border-radius: 0; }
+html.skin-sleeve .meter { background: var(--line-2); margin: 1.5px 0; }
+html.skin-sleeve .meter-threshold { border-radius: 0; }
+html.skin-sleeve .me { border-radius: var(--sr); }
+html.skin-sleeve .me-text small { font: 10.5px var(--mono); letter-spacing: .03em; }
+
+/* панель снизу/сверху: пластинке и спектру там места нет — просто квадратная обложка */
+html.skin-sleeve:is(.dock-bottom, .dock-top) :is(.disc, .viz) { display: none; }
+html.skin-sleeve:is(.dock-bottom, .dock-top) .stage .porthole { width: 80%; translate: none; }
+html.skin-sleeve:is(.dock-bottom, .dock-top) .stage { background: var(--oak-2); border-color: var(--line); }
+html.skin-sleeve:is(.dock-bottom, .dock-top) .now-title { font-size: 18px; }
+html.skin-sleeve:is(.dock-bottom, .dock-top) .now-artist { margin-top: 4px; }
+html.skin-sleeve:is(.dock-bottom, .dock-top) .play-btn { width: 42px; height: 42px; }
+
+/* ---- библиотека ---- */
+html.skin-sleeve .lib-top { padding-bottom: 10px; border-bottom: 1px solid var(--line); }
+html.skin-sleeve .sources { gap: 24px; }
+html.skin-sleeve .source { padding: 8px 0 6px; font: 500 11px/1 var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+html.skin-sleeve .source.active::after { bottom: 0; height: 1px; border-radius: 0; }
+
+html.skin-sleeve .search {
+  height: 58px; margin: 4px 0 0; padding: 0 2px; gap: 14px;
+  background: none; border: 0; border-bottom: 1px solid var(--line); border-radius: 0;
+  transition: border-color .2s ease;
+}
+html.skin-sleeve .search:focus-within { border-color: var(--text-2); }
+html.skin-sleeve .search svg { width: 20px; height: 20px; }
+html.skin-sleeve .search input { font: 400 21px var(--display); letter-spacing: -0.005em; }
+html.skin-sleeve .search input::placeholder { font-style: italic; color: var(--text-3); opacity: .8; }
+
+html.skin-sleeve .collections-wrap { margin-top: 16px; }
+html.skin-sleeve .chip { height: 30px; border-radius: var(--sr); background: transparent; border-color: var(--line-2); font-size: 13px; }
+html.skin-sleeve .chip:hover { border-color: var(--text-3); }
+html.skin-sleeve .chip.active { background: var(--text); color: var(--oak); }
+html.skin-sleeve .chip img { border-radius: 1px; }
+html.skin-sleeve .chip .count { font: 11px var(--mono); }
+html.skin-sleeve .coll-arrow { border-radius: var(--sr); }
+
+html.skin-sleeve .lib-head { margin: 30px 0 16px; align-items: flex-end; }
+html.skin-sleeve .lib-head h1 { font: 500 44px/1.02 var(--display); letter-spacing: -0.02em; }
+html.skin-sleeve .lib-head p { margin-top: 10px; font: 500 10.5px var(--mono); letter-spacing: .14em; text-transform: uppercase; }
+
+html.skin-sleeve .btn { border-radius: var(--sr); background: transparent; border-color: var(--line-2); }
+html.skin-sleeve .btn:hover { background: color-mix(in srgb, var(--text) 6%, transparent); border-color: var(--text-3); }
+html.skin-sleeve .btn.primary { background: var(--text); color: var(--oak); border-color: transparent; }
+html.skin-sleeve .btn.primary:hover { background: var(--amber); filter: none; }
+html.skin-sleeve .head-actions .btn:not(.icon-only) { font: 500 11px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+
+html.skin-sleeve .tracklist { border-top: 1px solid var(--line); margin-top: 0; }
+html.skin-sleeve .row {
+  border-radius: 0; padding: 9px 12px; box-shadow: inset 0 -1px 0 var(--line);
+  transition: background .15s ease;
+}
+html.skin-sleeve .row:hover { background: color-mix(in srgb, var(--text) 3.5%, transparent); }
+html.skin-sleeve .row.playing { background: color-mix(in srgb, var(--amber) 5%, transparent); box-shadow: inset 2px 0 0 var(--amber), inset 0 -1px 0 var(--line); }
+html.skin-sleeve .row.playing .t-title { font: italic 500 16px/1.3 var(--display); }
+html.skin-sleeve .row .num :is(img, .ph), html.skin-sleeve .row .play-hover { border-radius: 1px; }
+html.skin-sleeve .row .num .ph { font-family: var(--mono); font-size: 12px; }
+html.skin-sleeve .t-album { font-style: italic; }
+html.skin-sleeve .col-time { font: 12px var(--mono); }
+
+/* ---- окна, настройки, меню ---- */
+html.skin-sleeve :is(.sheet, .together, .menu, .toast) { border: 1px solid var(--line-2); }
+html.skin-sleeve .sheet { box-shadow: 0 40px 90px -20px rgb(0 0 0 / .75); }
+html.skin-sleeve .sheet-head h2 { font: 500 28px var(--display); letter-spacing: -0.015em; }
+html.skin-sleeve .sec { border-color: var(--line); }
+html.skin-sleeve .sec-title { font: 500 19px var(--display); }
+html.skin-sleeve .set-nav { border-color: var(--line); }
+html.skin-sleeve .set-tab.on { background: transparent; box-shadow: inset 2px 0 0 var(--amber); border-radius: 0; }
+html.skin-sleeve .seg { border-radius: var(--sr); background: transparent; border-color: var(--line-2); }
+html.skin-sleeve .seg button { border-radius: 1px; }
+html.skin-sleeve .seg button.on { background: var(--text); color: var(--oak); }
+html.skin-sleeve .input, html.skin-sleeve select.input { border-radius: var(--sr); }
+html.skin-sleeve .together-title, html.skin-sleeve .empty h3 { font-weight: 500; }
+html.skin-sleeve .pf-card { border-color: var(--line); background: transparent; }
+html.skin-sleeve .menu-item:hover { background: color-mix(in srgb, var(--text) 7%, transparent); }
+
+html.skin-sleeve ::-webkit-scrollbar { width: 6px; }
+html.skin-sleeve ::-webkit-scrollbar-thumb { border: 0; border-radius: 0; background: var(--line-2); }
+
+@media (prefers-reduced-motion: reduce) {
+  html.skin-sleeve :is(.porthole, .disc) { transition: none; }
+}
+html.skin-sleeve.look-still :is(.porthole, .disc) { transition: none; }
+html.skin-sleeve .h-head { padding-bottom: 8px; border-bottom: 1px solid var(--line); }
+html.skin-sleeve .h-head h2 { font: 500 23px/1.1 var(--display); letter-spacing: -0.01em; }
+html.skin-sleeve .h-more { font: 500 10.5px var(--mono); letter-spacing: .12em; text-transform: uppercase; }
+.skin-mock, .skin-mock * { text-transform: none; }
