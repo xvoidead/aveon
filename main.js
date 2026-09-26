@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, session, protocol, Menu, clipboard } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, session, protocol, Menu, clipboard, screen } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { Readable } = require('stream');
@@ -109,6 +109,18 @@ function createWindow() {
   win.webContents.on('will-navigate', (e) => e.preventDefault());
   if (process.argv.includes('--dev')) win.webContents.openDevTools({ mode: 'detach' });
 }
+
+// Кнопки окна прячутся и проявляются у правого верхнего угла. Над областями перетаскивания окно
+// не получает движение мыши, поэтому где курсор — смотрим отсюда
+const WIN_ZONE = { w: 240, h: 64 };
+let winReveal = false;
+setInterval(() => {
+  if (!win || win.isDestroyed() || !win.isVisible() || win.isMinimized() || config.get().ui?.autoHideWin === false) return;
+  const p = screen.getCursorScreenPoint();
+  const b = win.getContentBounds();
+  const on = p.y >= b.y && p.y < b.y + WIN_ZONE.h && p.x >= b.x + b.width - WIN_ZONE.w && p.x < b.x + b.width;
+  if (on !== winReveal) { winReveal = on; send('win:reveal', on); }
+}, 120);
 
 function send(channel, payload) {
   if (win && !win.isDestroyed()) win.webContents.send(channel, payload);

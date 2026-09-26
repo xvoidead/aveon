@@ -2202,19 +2202,15 @@ document.addEventListener('keydown', (e) => {
 
 $$('[data-win]').forEach((b) => { b.onclick = () => api.win.action(b.dataset.win); });
 
-// Кнопки окна прячутся и проявляются, когда курсор подходит к правому верхнему углу
-const WIN_ZONE = { w: 240, h: 64 };
+// Кнопки окна прячутся и проявляются, когда курсор подходит к правому верхнему углу (зона — в main.js)
 let winHideTimer = 0;
 function setWinReveal(on) {
   clearTimeout(winHideTimer);
   if (on) document.body.classList.add('win-reveal');
   else winHideTimer = setTimeout(() => document.body.classList.remove('win-reveal'), 700);
 }
-document.addEventListener('pointermove', (e) => {
-  if (!document.body.classList.contains('win-autohide')) return;
-  setWinReveal(e.clientY < WIN_ZONE.h && e.clientX > innerWidth - WIN_ZONE.w);
-}, { passive: true });
-document.documentElement.addEventListener('pointerleave', () => setWinReveal(false));
+// где курсор, говорит главный процесс (main.js): над областью перетаскивания окно само движение мыши не видит
+api.win.onReveal?.((on) => { if (document.body.classList.contains('win-autohide')) setWinReveal(on); });
 function applyWinAutohide() {
   document.body.classList.toggle('win-autohide', state.cfg.ui?.autoHideWin !== false);
 }

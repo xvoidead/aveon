@@ -155,6 +155,7 @@ contextBridge.exposeInMainWorld('tishe', {
   win: {
     action: (a) => ipcRenderer.send('win', a),
     onState: (cb) => on('win:state', cb),
+    onReveal: (cb) => on('win:reveal', cb),
     // Кнопки в превью окна на панели задач
     thumbState: (st) => ipcRenderer.send('thumb:state', st),
     onThumb: (cb) => on('thumb', cb),
