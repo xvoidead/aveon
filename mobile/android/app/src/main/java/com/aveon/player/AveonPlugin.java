@@ -303,7 +303,7 @@ public class AveonPlugin extends Plugin {
         return d;
     }
 
-    private static final java.util.regex.Pattern CACHE_NAME = java.util.regex.Pattern.compile("^[a-f0-9]{24}\\.(mp3|m4a|aac|ogg|webm|flac)(\\.part)?$");
+    private static final java.util.regex.Pattern CACHE_NAME = java.util.regex.Pattern.compile("^[a-f0-9]{24}\\.(mp3|m4a|aac|ogg|webm|flac|jpg)(\\.part)?$");
 
     static File cacheFile(Context ctx, String name) {
         if (name == null || !CACHE_NAME.matcher(name).matches()) return null;

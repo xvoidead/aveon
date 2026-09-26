@@ -20,7 +20,7 @@ async function refreshCacheInfo() {
 }
 
 function cacheBadge() {
-  return cacheInfo ? fmtBytes(cacheInfo.tracks.bytes + cacheInfo.lyrics.bytes) : '';
+  return cacheInfo ? fmtBytes(cacheInfo.tracks.bytes + (cacheInfo.downloads?.bytes || 0) + cacheInfo.lyrics.bytes) : '';
 }
 
 function cacheSection() {
@@ -28,7 +28,7 @@ function cacheSection() {
   const limit = i.limitMb * 1024 * 1024;
   const used = Math.min(1, i.tracks.bytes / limit);
   return `<section class="sec" data-sec="cache">
-    <h3 class="sec-title">Кэш<span class="state">${fmtBytes(i.tracks.bytes + i.lyrics.bytes)}</span></h3>
+    <h3 class="sec-title">Кэш<span class="state">${fmtBytes(i.tracks.bytes + (i.downloads?.bytes || 0) + i.lyrics.bytes)}</span></h3>
     <p class="sec-desc">Треки из Яндекс Музыки, SoundCloud и Spotify сохраняются сами, пока ты их слушаешь, и дальше играют с ${IS_MOBILE ? 'телефона' : 'диска'} — сразу и без интернета. Тексты песен хранятся все и целиком. Когда треки упираются в лимит, удаляются те, что слушал давнее всего.</p>
     <div class="cache-meter" role="img" aria-label="Треки занимают ${fmtBytes(i.tracks.bytes)} из ${limitLabel(i.limitMb)}">
       <div class="cache-bar"><i style="width:${(used * 100).toFixed(1)}%"></i></div>
@@ -38,6 +38,10 @@ function cacheSection() {
       <div class="cache-row">
         <div><b>Треки</b><small>${i.tracks.count} ${plural(i.tracks.count, 'трек', 'трека', 'треков')} · ${fmtBytes(i.tracks.bytes)}</small></div>
         <button class="btn" data-cache-clear="tracks" ${i.tracks.count ? '' : 'disabled'}>Очистить</button>
+      </div>
+      <div class="cache-row">
+        <div><b>Скачанные</b><small>${i.downloads?.count || 0} ${plural(i.downloads?.count || 0, 'трек', 'трека', 'треков')} · ${fmtBytes(i.downloads?.bytes || 0)} · лимит их не трогает</small></div>
+        <button class="btn" data-cache-clear="downloads" ${i.downloads?.count ? '' : 'disabled'}>Удалить</button>
       </div>
       <div class="cache-row">
         <div><b>Тексты песен</b><small>${i.lyrics.count} ${plural(i.lyrics.count, 'текст', 'текста', 'текстов')} · ${fmtBytes(i.lyrics.bytes)}</small></div>
@@ -67,9 +71,10 @@ function bindCache(body) {
   if (!sec) return;
   $$('[data-cache-clear]', sec).forEach((b) => {
     b.onclick = async () => {
-      const tracks = b.dataset.cacheClear === 'tracks';
+      const kind = b.dataset.cacheClear;
+      const tracks = kind === 'tracks';
       const ok = await ask({
-        title: tracks ? 'Удалить сохранённые треки?' : 'Удалить сохранённые тексты?',
+        title: kind === 'downloads' ? 'Удалить все скачанные?' : tracks ? 'Удалить сохранённые треки?' : 'Удалить сохранённые тексты?',
         text: 'Они сохранятся заново, когда снова их включишь.',
         ok: 'Удалить', input: false, danger: true,
       });

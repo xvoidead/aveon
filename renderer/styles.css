@@ -1314,3 +1314,10 @@ html.look-react-hoops .hoops { transform: scale(calc(1 - var(--m) * 0.07 + var(-
 .isl-ctl input[type="range"] { width: 100%; }
 .isl-ctl .row-actions { margin-top: 4px; }
 .isl-hint { margin: 2px 0 0; font-size: 12px; color: var(--text-3); line-height: 1.45; }
+
+/* ---------- скачанные (downloads.js) ---------- */
+.tag.dl { display: inline-flex; vertical-align: -2px; color: var(--amber); }
+.tag.dl svg { width: 13px; height: 13px; }
+.tag.dl.wait { color: var(--text-3); animation: dl-wait 1.2s ease-in-out infinite; }
+@keyframes dl-wait { 50% { opacity: .35; } }
+.head-actions .btn.done { color: var(--amber); }

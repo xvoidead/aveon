@@ -115,4 +115,47 @@ async function sharedStream(track) {
   return out;
 }
 
-module.exports = { init, resolveStream, sharedStream, matchCache, SOURCES };
+// ---- скачать для офлайна ----
+// Треки качаются по одному: поток каждого ищем прямо перед загрузкой — подписанные ссылки
+// Яндекса и SoundCloud живут недолго, заранее на всю подборку их брать нельзя
+const dlQueue = [];
+let dlRunning = false;
+
+function download(tracks) {
+  let added = 0;
+  for (const t of tracks) {
+    if (!t || t.source === 'local' || t.playable === false) continue;
+    const key = `${t.source}:${t.id}`;
+    if (dlQueue.some((q) => `${q.source}:${q.id}` === key)) continue;
+    dlQueue.push(t);
+    cache.emit({ download: { key, state: 'queued' } });
+    added++;
+  }
+  runDownloads();
+  return added;
+}
+
+async function runDownloads() {
+  if (dlRunning) return;
+  dlRunning = true;
+  while (dlQueue.length) {
+    const t = dlQueue.shift();
+    const key = `${t.source}:${t.id}`;
+    try {
+      const s = cache.has(t) ? { url: 'cached' } : await serviceStream(t);
+      await cache.remember(t, s, { pin: true });
+      texts.find(t).catch(() => {}); // текст — тоже для офлайна
+    } catch (e) {
+      cache.emit({ download: { key, state: 'error', error: e.message } });
+    }
+  }
+  dlRunning = false;
+}
+
+function cancelDownloads() {
+  for (const t of dlQueue.splice(0)) cache.emit({ download: { key: `${t.source}:${t.id}`, state: 'removed' } });
+}
+
+const pendingDownloads = () => [...cache.pendingKeys(), ...dlQueue.map((t) => `${t.source}:${t.id}`)];
+
+module.exports = { init, resolveStream, sharedStream, matchCache, SOURCES, download, cancelDownloads, pendingDownloads };

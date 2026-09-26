@@ -34,7 +34,7 @@ resolve.init(local);
 const SOURCES = { sc, ym, sp };
 const MIME = {
   '.mp3': 'audio/mpeg', '.flac': 'audio/flac', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.oga': 'audio/ogg',
-  '.opus': 'audio/ogg', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.webm': 'audio/webm', '.weba': 'audio/webm',
+  '.jpg': 'image/jpeg', '.opus': 'audio/ogg', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.webm': 'audio/webm', '.weba': 'audio/webm',
 };
 
 protocol.registerSchemesAsPrivileged([
@@ -356,7 +356,13 @@ function registerIpc() {
 
   // Кэш треков и текстов: сколько занимает, очистка
   handle('cache:info', () => cache.info());
-  handle('cache:clear', (kind) => cache.clear(kind));
+  handle('cache:clear', (kind) => { if (kind === 'downloads' || kind === 'all') resolve.cancelDownloads(); return cache.clear(kind); });
+
+  // Скачанные для офлайна (src/resolve.js → download, src/cache.js → pinned)
+  handle('dl:add', (tracks) => resolve.download(tracks));
+  handle('dl:remove', async (tracks) => { for (const t of tracks) await cache.unpin(t); return true; });
+  handle('dl:list', () => cache.downloads());
+  handle('dl:state', () => ({ done: cache.downloadedKeys(), pending: resolve.pendingDownloads() }));
 
   // Остров поверх всех окон (src/island.js): состояние — из окна плеера, кнопки — обратно в него
   ipcMain.on('island:state', (e, st) => {
@@ -469,7 +475,7 @@ app.whenReady().then(() => {
   duck.setTargets(config.get().duck.targets);
   duck.start((m) => send('duck:meter', m), (s) => send('duck:status', s));
   together.init((ev) => send('together:event', ev));
-  cache.init(cacheFiles, () => send('cache:changed')).catch((e) => console.warn('cache init:', e.message));
+  cache.init(cacheFiles, (ev) => send('cache:changed', ev)).catch((e) => console.warn('cache init:', e.message));
   eqpop.init((open) => send('eqpop:shown', open));
   discord.init();
   friends.init();

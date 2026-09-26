@@ -910,7 +910,7 @@ function rowHtml(t, i) {
   const tags = [
     state.view !== t.source ? `<span class="tag">${SHORT[t.source]}</span>` : '',
     t.preview ? '<span class="tag preview">30 сек</span>' : '',
-  ].join('');
+  ].join('') + dlTag(t); // downloads.js: скачан для офлайна
   const draggable = canReorder() ? ' draggable="true"' : '';
   const edit = state.view === 'local' && t.source === 'local' ? ' editable' : '';
   return `<div class="row${t.playable === false ? ' disabled' : ''}" data-i="${i}"${draggable}>
@@ -975,6 +975,8 @@ function openTrackMenu(i, pos) {
     items.unshift(...artists.slice(0, 3).map((name) => ({ label: artists.length > 1 ? name : 'Перейти к артисту', icon: 'i-user', onClick: () => openArtist(name) })), { sep: true });
   }
   if (t.source === 'local' && !t.shared) items.unshift({ label: 'Изменить теги и обложку', icon: 'i-pencil', onClick: () => openEditor(t) }, { sep: true });
+  const dl = dlMenuItems(t); // downloads.js
+  if (dl.length) items.push({ sep: true }, ...dl);
   if (state.account.loggedIn) items.push({ sep: true }, { label: 'Отправить другу', icon: 'i-chat', onClick: () => sendTrackMenu(t, pos) }); // friends.js
   if (state.view === 'albums' && state.album) {
     items.push({ sep: true }, { label: 'Убрать из альбома', icon: 'i-trash', danger: true, onClick: () => removeFromAlbum([t]) });
@@ -1190,6 +1192,7 @@ function renderActions() {
       playFrom(state.shown, Math.floor(Math.random() * state.shown.length));
     });
   }
+  dlActions(add); // downloads.js: «Скачать всё» / «Удалить все скачанные»
   if (state.view === 'albums' && state.album) {
     const iconBtn = (icon, fn, label) => { const b = add('', icon, fn); b.setAttribute('aria-label', label); b.title = label; };
     iconBtn('i-share', () => shareAlbum(state.album), 'Поделиться альбомом'); // share.js
@@ -1225,6 +1228,7 @@ function renderCollections() {
     box.append(b);
   };
   if (state.view === 'albums') {
+    chip('Скачанные', { active: state.sub === 'downloads', icon: 'i-download', count: DL.done.size || null, onClick: () => openView('albums', 'downloads') }); // downloads.js
     for (const a of state.albums) {
       chip(a.title, { active: state.sub === a.id, cover: a.cover, icon: 'i-list', count: a.count, onClick: () => openView('albums', a.id) });
     }
@@ -1329,7 +1333,9 @@ async function openView(view, sub = null) {
   if (view === 'artists') { openArtists(sub); return; } // artists.js
 
   if (view === 'albums') {
+    if (sub === 'downloads') { await openDownloads(seq); return; } // downloads.js
     if (!sub) {
+      if (!state.albums.length && DL.done.size) { openView('albums', 'downloads'); return; }
       if (!state.albums.length) {
         state.album = null;
         showEmpty({

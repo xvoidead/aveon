@@ -114,6 +114,14 @@ contextBridge.exposeInMainWorld('tishe', {
     miniToggle: () => call('mini:toggle'),
     onChange: (cb) => on('desk:changed', cb),
   },
+  // Скачанные для офлайна: треки лежат на диске вместе с обложкой и текстом
+  downloads: {
+    add: (tracks) => call('dl:add', tracks),
+    remove: (tracks) => call('dl:remove', tracks),
+    list: () => call('dl:list'),
+    state: () => call('dl:state'),
+    onEvent: (cb) => on('cache:changed', cb),
+  },
   cache: {
     info: () => call('cache:info'),
     clear: (kind) => call('cache:clear', kind),

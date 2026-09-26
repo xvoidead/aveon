@@ -5,7 +5,7 @@ const path = require('path');
 const { Readable } = require('stream');
 const { pipeline } = require('stream/promises');
 
-const NAME = /^[a-f0-9]{24}\.(mp3|m4a|aac|ogg|webm|flac)$/;
+const NAME = /^[a-f0-9]{24}\.(mp3|m4a|aac|ogg|webm|flac|jpg)$/; // jpg — обложка скачанного трека
 const dir = () => path.join(app.getPath('userData'), 'cache', 'audio');
 
 function fileOf(name) {

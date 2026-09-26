@@ -150,6 +150,7 @@ public class AveonWebViewClient extends BridgeWebViewClient {
         if (path.endsWith(".ogg")) return "audio/ogg";
         if (path.endsWith(".webm")) return "audio/webm";
         if (path.endsWith(".flac")) return "audio/flac";
+        if (path.endsWith(".jpg")) return "image/jpeg"; // обложка скачанного трека
         return null;
     }
 

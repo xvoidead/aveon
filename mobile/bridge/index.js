@@ -62,7 +62,7 @@ const ready = (async () => {
 ready.then(() => {
   together.init((ev) => send('together:event', ev));
   friends.init();
-  cache.init(cacheFiles, () => send('cache:changed')).catch((e) => console.warn('cache init:', e.message));
+  cache.init(cacheFiles, (ev) => send('cache:changed', ev)).catch((e) => console.warn('cache init:', e.message));
   account.init((ev) => send('account:event', ev));
   startDuck();
 }).catch((e) => console.error('bridge start:', e));
@@ -272,9 +272,16 @@ const api = {
     avatar: call((userId, at) => account.avatarOf(userId, at)),
     now: (p) => { ready.then(() => friends.now(clone(p))); },
   },
+  downloads: {
+    add: call((tracks) => resolve.download(tracks)),
+    remove: call(async (tracks) => { for (const t of tracks) await cache.unpin(t); return true; }),
+    list: call(() => cache.downloads()),
+    state: call(() => ({ done: cache.downloadedKeys(), pending: resolve.pendingDownloads() })),
+    onEvent: (cb) => on('cache:changed', cb),
+  },
   cache: {
     info: call(() => cache.info()),
-    clear: call((kind) => cache.clear(kind)),
+    clear: call((kind) => { if (kind === 'downloads' || kind === 'all') resolve.cancelDownloads(); return cache.clear(kind); }),
     onChange: (cb) => on('cache:changed', cb),
   },
   store: {
