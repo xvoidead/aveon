@@ -88,6 +88,22 @@ contextBridge.exposeInMainWorld('tishe', {
     avatar: (userId, at) => call('fr:avatar', userId, at),
     now: (p) => ipcRenderer.send('fr:now', p),
   },
+  // Остров поверх всех окон (src/island.js): окно плеера шлёт state, остров — action
+  island: {
+    push: (st) => ipcRenderer.send('island:state', st),
+    onAction: (cb) => on('island:action', cb),
+    action: (a) => ipcRenderer.send('island:action', a),
+    hover: (h) => ipcRenderer.send('island:hover', h),
+    onState: (cb) => on('island:state', cb),
+    onConfig: (cb) => on('island:config', cb),
+    onWallConfig: (cb) => on('livewall:config', cb),
+  },
+  // Раздел «Остров и окна»: мини-плеер, горячие клавиши, живые обои
+  desk: {
+    status: () => call('desk:status'),
+    miniToggle: () => call('mini:toggle'),
+    onChange: (cb) => on('desk:changed', cb),
+  },
   cache: {
     info: () => call('cache:info'),
     clear: (kind) => call('cache:clear', kind),

@@ -116,3 +116,10 @@ document.addEventListener('keydown', (e) => {
   if (e.key === 'Escape' && fsOpen() && !modal && $('#menu').hidden) exitFs();
   if (fsOpen()) fsWake();
 });
+
+// Часы в углу (Оформление → «Во весь экран»)
+setInterval(() => {
+  if (!fsOpen() || !document.documentElement.classList.contains('look-fs-clock')) return;
+  const d = new Date();
+  $('#fs-clock').textContent = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+}, 1000);

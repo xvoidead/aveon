@@ -40,8 +40,8 @@ html.mobile .head-actions { width: 100%; flex-wrap: wrap; }
 html.mobile .coll-arrow { display: none; }
 
 html.mobile .tracklist { margin: 0 -10px; padding: 0 0 16px; -webkit-overflow-scrolling: touch; }
-html.mobile .row { grid-template-columns: 48px minmax(0, 1fr) 40px; gap: 12px; padding: 7px 10px; }
-html.mobile .row .num, html.mobile .row .num img, html.mobile .row .num .ph { width: 48px; height: 48px; }
+html.mobile .row { grid-template-columns: var(--c-num, 48px) minmax(0, 1fr) 40px; gap: 12px; padding: 7px 10px; }
+html.mobile .row .num, html.mobile .row .num img, html.mobile .row .num .ph { width: var(--c-num, 48px); height: var(--c-num, 48px); }
 html.mobile .row .col-album, html.mobile .row .col-time { display: none; }
 html.mobile .row .play-hover { opacity: 0; }
 html.mobile .row.playing .play-hover { opacity: 1; }

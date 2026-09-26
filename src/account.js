@@ -212,13 +212,13 @@ async function avatarOf(userId, at) {
 
 // Какие настройки общие для всех компьютеров: микрофон у каждого свой
 function syncedSettings() {
-  const { ui, duck, crossfade, eq } = config.get();
+  const { ui, duck, crossfade, eq, look } = config.get();
   const { micDevice, ...rest } = duck;
-  return { ui, duck: rest, crossfade, eq };
+  return { ui, duck: rest, crossfade, eq, look };
 }
 
 function settingsChanged(patch) {
-  if (!patch || !(patch.ui || patch.eq || 'crossfade' in patch || (patch.duck && Object.keys(patch.duck).some((k) => k !== 'micDevice')))) return;
+  if (!patch || !(patch.ui || patch.eq || patch.look || 'crossfade' in patch || (patch.duck && Object.keys(patch.duck).some((k) => k !== 'micDevice')))) return;
   config.set({ account: { settingsAt: Date.now() } });
   schedule();
 }
@@ -256,6 +256,7 @@ async function syncSettings(remote, changed) {
           ui: theirs.ui, duck: { ...theirs.duck, micDevice: config.get().duck.micDevice }, account: { settingsAt: theirs.at },
           ...(theirs.crossfade != null ? { crossfade: theirs.crossfade } : {}),
           ...(theirs.eq ? { eq: theirs.eq } : {}),
+          ...(theirs.look ? { look: theirs.look } : {}),
         });
         changed.settings = true;
       }

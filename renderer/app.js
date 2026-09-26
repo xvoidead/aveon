@@ -668,7 +668,7 @@ function startViz() {
   const g = viz.getContext('2d');
   const data = new Uint8Array(fx.analyser.frequencyBinCount);
   const draw = () => {
-    if (audio.paused || document.hidden) { vizRunning = false; g.clearRect(0, 0, viz.width, viz.height); return; }
+    if (audio.paused || document.hidden || window.LOOK?.viz === false) { vizRunning = false; g.clearRect(0, 0, viz.width, viz.height); return; }
     const dpr = window.devicePixelRatio || 1;
     const w = viz.clientWidth * dpr, h = viz.clientHeight * dpr;
     if (viz.width !== w || viz.height !== h) { viz.width = w; viz.height = h; }
@@ -676,7 +676,7 @@ function startViz() {
     g.clearRect(0, 0, w, h);
     const cx = w / 2, cy = h / 2;
     const inner = w * 0.43;       // чуть снаружи внешнего обруча
-    const reach = w * 0.065;
+    const reach = w * 0.065 * ((window.LOOK?.vizPower ?? 100) / 100); // look.js: длина лучей
     const bars = 96;
     const m = duck.m;
     g.lineCap = 'round';
@@ -789,7 +789,7 @@ function micTick() {
 // Монитор присылает уровни ~30 раз в секунду. Голос выше порога → эффект быстро нарастает,
 // тишина дольше «держать после фразы» → плавно уходит.
 
-const duck = { m: 0, meter: { o: 0, m: 0, call: 0, dc: 0 }, lastVoice: -1e9, last: performance.now(), sent: 1, ok: null, error: '', streak: 0 };
+const duck = { forced: false, m: 0, meter: { o: 0, m: 0, call: 0, dc: 0 }, lastVoice: -1e9, last: performance.now(), sent: 1, ok: null, error: '', streak: 0 };
 
 api.duck.onMeter((m) => {
   duck.meter = m;
@@ -816,8 +816,10 @@ function duckTick() {
   if (mic.speaking) duck.lastVoice = now;
 
   // manual — бочка включена вручную (Android: кнопка на сцене и в уведомлении)
-  const talking = !!m.manual || (!!m.call && now - duck.lastVoice < d.hold);
-  const active = !!m.manual || (d.enabled && !!m.call && (d.mode === 'call' || talking));
+  // вручную: кнопка на телефоне, остров или клавиша B на компьютере
+  const manual = !!m.manual || duck.forced;
+  const talking = manual || (!!m.call && now - duck.lastVoice < d.hold);
+  const active = manual || (d.enabled && !!m.call && (d.mode === 'call' || talking));
   const want = active ? 1 : 0;
   const tau = want > duck.m ? d.attack : d.release;
   duck.m += (want - duck.m) * (1 - Math.exp(-dt / Math.max(10, tau / 3)));
@@ -844,15 +846,16 @@ function renderCall(talking) {
   const m = duck.meter;
   const broken = duck.ok === false;
   const inCall = !!m.call;
+  const manual = !!m.manual || duck.forced;
   // На телефоне плашка видна всегда: в ней кнопка «в бочку вручную», а шкал нет
-  $('#discord').classList.toggle('off', !IS_MOBILE && !inCall && !broken);
+  $('#discord').classList.toggle('off', !IS_MOBILE && !inCall && !broken && !manual);
   $('#discord').classList.toggle('no-meters', IS_MOBILE || !inCall);
   if (IS_MOBILE) $('#duck-manual').setAttribute('aria-pressed', String(!!m.manual));
 
   const el = $('#duck-chip');
   let text, cls = '';
   if (broken) { text = 'Монитор звука не запустился'; cls = 'err'; }
-  else if (m.manual) { text = 'Музыка в бочке'; cls = 'talk'; }
+  else if (manual) { text = 'Музыка в бочке'; cls = 'talk'; }
   else if (!inCall) text = 'Не в звонке';
   else if (!d.enabled) text = 'В звонке, эффект выключен';
   else if (talking) { text = 'Говорят, музыка в бочке'; cls = 'talk'; }
@@ -883,6 +886,12 @@ makeSlider($('#meter'), {
     toast(`Порог для голосов собеседников: ${Math.round(f * 100)}%`);
   },
 });
+
+// Бочка вручную на компьютере — без звонка, просто по желанию
+function toggleForcedBarrel() {
+  duck.forced = !duck.forced;
+  toast(duck.forced ? 'Музыка в бочке' : 'Бочка выключена');
+}
 
 $('#duck-enabled').addEventListener('change', (e) => saveCfg({ duck: { enabled: e.target.checked } }));
 if (IS_MOBILE) $('#duck-manual').addEventListener('click', () => api.mobile.barrel(!duck.meter.manual));
@@ -1521,16 +1530,21 @@ window.addEventListener('drop', async (e) => {
 
 // Разделы настроек: какой открыт и в каком разделе лежит каждая секция (data-sec)
 const SET_TABS = [
-  ['look', 'Звук и вид', 'i-palette'],
+  ['style', 'Оформление', 'i-palette'],
+  ['look', 'Звук', 'i-eq'],
   ['call', 'Звонок', 'i-phone'],
   ['censor', 'Цензура', 'i-shield'],
   ['services', 'Сервисы', 'i-plug'],
   ['library', 'Папки', 'i-folder'],
   ['cache', 'Кэш', 'i-disk'],
+  ['desk', 'Остров и окна', 'i-device'],
   ['keys', 'Клавиши', 'i-keys'],
-].filter(([id]) => !(IS_MOBILE && id === 'keys')); // на телефоне клавиатуры нет
-const SEC_TAB = { sound: 'look', ui: 'look', duck: 'call', mic: 'call', ext: 'call', censor: 'censor', ym: 'services', sc: 'services', sp: 'services', discord: 'services', local: 'library', cache: 'cache', keys: 'keys' };
-let settingsTab = 'look';
+].filter(([id]) => !(IS_MOBILE && (id === 'keys' || id === 'desk'))); // на телефоне нет клавиатуры и окон // на телефоне клавиатуры нет
+const SEC_TAB = {
+  island: 'desk', mini: 'desk', tray: 'desk', hotkeys: 'desk', livewall: 'desk', // desk.js
+  dock: 'style', theme: 'style', colors: 'style', type: 'style', bg: 'style', barrel: 'style', list: 'style', lyricslook: 'style', fsmode: 'style', motion: 'style', // look.js
+  sound: 'look', duck: 'call', mic: 'call', ext: 'call', censor: 'censor', ym: 'services', sc: 'services', sp: 'services', discord: 'services', local: 'library', cache: 'cache', keys: 'keys' };
+let settingsTab = 'style';
 
 function openSettings(focus) {
   if (focus === 'account') { openProfile(); return; } // аккаунт теперь в профиле (profile.js)
@@ -1614,6 +1628,7 @@ const KEYS = [
   ['E', 'эквалайзер'],
   ['L', 'текст песни'],
   ['F', 'во весь экран'],
+  ['B', 'бочка вручную'],
   ['Ctrl + F', 'поиск'],
   ['Ctrl + ,', 'настройки'],
   ['Ctrl + V', 'открыть код альбома или пресета'],
@@ -1632,6 +1647,7 @@ async function renderSettings() {
   state.account = await api.account.status().catch(() => state.account);
   await refreshDiscordStatus();
   await refreshCacheInfo(); // cache.js
+  await refreshDesk(); // desk.js
 
   $('#settings-body').innerHTML = `
     <section class="sec" data-sec="sound">
@@ -1645,13 +1661,7 @@ async function renderSettings() {
         <button class="btn" id="set-open-eq"><svg><use href="#i-eq"/></svg>Открыть</button></div></div>
     </section>
 
-    <section class="sec" data-sec="ui">
-      <h3 class="sec-title">Вид</h3>
-      <p class="sec-desc">Интерфейс написан строчными буквами. Названия треков, артистов и тексты песен тоже, но их можно оставить как есть.</p>
-      <div class="field"><label>Названия треков как есть</label><div class="ctl"><label class="switch"><input type="checkbox" id="keep-titles" ${c.ui?.keepTitles ? 'checked' : ''} aria-label="Названия треков как есть"><span></span></label></div></div>
-      <div class="field"><label>Фон в цвет обложки</label><div class="ctl"><label class="switch"><input type="checkbox" id="tint-bg" ${(c.ui?.tintBg ?? !IS_MOBILE) ? 'checked' : ''} aria-label="Фон в цвет обложки"><span></span></label></div></div>
-      <div class="field desktop-only"><label>Прятать кнопки окна</label><div class="ctl"><label class="switch"><input type="checkbox" id="autohide-win" ${c.ui?.autoHideWin !== false ? 'checked' : ''} aria-label="Прятать кнопки окна"><span></span></label></div></div>
-    </section>
+    ${lookSection()}
 
     <section class="sec" data-sec="duck">
       <h3 class="sec-title">Когда в Discord говорят</h3>
@@ -1737,6 +1747,7 @@ ${censorSettingsHtml()}
     </section>
 
     ${cacheSection()}
+    ${deskSection()}
 
     <section class="sec desktop-only" data-sec="ext">
       <h3 class="sec-title">Приглушать другие программы</h3>
@@ -1762,20 +1773,7 @@ ${censorSettingsHtml()}
     $('#crossfade-val', body).textContent = fadeLabel(+e.target.value);
   };
   $('#crossfade', body).onchange = (e) => saveCfg({ crossfade: +e.target.value });
-  $('#autohide-win', body).onchange = (e) => {
-    state.cfg.ui.autoHideWin = e.target.checked;
-    applyWinAutohide();
-    saveCfg({ ui: { autoHideWin: e.target.checked } });
-  };
-  $('#tint-bg', body).onchange = (e) => {
-    state.cfg.ui.tintBg = e.target.checked;
-    reapplyTheme(); // extras.js
-    saveCfg({ ui: { tintBg: e.target.checked } });
-  };
-  $('#keep-titles', body).onchange = (e) => {
-    document.body.classList.toggle('keep-titles', e.target.checked);
-    saveCfg({ ui: { keepTitles: e.target.checked } });
-  };
+  bindLook(body); // look.js
 
   $$('input[data-duck]', body).forEach((inp) => {
     const key = inp.dataset.duck;
@@ -1882,6 +1880,7 @@ ${censorSettingsHtml()}
     };
   });
   bindCache(body); // cache.js
+  bindDesk(body); // desk.js
   $('#folder-add', body).onclick = addFolder;
   const rescan = $('#folder-rescan', body);
   if (rescan) rescan.onclick = () => scanLocal(true);
@@ -1908,6 +1907,7 @@ function applySynced(changed) {
     api.config.get().then((cfg) => {
       state.cfg = cfg;
       document.body.classList.toggle('keep-titles', !!cfg.ui?.keepTitles);
+      applyLook(); // look.js: оформление тоже приходит с других устройств
       applyWinAutohide();
       syncDuckSwitch();
       eqApply(); // eq.js: эквалайзер и свои пресеты тоже приходят с других компьютеров
@@ -2176,6 +2176,7 @@ document.addEventListener('keydown', (e) => {
   else if (e.ctrlKey && e.key === 'ArrowLeft') prev();
   else if (e.key === 'ArrowRight') audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 5);
   else if (e.key === 'ArrowLeft') audio.currentTime = Math.max(0, audio.currentTime - 5);
+  else if (e.key.toLowerCase() === 'b' || e.key.toLowerCase() === 'и') toggleForcedBarrel();
   else if (e.key === 'ArrowUp') { e.preventDefault(); setVolume(Math.min(1, state.cfg.volume + 0.05), true); }
   else if (e.key === 'ArrowDown') { e.preventDefault(); setVolume(Math.max(0, state.cfg.volume - 0.05), true); }
   else if (e.code === 'KeyM') toggleMute();
@@ -2215,6 +2216,7 @@ api.win.onThumb((action) => {
 
 async function init() {
   state.cfg = await api.config.get();
+  applyLook(); // look.js
   state.account = await api.account.status().catch(() => state.account);
   if (!state.account.loggedIn) showAuth();
   document.body.classList.toggle('keep-titles', !!state.cfg.ui?.keepTitles);
@@ -2224,7 +2226,7 @@ async function init() {
   renderModes();
   applyVolume();
   await Promise.all([refreshAlbums(), loadStats()]);
-  const start = VIEWS.includes(state.cfg.view) ? state.cfg.view : 'local';
+  const start = lookStartView(VIEWS.includes(state.cfg.view) ? state.cfg.view : 'local'); // look.js
   if (state.cfg.localFolders.length) scanLocal();
   api.sp.status().then((s) => {
     state.sp = s;

@@ -261,7 +261,10 @@ async function loadFriends() {
     const d = await api.friends.list();
     const fresh = d.incoming.filter((p) => Friends.seenIncoming && !Friends.seenIncoming.has(p.id));
     Friends.seenIncoming = new Set(d.incoming.map((p) => p.id));
-    for (const p of fresh) toast(`${firstName(p.name)} (@${p.login}) хочет добавить тебя в друзья`);
+    for (const p of fresh) {
+      toast(`${firstName(p.name)} (@${p.login}) хочет добавить тебя в друзья`);
+      islandNotify(`${firstName(p.name)} хочет в друзья`, 'friend'); // island-feed.js
+    }
     Friends.data = d;
     Friends.fetchedAt = performance.now();
     Friends.error = '';

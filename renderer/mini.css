@@ -1,0 +1,40 @@
+/* Мини-плеер: карточка с размытой обложкой на фоне, тащится за пустые места */
+:root { --amber: #f0a63a; --voice: #9aa8ff; --m: 0; color-scheme: dark; }
+* { box-sizing: border-box; }
+html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; }
+body { padding: 8px; font: 500 13px/1.3 "Onest", "Segoe UI", sans-serif; color: #f4f1ec; }
+button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; -webkit-app-region: no-drag; }
+svg { width: 16px; height: 16px; }
+
+.card {
+  position: relative; height: 96px; display: flex; gap: 12px; padding: 10px; border-radius: 20px; overflow: hidden;
+  background: #120d0b; -webkit-app-region: drag;
+  box-shadow: 0 10px 28px rgb(0 0 0 / .45), inset 0 0 0 1px rgb(255 255 255 / .07);
+}
+.card.barrel { box-shadow: 0 10px 28px rgb(0 0 0 / .45), 0 0 0 1.5px var(--voice), 0 0 20px -4px var(--voice); }
+.bg { position: absolute; inset: -30px; background: center / cover no-repeat; filter: blur(28px) saturate(1.3) brightness(.4); opacity: .9; transition: background-image .5s ease; }
+.cover {
+  position: relative; width: 76px; height: 76px; flex: none; border-radius: 14px; background: #2a201b center / cover no-repeat;
+  display: grid; place-items: center; font-size: 26px; color: rgb(255 255 255 / .35);
+  box-shadow: 0 6px 16px rgb(0 0 0 / .4); cursor: pointer; -webkit-app-region: no-drag;
+  filter: blur(calc(var(--m) * 2px)) saturate(calc(1 - var(--m) * .5));
+}
+.main { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; }
+.text { display: flex; flex-direction: column; min-width: 0; }
+.text b, .text small, .text em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.text b { font-weight: 600; font-size: 14px; }
+.text small { color: rgb(244 241 236 / .65); font-size: 12px; }
+.text em { font-style: normal; color: var(--amber); font-size: 12px; min-height: 0; }
+.text em:empty { display: none; }
+.card.lyric .text small { display: none; }
+.bar { position: relative; height: 10px; display: flex; align-items: center; cursor: pointer; -webkit-app-region: no-drag; }
+.bar::before { content: ""; position: absolute; left: 0; right: 0; height: 3px; border-radius: 2px; background: rgb(255 255 255 / .15); }
+.bar i { position: relative; height: 3px; border-radius: 2px; background: var(--amber); width: 0; }
+.ctl { display: flex; align-items: center; gap: 4px; }
+.ctl button { width: 26px; height: 26px; display: grid; place-items: center; border-radius: 50%; color: rgb(244 241 236 / .75); }
+.ctl button:hover { background: rgb(255 255 255 / .12); color: #fff; }
+.ctl .play { width: 28px; height: 28px; background: #f4f1ec; color: #000; }
+.ctl .play:hover { background: #fff; color: #000; }
+#b-barrel.on { color: var(--voice); }
+.time { margin-left: auto; margin-right: 2px; font-size: 11px; color: rgb(244 241 236 / .5); font-variant-numeric: tabular-nums; }
+#b-close { opacity: .6; }
