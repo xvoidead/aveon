@@ -1634,3 +1634,24 @@ body.is-scratching { user-select: none; }
 .wave-pop-opts button.on svg { opacity: 1; }
 .wave-pop.dj .wave-pop-opts button.on { color: var(--voice); }
 @media (prefers-reduced-motion: reduce) { .wave-word-opt.flip { animation: none; } }
+
+/* ---------- поиск по настройкам ---------- */
+.set-search {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 10px; padding: 0 10px; height: 38px; border-radius: 10px;
+  background: var(--rivet); border: 1px solid transparent; transition: border-color .15s ease, background .15s ease;
+}
+.set-search:focus-within { border-color: color-mix(in srgb, var(--amber) 55%, transparent); background: var(--oak); }
+.set-search svg { width: 16px; height: 16px; flex: none; color: var(--text-3); }
+.set-search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; color: var(--text); font: 500 13.5px var(--ui); }
+.set-search input::placeholder { color: var(--text-3); text-transform: lowercase; }
+.set-search input::-webkit-search-cancel-button { filter: invert(.6); cursor: pointer; }
+.set-tabs { display: flex; flex-direction: column; gap: 2px; }
+.set-tab.ss-dim { opacity: .4; }
+.set-tab.ss-found small { color: var(--amber); font-weight: 600; }
+.ss-hide { display: none !important; }
+.ss-empty { margin: 40px 0; text-align: center; color: var(--text-3); line-height: 1.6; }
+::highlight(set-search) { background-color: color-mix(in srgb, var(--amber) 45%, transparent); color: var(--text); }
+/* узкое окно (разделы — одними значками) и телефон (разделы — полоской снизу): поиск не помещается */
+@media (max-width: 820px) { .set-search { display: none; } }
+html.mobile .set-search { display: none; }
+html.mobile .set-tabs { flex-direction: row; }

@@ -1749,22 +1749,116 @@ function tabBadge(tab) {
   return '';
 }
 
+// ---- поиск по настройкам ----
+// Поле над разделами. Пока в нём что-то есть — видны строки из всех разделов, где встречается
+// запрос (в подписи, описании, вариантах), совпадения подсвечены; у разделов слева — сколько нашлось
+let settingsQuery = '';
+const normQ = (x) => String(x || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
+
+// текст строки для поиска: видимый текст плюс подсказки полей и варианты списков
+function searchText(el) {
+  const extra = [...el.querySelectorAll('input[placeholder], [aria-label], option, [title]')]
+    .map((x) => `${x.placeholder || ''} ${x.getAttribute('aria-label') || ''} ${x.getAttribute('title') || ''} ${x.tagName === 'OPTION' ? x.textContent : ''}`);
+  return normQ(`${el.textContent} ${extra.join(' ')}`);
+}
+
+// Подсветка через CSS Highlight API — разметку не трогаем, обработчики и поля остаются как есть
+function highlightSettings(q) {
+  if (!window.CSS?.highlights) return;
+  CSS.highlights.delete('set-search');
+  if (!q) return;
+  const ranges = [];
+  const walker = document.createTreeWalker($('#settings-body'), NodeFilter.SHOW_TEXT);
+  for (let n = walker.nextNode(); n; n = walker.nextNode()) {
+    if (n.parentElement.closest('[hidden], .ss-hide')) continue;
+    const text = n.nodeValue.toLowerCase().replace(/ё/g, 'е');
+    for (let i = text.indexOf(q); i !== -1 && ranges.length < 300; i = text.indexOf(q, i + q.length)) {
+      const r = new Range();
+      r.setStart(n, i);
+      r.setEnd(n, i + q.length);
+      ranges.push(r);
+    }
+  }
+  CSS.highlights.set('set-search', new Highlight(...ranges));
+}
+
+// Разделы — по вкладке; при поиске — по совпадениям. Возвращает число найденного по вкладкам
+function applySettingsView() {
+  const q = normQ(settingsQuery);
+  const found = {};
+  for (const sec of $$('#settings-body .sec')) {
+    const tab = SEC_TAB[sec.dataset.sec];
+    const parts = [...sec.children];
+    for (const el of parts) el.classList.remove('ss-hide');
+    if (!q) { sec.hidden = tab !== settingsTab; continue; }
+    const title = sec.querySelector('.sec-title');
+    const whole = title && searchText(title).includes(q); // совпал заголовок — показываем всю секцию
+    let hits = 0;
+    for (const el of parts) {
+      if (el === title) continue;
+      const hit = whole || searchText(el).includes(q);
+      el.classList.toggle('ss-hide', !hit);
+      if (hit) hits++;
+    }
+    sec.hidden = !whole && !hits;
+    if (!sec.hidden) found[tab] = (found[tab] || 0) + Math.max(hits, 1);
+  }
+  highlightSettings(q);
+  const empty = $('#settings-body .ss-empty');
+  const nothing = q && !Object.keys(found).length;
+  if (nothing && !empty) $('#settings-body').insertAdjacentHTML('beforeend', `<p class="ss-empty">Ничего не нашлось. Попробуй другое слово — например «громкость», «тема» или «токен».</p>`);
+  else if (!nothing) empty?.remove();
+  if (nothing) $('#settings-body .ss-empty').firstChild.nodeValue = `По запросу «${settingsQuery.trim()}» ничего нет. Попробуй другое слово — например «громкость», «тема» или «токен».`;
+  return found;
+}
+
 function renderSettingsNav() {
-  $('#set-nav').innerHTML = SET_TABS.map(([id, label, icon]) => `
-    <button class="set-tab${id === settingsTab ? ' on' : ''}" data-tab="${id}" aria-current="${id === settingsTab ? 'page' : 'false'}">
-      <svg><use href="#${icon}"/></svg><span>${label}</span><small>${esc(tabBadge(id))}</small>
-    </button>`).join('');
-  $('#set-title').textContent = SET_TABS.find(([id]) => id === settingsTab)[1];
-  for (const sec of $$('#settings-body .sec')) sec.hidden = SEC_TAB[sec.dataset.sec] !== settingsTab;
+  const nav = $('#set-nav');
+  if (!$('#set-q', nav)) {
+    nav.innerHTML = `<label class="set-search"><svg><use href="#i-search"/></svg>
+        <input id="set-q" type="search" placeholder="поиск настроек" spellcheck="false" aria-label="Поиск настроек"></label>
+      <div class="set-tabs" id="set-tabs"></div>`;
+    const input = $('#set-q', nav);
+    input.value = settingsQuery;
+    input.addEventListener('input', () => { settingsQuery = input.value; renderSettingsNav(); $('#settings-body').scrollTop = 0; });
+    input.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && input.value) { e.stopPropagation(); input.value = ''; settingsQuery = ''; renderSettingsNav(); }
+    });
+  }
+  const found = applySettingsView();
+  const searching = !!normQ(settingsQuery);
+  $('#set-tabs', nav).innerHTML = SET_TABS.map(([id, label, icon]) => {
+    const on = !searching && id === settingsTab;
+    const badge = searching ? (found[id] ? String(found[id]) : '') : tabBadge(id);
+    return `<button class="set-tab${on ? ' on' : ''}${searching && !found[id] ? ' ss-dim' : ''}${searching && found[id] ? ' ss-found' : ''}" data-tab="${id}" aria-current="${on ? 'page' : 'false'}">
+      <svg><use href="#${icon}"/></svg><span>${label}</span><small>${esc(badge)}</small>
+    </button>`;
+  }).join('');
+  $('#set-title').textContent = searching ? `Поиск: ${settingsQuery.trim()}` : SET_TABS.find(([id]) => id === settingsTab)[1];
 }
 
 $('#set-nav').addEventListener('click', (e) => {
   const b = e.target.closest('[data-tab]');
-  if (!b || b.dataset.tab === settingsTab) return;
+  if (!b) return;
+  const searching = !!normQ(settingsQuery);
+  if (!searching && b.dataset.tab === settingsTab) return;
   settingsTab = b.dataset.tab;
+  if (searching) { // из поиска — в раздел, поиск сбрасываем
+    settingsQuery = '';
+    $('#set-q').value = '';
+  }
   renderSettingsNav();
   $('#settings-body').scrollTop = 0;
 });
+
+// Ctrl+F в открытых настройках — в поиск настроек, а не в поиск музыки
+document.addEventListener('keydown', (e) => {
+  if ($('#settings').hidden || !(e.ctrlKey || e.metaKey) || e.code !== 'KeyF') return;
+  e.preventDefault();
+  e.stopPropagation();
+  $('#set-q')?.focus();
+  $('#set-q')?.select();
+}, true);
 function closeSettings() { $('#settings').hidden = true; }
 $('#open-settings').onclick = () => openSettings();
 $('#close-settings').onclick = closeSettings;
