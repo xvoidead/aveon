@@ -6,7 +6,7 @@ const config = require('./config');
 const local = require('./services/local');
 
 // Приложение «авеон» на discord.com/developers/applications — его название Discord пишет в «Слушает …»,
-// а картинки logo / ym / sc / sp / local загружены в нём в Rich Presence → Art Assets (docs/discord)
+// а значки ym / sc / sp загружены в нём в Rich Presence → Art Assets (docs/discord)
 const CLIENT_ID = '1553163501642580100';
 
 const OP = { HANDSHAKE: 0, FRAME: 1, CLOSE: 2, PING: 3, PONG: 4 };
@@ -19,7 +19,7 @@ const SOURCES = {
   ym: { name: 'Яндекс Музыка', open: 'Открыть в Яндекс Музыке', icon: 'ym' },
   sc: { name: 'SoundCloud', open: 'Открыть в SoundCloud', icon: 'sc' },
   sp: { name: 'Spotify', open: 'Открыть в Spotify', icon: 'sp' },
-  local: { name: 'Свой файл', open: '', icon: 'local' },
+  local: { name: 'Свой файл', open: '', icon: '' }, // своего значка нет — только обложка
 };
 
 let sock = null;
@@ -153,7 +153,7 @@ async function activity(p) {
     assets: {},
     instance: false,
   };
-  const large = cover || asset('logo');
+  const large = cover; // обложки нет — без большой картинки
   if (large) Object.assign(a.assets, { large_image: large, large_text: clip(t.album || t.title) });
   if (asset(src.icon)) {
     Object.assign(a.assets, {
