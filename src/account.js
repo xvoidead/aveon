@@ -1,5 +1,5 @@
 // Аккаунт авеона: вход на свой сервер (папка server/) и синхронизация между компьютерами.
-// Синхронизируются альбомы, вид и настройки бочки, статистика. Токены музыкальных сервисов,
+// Синхронизируются альбомы, вид, эквалайзер со своими пресетами, настройки бочки и статистика. Токены музыкальных сервисов,
 // папки с музыкой и место остановки остаются только на этом компьютере.
 const crypto = require('crypto');
 const os = require('os');
@@ -143,13 +143,13 @@ async function remove(password) {
 
 // Какие настройки общие для всех компьютеров: микрофон у каждого свой
 function syncedSettings() {
-  const { ui, duck, crossfade } = config.get();
+  const { ui, duck, crossfade, eq } = config.get();
   const { micDevice, ...rest } = duck;
-  return { ui, duck: rest, crossfade };
+  return { ui, duck: rest, crossfade, eq };
 }
 
 function settingsChanged(patch) {
-  if (!patch || !(patch.ui || 'crossfade' in patch || (patch.duck && Object.keys(patch.duck).some((k) => k !== 'micDevice')))) return;
+  if (!patch || !(patch.ui || patch.eq || 'crossfade' in patch || (patch.duck && Object.keys(patch.duck).some((k) => k !== 'micDevice')))) return;
   config.set({ account: { settingsAt: Date.now() } });
   schedule();
 }
@@ -186,6 +186,7 @@ async function syncSettings(remote, changed) {
         config.set({
           ui: theirs.ui, duck: { ...theirs.duck, micDevice: config.get().duck.micDevice }, account: { settingsAt: theirs.at },
           ...(theirs.crossfade != null ? { crossfade: theirs.crossfade } : {}),
+          ...(theirs.eq ? { eq: theirs.eq } : {}),
         });
         changed.settings = true;
       }

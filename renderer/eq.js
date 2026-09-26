@@ -68,12 +68,15 @@ function closeEq() {
   $('#btn-eq').setAttribute('aria-pressed', 'false');
 }
 
+const eqMine = () => state.cfg.eq.custom || [];
+
 function renderEq() {
   const e = state.cfg.eq;
   eqEl.classList.toggle('off', !e.enabled);
   $('#eq-enabled').checked = e.enabled;
   $('#eq-presets').innerHTML = [...EQ_PRESETS.map(([id, label]) => [id, label]), ...(e.preset === 'custom' ? [['custom', 'Свой']] : [])]
     .map(([id, label]) => `<button data-preset="${id}" class="${e.preset === id ? 'on' : ''}">${label}</button>`).join('');
+  renderEqMine();
   $('#eq-bands').innerHTML = EQ_FREQS.map((f, i) => `
     <div class="eq-band">
       <span class="db ${e.gains[i] ? 'on' : ''}" data-db="${i}">${fmtDb(e.gains[i])}</span>
@@ -93,9 +96,126 @@ function eqLive(patch) {
 }
 
 function eqSave() {
-  const { enabled, preset, gains, preamp } = state.cfg.eq;
-  return saveCfg({ eq: { enabled, preset, gains: [...gains], preamp } });
+  const { enabled, preset, gains, preamp, custom = [] } = state.cfg.eq;
+  return saveCfg({ eq: { enabled, preset, gains: [...gains], preamp, custom } });
 }
+
+// ---------- свои пресеты ----------
+// Ряд под встроенными: свои пресеты (у каждого меню «⋯») и «Сохранить как пресет».
+// Хранятся в настройках эквалайзера и вместе с ними синхронизируются через аккаунт.
+
+function renderEqMine() {
+  const e = state.cfg.eq;
+  const mine = eqMine();
+  const own = mine.find((p) => p.id === e.preset);
+  $('#eq-mine').innerHTML = `<span class="eq-mine-label">мои</span>${mine.map((p) => `
+    <span class="chip${e.preset === p.id ? ' active' : ''}" data-mine="${esc(p.id)}" role="button" tabindex="0" title="${esc(p.name)}">
+      <span>${esc(p.name)}</span>
+      <button class="chip-more" data-mine-more="${esc(p.id)}" aria-label="Действия с пресетом" aria-haspopup="menu"><svg><use href="#i-more"/></svg></button>
+    </span>`).join('')}
+    ${own ? '' : `<button class="chip plain new" id="eq-save-as"><svg><use href="#i-plus"/></svg><span>${mine.length ? 'Сохранить текущий' : 'Сохранить как свой пресет'}</span></button>`}`;
+  $('#eq-save-as')?.addEventListener('click', eqSaveAs);
+}
+
+// Сравнение с точностью до полудецибела: так ползунки и хранятся
+const sameGains = (a, b) => a.length === b.length && a.every((v, i) => Math.abs(v - b[i]) < 0.01);
+const newPresetId = () => `u:${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
+
+// Добавить пресет в свои; пресет с тем же именем заменяется
+async function eqAddMine(preset, { select = true } = {}) {
+  const mine = [...eqMine()];
+  const same = mine.find((p) => p.name.toLowerCase() === preset.name.toLowerCase());
+  const p = { id: same?.id || newPresetId(), name: preset.name.slice(0, 40), gains: preset.gains.map(Number), preamp: +preset.preamp || 0 };
+  if (same) mine[mine.indexOf(same)] = p; else mine.push(p);
+  eqLive(select ? { custom: mine, preset: p.id, gains: [...p.gains], preamp: p.preamp, enabled: true } : { custom: mine });
+  await eqSave();
+  renderEq();
+  return { preset: p, replaced: !!same };
+}
+
+async function eqSaveAs() {
+  const e = state.cfg.eq;
+  const name = await ask({
+    title: 'Свой пресет',
+    text: 'Сохранятся все 10 полос и предусилитель. Пресет появится на всех твоих компьютерах.',
+    ok: 'Сохранить',
+  });
+  if (!name) return;
+  const { preset, replaced } = await eqAddMine({ name, gains: e.gains, preamp: e.preamp });
+  toast(replaced ? `Пресет «${preset.name}» обновлён` : `Пресет «${preset.name}» сохранён`);
+}
+
+function eqUseMine(id) {
+  const p = eqMine().find((x) => x.id === id);
+  if (!p) return;
+  eqLive({ preset: p.id, gains: [...p.gains], preamp: p.preamp, enabled: true });
+  eqSave().then(renderEq);
+}
+
+async function eqUpdateMine(id) {
+  const e = state.cfg.eq;
+  eqLive({ custom: eqMine().map((x) => (x.id === id ? { ...x, gains: [...e.gains], preamp: e.preamp } : x)), preset: id });
+  await eqSave();
+  renderEq();
+  toast('Пресет обновлён');
+}
+
+async function eqRenameMine(id) {
+  const p = eqMine().find((x) => x.id === id);
+  if (!p) return;
+  const name = await ask({ title: 'Переименовать пресет', value: p.name, ok: 'Сохранить' });
+  if (!name || name === p.name) return;
+  eqLive({ custom: eqMine().map((x) => (x.id === id ? { ...x, name: name.slice(0, 40) } : x)) });
+  await eqSave();
+  renderEq();
+}
+
+async function eqDeleteMine(id) {
+  const p = eqMine().find((x) => x.id === id);
+  if (!p) return;
+  const ok = await ask({ title: `Удалить «${p.name}»?`, text: 'Звук не изменится: полосы останутся как сейчас.', ok: 'Удалить', input: false, danger: true });
+  if (!ok) return;
+  eqLive({ custom: eqMine().filter((x) => x.id !== id), ...(state.cfg.eq.preset === id ? { preset: 'custom' } : {}) });
+  await eqSave();
+  renderEq();
+  toast(`Пресет «${p.name}» удалён`);
+}
+
+function eqMineMenu(id, anchor) {
+  const e = state.cfg.eq;
+  const p = eqMine().find((x) => x.id === id);
+  if (!p) return;
+  const changed = !(sameGains(p.gains, e.gains) && p.preamp === e.preamp);
+  showMenu([
+    { label: 'Включить', icon: 'i-eq', onClick: () => eqUseMine(id) },
+    ...(changed ? [{ label: 'Записать сюда текущие полосы', icon: 'i-refresh', onClick: () => eqUpdateMine(id) }] : []),
+    { label: 'Переименовать', icon: 'i-pencil', onClick: () => eqRenameMine(id) },
+    { sep: true },
+    { label: 'Удалить', icon: 'i-trash', danger: true, onClick: () => eqDeleteMine(id) },
+  ], { anchor });
+}
+
+$('#eq-mine').addEventListener('click', (e) => {
+  const more = e.target.closest('[data-mine-more]');
+  if (more) {
+    e.stopPropagation();
+    if (more.getAttribute('aria-expanded') === 'true') { closeMenu(); return; }
+    eqMineMenu(more.dataset.mineMore, more);
+    return;
+  }
+  const chip = e.target.closest('[data-mine]');
+  if (chip) eqUseMine(chip.dataset.mine);
+});
+$('#eq-mine').addEventListener('contextmenu', (e) => {
+  const chip = e.target.closest('[data-mine]');
+  if (!chip) return;
+  e.preventDefault();
+  eqMineMenu(chip.dataset.mine, chip.querySelector('.chip-more'));
+});
+$('#eq-mine').addEventListener('keydown', (e) => {
+  const chip = e.target.closest?.('[data-mine]');
+  if (chip && e.target === chip && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); eqUseMine(chip.dataset.mine); }
+});
 
 $('#eq-bands').addEventListener('input', (e) => {
   const i = e.target.dataset?.band;
@@ -107,7 +227,14 @@ $('#eq-bands').addEventListener('input', (e) => {
   db.classList.toggle('on', !!gains[+i]);
   eqLive({ gains, preset: 'custom' });
 });
-$('#eq-bands').addEventListener('change', async () => { await eqSave(); renderEq(); });
+$('#eq-bands').addEventListener('change', async () => {
+  // Полосы вернули ровно как в своём пресете — снова считаем, что выбран он
+  const e = state.cfg.eq;
+  const back = eqMine().find((p) => sameGains(p.gains, e.gains) && p.preamp === e.preamp);
+  if (back) e.preset = back.id;
+  await eqSave();
+  renderEq();
+});
 $('#eq-bands').addEventListener('dblclick', async (e) => {
   const i = e.target.dataset?.band;
   if (i == null) return;

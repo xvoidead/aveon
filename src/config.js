@@ -59,6 +59,7 @@ const DEFAULTS = {
     preset: 'flat', // см. EQ_PRESETS в renderer/eq.js; custom — полосы двигали вручную
     gains: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0], // дБ для 32 Гц … 16 кГц
     preamp: 0, // дБ
+    custom: [], // свои пресеты: { id: 'u:…', name, gains, preamp }
   },
   mxm: { token: '' }, // токен Musixmatch: выдаётся редко, поэтому храним
 };
