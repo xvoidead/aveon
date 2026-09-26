@@ -168,6 +168,7 @@ function renderFriendsBadge() {
 function renderFriends() {
   renderFriendsBadge();
   if (friendsEl.hidden) return;
+  requestAnimationFrame(placeFriends);
   if (Chat.id) { renderChat(); return; }
   const d = Friends.data;
   const login = state.account.login || '';
@@ -457,6 +458,20 @@ setInterval(() => {
 }, 1000);
 
 // ---- панель ----
+
+// Панель — под кнопкой «Друзья», правым краем к ней: при любой раскладке (плеер справа, снизу…)
+// она у кнопки, а не у края окна поверх сцены
+function placeFriends() {
+  if (friendsEl.hidden) return;
+  const r = friendsBtn.getBoundingClientRect();
+  const w = friendsEl.offsetWidth, h = friendsEl.offsetHeight, edge = 12;
+  const left = Math.min(Math.max(edge, r.right - w), innerWidth - w - edge);
+  let top = r.bottom + 8;
+  if (top + h > innerHeight - edge) top = Math.max(edge, innerHeight - edge - h);
+  friendsEl.style.left = `${left}px`;
+  friendsEl.style.top = `${top}px`;
+}
+window.addEventListener('resize', placeFriends);
 
 function openFriends() {
   closeTogether(); // together.js — панели на одном месте

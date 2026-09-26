@@ -1338,3 +1338,6 @@ html:is(.dock-bottom, .dock-top) .call { height: 34px; display: flex; align-item
 html:is(.dock-bottom, .dock-top) .call-head { gap: 10px; }
 html:is(.dock-bottom, .dock-top) .me { padding: 0; }
 html:is(.dock-bottom, .dock-top) .me-avatar { width: 34px; height: 34px; }
+
+/* панель друзей ставит friends.js (placeFriends) — под кнопкой, а не у края окна */
+.together.friends { right: auto; }
