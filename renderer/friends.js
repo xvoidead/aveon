@@ -18,6 +18,7 @@ const Friends = {
   seenKnocks: null,   // id друзей, которые просятся в руму и о которых уже сказали
   knocked: new Map(), // к кому мы попросились → когда: его приглашение принимаем сами
   seenMsg: new Map(), // от кого → id последнего непрочитанного, о котором уже сказали
+  seenReact: new Map(), // от кого → последняя реакция на моё сообщение, о которой уже сказали
   msgPrimed: false,   // первый опрос: о старых непрочитанных не тостим, их видно по счётчику
   unreadWas: new Map(), // сколько непрочитанного было при прошлой отрисовке: вырос — счётчик подпрыгивает
   viewAnim: null,     // 'in' — открыли чат или профиль, 'back' — вернулись к списку (анимация перехода)
@@ -395,7 +396,10 @@ async function loadFriends() {
     Friends.seenIncoming = new Set(d.incoming.map((p) => p.id));
     for (const p of fresh) {
       toast(`${firstName(p.name)} (@${p.login}) хочет добавить тебя в друзья`);
-      islandNotify(`${firstName(p.name)} хочет в друзья`, 'friend', p); // island-feed.js
+      islandNotify(`${firstName(p.name)} хочет в друзья`, 'friend', p, [ // island-feed.js
+        { label: 'Принять', primary: true, do: 'accept', arg: p.id },
+        { label: 'Отклонить', do: 'decline', arg: p.id },
+      ]);
     }
     const inv = d.invites || [];
     const newInv = inv.filter((p) => Friends.seenInvites && !Friends.seenInvites.has(`${p.id}:${p.code}`));
@@ -405,7 +409,10 @@ async function loadFriends() {
     Friends.seenKnocks = new Set(knocks.map((p) => p.id));
     for (const p of newKnocks) {
       toast(`${firstName(p.name)} просится к тебе в руму — открой «Друзья»`);
-      islandNotify(`${firstName(p.name)} просится в руму`, 'friend', p);
+      islandNotify(`${firstName(p.name)} просится в руму`, 'friend', p, [
+        { label: 'Пустить', primary: true, do: 'letin', arg: p.id },
+        { label: 'Нет', do: 'refuse', arg: p.id },
+      ]);
     }
     for (const f of d.friends) {
       const last = f.last;
@@ -413,9 +420,25 @@ async function loadFriends() {
       if (last) Friends.seenMsg.set(f.id, Math.max(seen, last.id));
       if (!last || !Friends.msgPrimed || last.id <= seen) continue;
       if (Chat.id === f.id && !friendsEl.hidden) continue; // чат открыт — сообщение и так видно
-      const what = last.track_title ? `♪ ${last.track_title}` : last.text;
+      const what = last.track_title ? `♪ ${last.track_title}` : last.album_title ? `💿 альбом «${last.album_title}»` : last.text;
       toast(`${firstName(f.name)}: ${what}`);
-      islandNotify(`${firstName(f.name)}: ${what}`, 'friend', f); // island-feed.js
+      islandNotify(`${firstName(f.name)}: ${what}`, 'friend', f, [{ label: 'Ответить', primary: true, do: 'chat', arg: f.id }]); // island-feed.js
+    }
+    // приняли мою заявку — был в «ждут ответа», стал другом
+    const nowFriends = new Set(d.friends.map((f) => f.id));
+    for (const p of Friends.data?.outgoing || []) {
+      if (!nowFriends.has(p.id)) continue;
+      toast(`${firstName(p.name)} теперь в друзьях`);
+      islandNotify(`${firstName(p.name)} теперь в друзьях`, 'friend', p, [{ label: 'Написать', do: 'chat', arg: p.id }]);
+    }
+    // реакция друга на моё сообщение
+    for (const f of d.friends) {
+      const r = f.react;
+      const key = r ? `${r.msg}:${r.e}:${r.at}` : '';
+      const seen = Friends.seenReact.get(f.id);
+      Friends.seenReact.set(f.id, key);
+      if (!r || !Friends.msgPrimed || seen === key || (Chat.id === f.id && !friendsEl.hidden)) continue;
+      islandNotify(`${firstName(f.name)} ${r.e} ${r.text ? `«${r.text}»` : 'твоё сообщение'}`, 'friend', f, [{ label: 'Открыть чат', do: 'chat', arg: f.id }]);
     }
     Friends.msgPrimed = true;
     Friends.data = d;
@@ -425,7 +448,10 @@ async function loadFriends() {
     for (const p of newInv) {
       if (p === accepted) continue;
       toast(`${firstName(p.name)} зовёт тебя в руму — открой «Друзья»`);
-      islandNotify(`${firstName(p.name)} зовёт в руму`, 'friend', p); // island-feed.js
+      islandNotify(`${firstName(p.name)} зовёт в руму`, 'friend', p, [ // island-feed.js
+        { label: 'Войти', primary: true, do: 'join', arg: p.id },
+        { label: 'Не пойду', do: 'nojoin', arg: p.id },
+      ]);
     }
     if (accepted) {
       Friends.knocked.delete(accepted.id);
@@ -516,6 +542,7 @@ api.account.onEvent(() => {
   Friends.seenKnocks = null;
   Friends.knocked.clear();
   Friends.seenMsg.clear();
+  Friends.seenReact.clear();
   Friends.msgPrimed = false;
   Chat.id = null;
   FP.id = null;
@@ -1101,4 +1128,13 @@ function heartBurst(node) {
   list.append(h);
   h.addEventListener('animationend', () => h.remove(), { once: true });
   setTimeout(() => h.remove(), 900);
+}
+
+// Из острова: показать плеер, открыть чат с другом и поставить курсор в поле ввода.
+// В самом острове печатать нельзя — он не забирает фокус (чтобы не выбивать из игры)
+function chatFromIsland(id) {
+  api.island.action({ type: 'focus' }); // главный процесс покажет окно плеера
+  if (!friendById(id)) return;
+  openChat(id);
+  setTimeout(() => $('#fr-text', friendsEl)?.focus(), 150);
 }

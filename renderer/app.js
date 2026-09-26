@@ -657,7 +657,7 @@ async function loadTrack(track, { autoplay = true, startAt = 0, quiet = false } 
     if (track.shared && Together.active()) { toast(`${track.title}: ${e.message}`, 'err'); return; } // трек друга в руме: ждём следующий от него
     failStreak++;
     toast(`${track.title}: ${e.message}`, 'err');
-    if (failStreak < 5 && state.queue.length > 1) setTimeout(() => next(true), 600);
+    if (failStreak < 5 && state.queue.length > 1) { islandNotify(`Не включился «${track.title}» — дальше`, 'info'); setTimeout(() => next(true), 600); }
     else failStreak = 0;
     return;
   }
@@ -687,7 +687,7 @@ function onAudioError(err) {
   }
   retried = false;
   toast(`Не получилось включить «${t.title}»${err?.message ? `: ${err.message}` : ''}`, 'err');
-  if (++failStreak < 5 && state.queue.length > 1) setTimeout(() => next(true), 600);
+  if (++failStreak < 5 && state.queue.length > 1) { islandNotify(`Не включился «${t.title}» — дальше`, 'info'); setTimeout(() => next(true), 600); }
 }
 
 onAudio('error', () => {
@@ -2531,6 +2531,10 @@ api.account.onEvent((ev) => {
   }
   if (ev.error) toast(ev.error, 'err');
   applySynced(ev.changed);
+  if (ev.changed?.keys) { // src/account.js: ключи сервисов с другого компьютера
+    toast('Ключи сервисов пришли с другого компьютера');
+    islandNotify('Ключи сервисов пришли с другого компьютера', 'info');
+  }
   // не перерисовываем настройки, пока в них что-то печатают
   if (!$('#settings').hidden && !document.activeElement?.closest('#settings-body')) renderSettings();
 });

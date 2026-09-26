@@ -85,9 +85,9 @@ def own_pair(conn, me: int, user_id: int, msg_id: int):
 
 
 def unread_by_friend(conn, user_id: int) -> dict[int, dict]:
-    """от кого → {unread, last: {id, text, track_title}} по непрочитанным входящим"""
+    """от кого → {unread, last: {id, text, track_title, album_title}} по непрочитанным входящим"""
     rows = conn.execute(
-        "SELECT m.from_id, m.id, m.text, m.track, c.n FROM messages m JOIN "
+        "SELECT m.from_id, m.id, m.text, m.track, m.album, c.n FROM messages m JOIN "
         "(SELECT from_id, COUNT(*) AS n, MAX(id) AS last FROM messages WHERE to_id = ? AND read = 0 GROUP BY from_id) c "
         "ON m.id = c.last",
         (user_id,),
@@ -95,7 +95,22 @@ def unread_by_friend(conn, user_id: int) -> dict[int, dict]:
     out = {}
     for r in rows:
         title = json.loads(r["track"]).get("title", "") if r["track"] else ""
-        out[r["from_id"]] = {"unread": r["n"], "last": {"id": r["id"], "text": r["text"], "track_title": title}}
+        album = json.loads(r["album"]).get("title", "") if r["album"] else ""
+        out[r["from_id"]] = {"unread": r["n"], "last": {"id": r["id"], "text": r["text"], "track_title": title, "album_title": album}}
+    return out
+
+
+def reactions_to_me(conn, user_id: int) -> dict[int, dict]:
+    """друг → его последняя реакция на моё сообщение: {msg, e, at, text} — для уведомления «Дима ❤️»"""
+    rows = conn.execute(
+        "SELECT r.user_id, r.msg_id, r.e, r.at, m.text, m.track FROM message_reactions r JOIN messages m ON m.id = r.msg_id "
+        "WHERE m.from_id = ? AND r.user_id != ? ORDER BY r.at, r.rowid",
+        (user_id, user_id),
+    ).fetchall()
+    out = {}
+    for r in rows:  # по порядку — у каждого друга останется последняя
+        what = r["text"] or (json.loads(r["track"]).get("title", "") if r["track"] else "")
+        out[r["user_id"]] = {"msg": r["msg_id"], "e": r["e"], "at": r["at"], "text": what[:80]}
     return out
 
 

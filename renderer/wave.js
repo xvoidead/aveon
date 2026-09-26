@@ -351,7 +351,10 @@ function applyWave() {
     if (p.dj === 'off') stopDj();
   }
   if ('voice' in p) speak('Привет! Теперь говорю я.');
-  if (['mood', 'diversity', 'language'].some((k) => k in p) && Wave.active) waveStart(); // волна перестраивается
+  if (['mood', 'diversity', 'language'].some((k) => k in p) && Wave.active) { // волна перестраивается
+    waveStart();
+    islandNotify(`Волна: ${$('#wave-tuner .wave-phrase')?.textContent.replace(/\s+/g, ' ').trim() || 'перестроилась'}`, 'info');
+  }
 }
 
 function cycleWave(key, step) {

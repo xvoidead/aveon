@@ -87,6 +87,7 @@ api.downloads.onEvent((ev) => {
     toast(DL.failed
       ? `Скачано ${ok} из ${DL.batch}: у ${DL.failed} ${plural(DL.failed, 'трека', 'треков', 'треков')} поток нельзя сохранить`
       : `Скачано: ${ok} ${plural(ok, 'трек', 'трека', 'треков')} — слушай без интернета`, !!DL.failed);
+    islandNotify(`Скачано: ${ok} ${plural(ok, 'трек', 'трека', 'треков')}${DL.failed ? ` из ${DL.batch}` : ''}`, 'info'); // island-feed.js
     DL.batch = 0;
     DL.failed = 0;
     if (state.view === 'albums' && state.sub === 'downloads') openView('albums', 'downloads');

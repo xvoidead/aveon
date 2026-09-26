@@ -53,7 +53,7 @@ api.island.onState((s) => {
   for (const [k, v] of Object.entries(s.avatars || {})) avatars.set(k, v);
   if (s.notice && s.notice.id !== lastNotice) {
     lastNotice = s.notice.id;
-    notice(s.notice.text, s.notice.av);
+    notice(s.notice.text, s.notice.av, s.notice.kind);
   }
   document.body.classList.toggle('hidden', !s.hasTrack && !is('notice') && !previewing);
   if (!s.hasTrack) return;
@@ -87,6 +87,7 @@ api.island.onState((s) => {
   renderLyr(ly);
   pill.classList.toggle('friend-live', !!s.friends?.count);
   renderFriends(s.friends);
+  renderEvents(s.events || []);
   renderLabel();
   $('#b-play use').setAttribute('href', s.playing ? '#i-pause' : '#i-play');
   $('#b-barrel').classList.toggle('on', !!s.manual);
@@ -156,10 +157,25 @@ function renderLyr(ly) {
   $('#l-next').textContent = ly.next;
   if ($('#l-cur').textContent !== cur) {
     $('#l-cur').textContent = cur;
+    fitLyricLine();
     box.classList.remove('swap');
     void box.offsetWidth;
     box.classList.add('swap');
   }
+}
+
+// Длинная строка: сначала уменьшаем шрифт (до 12 px), не помещается и так — две строки,
+// а капсула становится выше на строку (--lx), чтобы следующая строка текста не обрезалась
+function fitLyricLine() {
+  const el = $('#l-cur');
+  el.classList.remove('two');
+  let size = 15;
+  el.style.fontSize = `${size}px`;
+  if (!el.clientWidth) { pill.style.setProperty('--lx', '0px'); return; } // капсула свёрнута — посчитаем при раскрытии
+  while (el.scrollWidth > el.clientWidth + 1 && size > 12) { size -= 0.5; el.style.fontSize = `${size}px`; }
+  const two = el.scrollWidth > el.clientWidth + 1;
+  el.classList.toggle('two', two);
+  pill.style.setProperty('--lx', two ? '20px' : '0px');
 }
 
 function renderFriends(f) {
@@ -187,8 +203,24 @@ function peek() {
 }
 
 // av — ключ аватарки друга: на время уведомления она вместо обложки
-function notice(text, av = '') {
-  if (is('open')) return;
+// откуда уведомление — в подписи
+const NOTICE_FROM = { friend: 'друзья', together: 'рума', admin: 'от админов', info: 'авеон' };
+let pendingNotice = null; // пришло, пока остров раскрыт под курсором, — покажем, когда свернётся
+
+// эмодзи картинками Apple, как в окне плеера (renderer/app.js → emojify)
+const EMOJI_CDN = 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.1.2/img/apple/64/';
+const EMOJI_RE = /\p{Regional_Indicator}{2}|[#*0-9]\uFE0F?\u20E3|\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier})?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier})?)*/gu;
+const emo = (s) => esc(s).replace(EMOJI_RE, (e) => (/^[\u00a9\u00ae\u2122]$/.test(e) ? e
+  : `<img class="emoji" src="${EMOJI_CDN}${[...e].map((c) => c.codePointAt(0).toString(16).padStart(4, '0')).join('-')}.png" alt="${e}">`));
+document.addEventListener('error', (e) => {
+  const img = e.target;
+  if (!img.classList?.contains('emoji')) return;
+  if (!img.dataset.retry && img.src.includes('-fe0f')) { img.dataset.retry = '1'; img.src = img.src.replace(/-fe0f/g, ''); return; }
+  img.replaceWith(document.createTextNode(img.alt));
+}, true);
+
+function notice(text, av = '', kind = 'info') {
+  if (is('open')) { pendingNotice = { text, av, kind, at: Date.now() }; return; }
   pill.classList.remove('peek');
   pill.classList.add('notice');
   const face = avatarCss(av);
@@ -196,8 +228,10 @@ function notice(text, av = '') {
   pill.classList.toggle('face', !!face);
   pill.style.width = '';
   document.body.classList.remove('hidden');
-  $('#p-title').textContent = text;
-  $('#p-sub').textContent = 'авеон';
+  const title = $('#p-title');
+  title.innerHTML = emo(text);
+  title.dataset.key = ''; // после уведомления renderLabel перепишет название заново
+  $('#p-sub').textContent = NOTICE_FROM[kind] || 'авеон';
   clearTimeout(noticeTimer);
   noticeTimer = setTimeout(() => {
     pill.classList.remove('notice', 'face');
@@ -244,22 +278,45 @@ requestAnimationFrame(tick);
 // свои mouseenter/mouseleave здесь врут, когда окно переключается «пропускать клики / ловить»
 function pointerIn() {
   clearTimeout(leaveTimer);
-  if (is('open')) return;
+  if (is('open')) { api.island.hover(true); return; } // уже раскрыт — но ловить мышь напомнить (вдруг сбросили)
   pill.classList.remove('peek', 'notice');
   pill.classList.add('open');
   renderLabel();
   fitWidth();
   window.sendPillRect?.(); // сразу, не дожидаясь кадра
+  requestAnimationFrame(fitLyricLine); // строку текста меряем, когда у неё появилась ширина
+  // Пока остров раскрыт, окно ловит мышь целиком (src/hover.js → setHover), а ушёл ли курсор,
+  // решаем здесь по :hover. Раньше решал главный процесс по границе капсулы — она отставала,
+  // пока капсула росла вниз, и остров сворачивался, едва курсор доходил до кнопок ленты
+  api.island.hover(true);
 }
 function pointerOut() {
   clearTimeout(leaveTimer);
   leaveTimer = setTimeout(() => {
+    if (pill.matches(':hover')) return; // курсор всё-таки на капсуле
     pill.classList.remove('open');
+    api.island.hover(false);
     renderLabel();
+    // уведомление, пришедшее под курсором, — сейчас, если ещё свежее
+    const p = pendingNotice;
+    pendingNotice = null;
+    if (p && Date.now() - p.at < 8000) notice(p.text, p.av, p.kind);
   }, 220);
 }
 pill.addEventListener('mouseenter', pointerIn); // быстрее часов главного процесса, если событие пришло
-api.island.onPointer((on) => (on ? pointerIn() : pointerOut()));
+pill.addEventListener('mouseleave', () => { if (is('open')) pointerOut(); });
+document.addEventListener('mouseleave', () => { if (is('open')) pointerOut(); });
+// главный процесс: зашёл — раскрыть; «ушёл» у раскрытого проверяем по :hover (окно в это время ловит мышь)
+api.island.onPointer((on) => {
+  if (on === 'reset') { // окно прячут: свернуться сразу, без задержки и без проверки :hover
+    clearTimeout(leaveTimer);
+    pill.classList.remove('open');
+    pendingNotice = null;
+    renderLabel();
+    return;
+  }
+  if (on) pointerIn(); else if (!pill.matches(':hover')) pointerOut();
+});
 
 const act = (type, extra) => api.island.action({ type, ...extra });
 $('#b-play').onclick = () => act('thumb', { action: 'toggle' });
@@ -296,3 +353,44 @@ pill.addEventListener('wheel', (e) => { e.preventDefault(); act('volume', { delt
   setInterval(send, 150);
   send();
 })();
+
+
+// ---- лента событий в раскрытом острове: последние три, с кнопками и крестиком ----
+const EV_ICON = { friend: '👋', together: '🎧', admin: '📣', info: '🔔' };
+function evAgo(at) {
+  const s = Math.max(0, Math.round((Date.now() - at) / 1000));
+  return s < 60 ? 'сейчас' : s < 3600 ? `${Math.round(s / 60)} мин` : `${Math.round(s / 3600)} ч`;
+}
+
+function renderEvents(list) {
+  let box = $('#events');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'events';
+    box.className = 'events';
+    $('#friends').after(box);
+    // по нажатию, а не по отпусканию: строка может перерисоваться между ними — и клик терялся бы
+    box.addEventListener('pointerdown', (e) => {
+      const b = e.target.closest('[data-ev]');
+      if (!b || e.button !== 0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      act('event', { id: b.dataset.ev, i: b.dataset.i === undefined ? null : +b.dataset.i });
+    });
+    setInterval(() => { for (const t of box.querySelectorAll('[data-at]')) t.textContent = evAgo(+t.dataset.at); }, 20000);
+  }
+  // пока есть события, строка «друг слушает» не нужна — событие о нём тоже будет в ленте
+  $('#friends').classList.toggle('under-events', list.length > 0);
+  pill.classList.toggle('has-events', list.length > 0);
+  pill.style.setProperty('--ev', String(list.length));
+  const html = list.map((e) => {
+    const bg = avatarCss(e.av);
+    const face = bg ? `<i class="pic" style='background-image:${bg}'></i>` : e.letter ? `<i>${esc(e.letter)}</i>` : `<i class="ico">${emo(EV_ICON[e.kind] || '🔔')}</i>`;
+    return `<div class="ev">${face}<span class="ev-t">${emo(e.text)}</span><small data-at="${e.at}">${evAgo(e.at)}</small>
+      ${e.acts.map((a) => `<button class="${a.primary ? 'primary' : ''}" data-ev="${esc(e.id)}" data-i="${a.i}">${esc(a.label)}</button>`).join('')}
+      <button class="ev-x" data-ev="${esc(e.id)}" title="Убрать">×</button></div>`;
+  }).join('');
+  // перерисовываем, только если поменялось: состояние приходит 15 раз в секунду, клик по
+  // пересозданной кнопке терялся бы
+  if (box.dataset.html !== html) { box.innerHTML = html; box.dataset.html = html; }
+}
