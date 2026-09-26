@@ -260,46 +260,73 @@ function stopDj() {
   else window.speechSynthesis?.cancel();
 }
 
-// ---------- экран «Волна» ----------
+// ---------- экран «Волна»: эфир и шкала приёмника ----------
+// Сверху — эфир: тонкие линии, которые качаются под музыку, и слово «волна», чьи буквы плывут
+// на средней линии. Ниже — настройки как шкала радиоприёмника: клик по делению переводит стрелку.
 
-const waveSeg = (key, opts, cur) => `<div class="wave-seg" data-wave="${key}">${opts.map(([v, t]) => `<button data-v="${v}" class="${cur === v ? 'on' : ''}">${t}</button>`).join('')}</div>`;
+// Диджей на шкале: от «молчит» до «каждый трек» — одна шкала вместо двух рядов кнопок
+const DJ_STOPS = [['off', 'Молчит'], ['4', 'Изредка'], ['2', 'Через один'], ['1', 'Каждый трек']];
+const djStop = (cfg) => (cfg.dj ? String(cfg.djEvery) : 'off');
+
+function tunerHtml(key, label, opts, cur) {
+  const i = Math.max(0, opts.findIndex(([v]) => v === cur));
+  const n = opts.length;
+  return `<div class="tuner" data-wave="${key}" style="--n:${n};--at:${i}">
+    <span class="tuner-name">${label}</span>
+    <div class="tuner-band" role="radiogroup" aria-label="${label}">
+      <i class="tuner-needle" aria-hidden="true"></i>
+      ${opts.map(([v, t], k) => `<button role="radio" aria-checked="${k === i}" data-v="${v}" class="${k === i ? 'on' : ''}">${t}</button>`).join('')}
+    </div>
+  </div>`;
+}
 
 function renderWaveHero() {
   const box = $('#wave-hero');
   if (!box || box.hidden) return;
   const cfg = waveCfg();
   const ym = waveMode() === 'ym';
+  const on = Wave.active && state.track;
   const playing = Wave.active && !audio.paused;
-  box.querySelector('.wave-go').innerHTML = Wave.loading ? '<span class="spinner small"></span>'
-    : `<svg><use href="#${playing ? 'i-pause' : 'i-play'}"/></svg>`;
-  box.querySelector('.wave-now').innerHTML = Wave.active && state.track
+  box.classList.toggle('live', playing);
+  box.classList.toggle('dj-on', !!duck.dj);
+  const go = box.querySelector('.wave-go');
+  go.innerHTML = Wave.loading ? '<span class="spinner small"></span>' : `<svg><use href="#${playing ? 'i-pause' : 'i-play'}"/></svg>`;
+  go.setAttribute('aria-label', playing ? 'Пауза' : Wave.active ? 'Продолжить волну' : 'Включить волну');
+  box.querySelector('.wave-now').innerHTML = on
     ? `<b>${esc(state.track.title)}</b><span>${esc(state.track.artist || '')}</span>`
-    : `<b>${ym ? 'Моя волна' : 'Своя волна'}</b><span>${ym ? 'из твоей Яндекс Музыки — подстраивается под лайки и пропуски' : 'любимое из статистики и похожее из подключённых сервисов'}</span>`;
+    : `<b>${ym ? 'Моя волна' : 'Своя волна'}</b><span>${ym ? 'Из твоей Яндекс Музыки. Лайки и пропуски её направляют.' : 'Из того, что ты слушаешь, и похожего в подключённых сервисах.'}</span>`;
   box.querySelector('.wave-rate').hidden = !Wave.active;
-  box.querySelector('.wave-opts').innerHTML = `
-    ${ym ? `<div class="wave-row"><span>Настроение</span>${waveSeg('mood', MOODS, cfg.mood)}</div>` : ''}
-    <div class="wave-row"><span>Характер</span>${waveSeg('diversity', DIVERSITY, cfg.diversity)}</div>
-    ${ym ? `<div class="wave-row"><span>Язык</span>${waveSeg('language', LANGS, cfg.language)}</div>` : ''}
-    <div class="wave-row"><span>Диджей</span>
-      ${waveSeg('dj', [['off', 'Молчит'], ['on', 'Говорит']], cfg.dj ? 'on' : 'off')}
-      ${cfg.dj ? waveSeg('djEvery', [['1', 'Каждый трек'], ['2', 'Через один'], ['4', 'Изредка']], String(cfg.djEvery)) : ''}
-    </div>
-    ${cfg.dj && !IS_MOBILE && djVoices.length > 1 ? `<div class="wave-row"><span>Голос</span><select class="input wave-voice">${djVoices.map((v) => `<option ${v.name === cfg.djVoice ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select></div>` : ''}`;
-  bindWaveOpts(box);
+
+  const tuner = $('#wave-tuner');
+  tuner.innerHTML = `
+    ${ym ? tunerHtml('mood', 'Настроение', MOODS, cfg.mood) : ''}
+    ${tunerHtml('diversity', 'Характер', DIVERSITY, cfg.diversity)}
+    ${ym ? tunerHtml('language', 'Язык', LANGS, cfg.language) : ''}
+    ${tunerHtml('djStop', 'Диджей', DJ_STOPS, djStop(cfg))}
+    ${cfg.dj && !IS_MOBILE && djVoices.length > 1 ? `<label class="tuner-voice"><span class="tuner-name">Голос</span><select class="input wave-voice">${djVoices.map((v) => `<option ${v.name === cfg.djVoice ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select></label>` : ''}`;
+  bindWaveOpts(tuner);
 }
 
 function bindWaveOpts(box) {
-  box.querySelectorAll('[data-wave] button').forEach((b) => {
-    b.onclick = async () => {
-      const key = b.closest('[data-wave]').dataset.wave;
-      const v = key === 'dj' ? b.dataset.v === 'on' : key === 'djEvery' ? +b.dataset.v : b.dataset.v;
-      await saveCfg({ wave: { [key]: v } });
-      renderWaveHero();
-      // новые настроение, характер или язык — волна сразу перестраивается
-      if (Wave.active && ['mood', 'diversity', 'language'].includes(key)) waveStart();
-      if (key === 'dj' && v && Wave.active && state.track) { Wave.sinceDj = 99; maybeDj(state.track); }
-      if (key === 'dj' && !v) stopDj();
-    };
+  box.querySelectorAll('.tuner').forEach((t) => {
+    const key = t.dataset.wave;
+    t.querySelectorAll('button').forEach((b, i) => {
+      b.onclick = async () => {
+        t.style.setProperty('--at', i); // стрелка переезжает сразу, сохранение — следом
+        t.querySelectorAll('button').forEach((x, k) => { x.classList.toggle('on', k === i); x.setAttribute('aria-checked', String(k === i)); });
+        const v = b.dataset.v;
+        if (key === 'djStop') {
+          const dj = v !== 'off';
+          await saveCfg({ wave: dj ? { dj, djEvery: +v } : { dj } });
+          if (dj && Wave.active && state.track) { Wave.sinceDj = 99; maybeDj(state.track); }
+          if (!dj) stopDj();
+        } else {
+          await saveCfg({ wave: { [key]: v } });
+          if (Wave.active) waveStart(); // новое настроение, характер или язык — волна перестраивается
+        }
+        renderWaveHero();
+      };
+    });
   });
   const voice = box.querySelector('.wave-voice');
   if (voice) voice.onchange = () => saveCfg({ wave: { djVoice: voice.value } });
@@ -313,16 +340,20 @@ function ensureWaveHero() {
   box.id = 'wave-hero';
   box.hidden = true;
   box.innerHTML = `
-    <canvas class="wave-canvas" id="wave-canvas"></canvas>
-    <div class="wave-main">
-      <button class="wave-go" id="wave-go" aria-label="Волна"></button>
+    <div class="wave-air">
+      <canvas class="wave-canvas" id="wave-canvas" aria-hidden="true"></canvas>
+      <h2 class="wave-word" id="wave-word" aria-label="Волна">${[...'волна'].map((c) => `<span aria-hidden="true">${c}</span>`).join('')}</h2>
+    </div>
+    <div class="wave-deck">
+      <button class="wave-go" id="wave-go"></button>
       <div class="wave-now"></div>
       <div class="wave-rate" hidden>
-        <button class="icon-btn" id="wave-like" aria-label="Нравится" title="Нравится — волна учтёт"><svg><use href="#i-heart"/></svg></button>
-        <button class="icon-btn" id="wave-dislike" aria-label="Не нравится" title="Не нравится — пропустить и больше не ставить"><svg><use href="#i-dislike"/></svg></button>
+        <button class="icon-btn" id="wave-like" aria-label="Нравится" title="Нравится"><svg><use href="#i-heart"/></svg></button>
+        <button class="icon-btn" id="wave-dislike" aria-label="Не нравится" title="Не нравится: пропустить и больше не ставить"><svg><use href="#i-dislike"/></svg></button>
       </div>
     </div>
-    <div class="wave-opts"></div>`;
+    <div class="wave-tuner" id="wave-tuner"></div>
+    <h3 class="wave-next" id="wave-next" hidden>Дальше в волне</h3>`;
   $('#tracklist').before(box);
   box.querySelector('#wave-go').onclick = () => {
     if (Wave.loading) return;
@@ -330,7 +361,8 @@ function ensureWaveHero() {
   };
   box.querySelector('#wave-like').onclick = waveLike;
   box.querySelector('#wave-dislike').onclick = waveDislike;
-  drawWave();
+  new ResizeObserver(measureWord).observe(box);
+  requestAnimationFrame(drawWave);
   return box;
 }
 
@@ -339,15 +371,17 @@ function renderWave() {
   const box = ensureWaveHero();
   box.hidden = false;
   $('#content').classList.add('wave-on');
-  $('#view-title').textContent = 'Волна';
   renderWaveHero();
+  measureWord();
+  const next = $('#wave-next');
   if (Wave.active && state.queue.length) {
-    const upcoming = state.order.slice(Math.max(0, state.pos - 3)).map((i) => state.queue[i]).filter(Boolean);
-    renderTracks(upcoming, 'Что звучит и что будет дальше');
+    const upcoming = state.order.slice(Math.max(0, state.pos)).map((i) => state.queue[i]).filter(Boolean);
+    renderTracks(upcoming, '');
+    next.hidden = false;
   } else {
     renderTracks([], '');
     $('#empty').hidden = true;
-    $('#view-sub').textContent = '';
+    next.hidden = true;
   }
 }
 
@@ -357,44 +391,86 @@ function leaveWaveView() {
   $('#content').classList.remove('wave-on');
 }
 
-// Волны на фоне героя: спокойно, пока тихо; играет волна — качаются под музыку
+// ---- эфир ----
+// Семь линий: у каждой своя частота и фаза, вместе — как рябь на осциллографе. Энергия — из басов,
+// пока играет волна; тихо — линии едва дышат. Средняя линия несёт буквы слова «волна».
+
 const waveBins = new Uint8Array(1024);
-let wavePhase = 0, waveEnergy = 0;
+const LINES = 7;
+let wavePhase = 0, waveEnergy = 0.12;
+let letters = []; // центры букв относительно холста, в CSS-пикселях
+
+function measureWord() {
+  const c = $('#wave-canvas'), word = $('#wave-word');
+  if (!c || !word) return;
+  const base = c.getBoundingClientRect();
+  letters = [...word.children].map((s) => {
+    s.style.transform = '';
+    const r = s.getBoundingClientRect();
+    return { el: s, x: r.left + r.width / 2 - base.left, w: base.width };
+  });
+}
+
+// Высота линии k в точке t (0…1 по ширине), в долях амплитуды
+function lineAt(k, t) {
+  const f = 1.6 + k * 0.45;
+  return Math.sin(t * Math.PI * f + wavePhase * (0.8 + k * 0.17) + k * 1.3) * 0.7
+    + Math.sin(t * Math.PI * (f * 2.3) - wavePhase * 1.1 + k) * 0.3;
+}
+
+const still = () => document.documentElement.classList.contains('look-still') || matchMedia('(prefers-reduced-motion: reduce)').matches;
+
 function drawWave() {
   const c = $('#wave-canvas');
   const box = $('#wave-hero');
   if (c && box && !box.hidden && !document.hidden) {
     const dpr = window.devicePixelRatio || 1;
     const w = c.clientWidth * dpr, h = c.clientHeight * dpr;
-    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
-    const g = c.getContext('2d');
-    g.clearRect(0, 0, w, h);
-    let target = 0.15;
+    if (c.width !== w || c.height !== h) { c.width = w; c.height = h; measureWord(); }
+    let target = 0.12;
     if (Wave.active && !audio.paused && fx.analyser) {
       const d = waveBins.subarray(0, fx.analyser.frequencyBinCount);
       fx.analyser.getByteFrequencyData(d);
       let s = 0;
-      for (let i = 1; i < 40; i++) s += d[i];
-      target = 0.25 + (s / 39 / 255) * 1.2;
+      for (let i = 1; i < 24; i++) s += d[i];
+      target = 0.3 + Math.pow(s / 23 / 255, 1.4) * 1.1 * (window.LOOK?.reactGain ?? 100) / 100;
     }
-    waveEnergy += (target - waveEnergy) * 0.08;
-    wavePhase += 0.012 + waveEnergy * 0.03;
+    waveEnergy += (target - waveEnergy) * 0.07;
+    if (!still()) wavePhase += 0.008 + waveEnergy * 0.022;
+
+    const g = c.getContext('2d');
+    g.clearRect(0, 0, w, h);
     const cs = getComputedStyle(document.documentElement);
-    const colors = [cs.getPropertyValue('--amber').trim() || '#f0a63a', cs.getPropertyValue('--voice').trim() || '#9aa8ff', cs.getPropertyValue('--text-3').trim() || '#888'];
-    for (let k = 0; k < 3; k++) {
+    const amber = cs.getPropertyValue('--amber').trim() || '#f0a63a';
+    const voice = cs.getPropertyValue('--voice').trim() || '#9aa8ff';
+    const mid = Math.floor(LINES / 2);
+    const amp = h * 0.075 * (0.4 + waveEnergy);
+    for (let k = 0; k < LINES; k++) {
+      const y0 = h * (0.2 + (k / (LINES - 1)) * 0.6);
       g.beginPath();
-      g.lineWidth = (2.4 - k * 0.6) * dpr;
-      g.strokeStyle = colors[k];
-      g.globalAlpha = 0.75 - k * 0.2;
-      const amp = h * (0.16 + k * 0.05) * waveEnergy;
-      for (let x = 0; x <= w; x += 6 * dpr) {
+      g.lineWidth = (k === mid ? 2.2 : 1) * dpr;
+      g.strokeStyle = k === mid && (duck.dj || duck.m > 0.5) ? voice : amber;
+      g.globalAlpha = k === mid ? 0.95 : 0.16 + (1 - Math.abs(k - mid) / mid) * 0.32;
+      for (let x = 0; x <= w; x += 4 * dpr) {
         const t = x / w;
-        const y = h * 0.55 + Math.sin(t * Math.PI * (2 + k) + wavePhase * (1 + k * 0.4)) * amp * Math.sin(t * Math.PI);
+        const env = Math.sin(t * Math.PI) * 0.85 + 0.15; // к краям затихают
+        const y = y0 + lineAt(k, t) * amp * env;
         if (x === 0) g.moveTo(x, y); else g.lineTo(x, y);
       }
       g.stroke();
     }
     g.globalAlpha = 1;
+
+    // буквы — на средней линии
+    const y0 = 0.2 + (mid / (LINES - 1)) * 0.6;
+    for (const L of letters) {
+      const t = L.x / (L.w || 1);
+      const env = Math.sin(t * Math.PI) * 0.85 + 0.15;
+      const dy = (lineAt(mid, t) * amp * env) / dpr;
+      const slope = (lineAt(mid, t + 0.01) - lineAt(mid, t)) * amp * env / dpr;
+      L.el.style.transform = `translateY(${dy.toFixed(1)}px) rotate(${Math.max(-8, Math.min(8, slope * 1.2)).toFixed(1)}deg)`;
+    }
+    void y0;
   }
   requestAnimationFrame(drawWave);
 }

@@ -1342,43 +1342,79 @@ html:is(.dock-bottom, .dock-top) .me-avatar { width: 34px; height: 34px; }
 /* панель друзей ставит friends.js (placeFriends) — под кнопкой, а не у края окна */
 .together.friends { right: auto; }
 
-/* ---------- волна (wave.js) ---------- */
-.library.wave-on .search, .library.wave-on .collections-wrap { display: none; }
-.wave-hero {
-  position: relative; margin: 4px -8px 16px; padding: 58px 26px 20px; border-radius: 22px; overflow: hidden;
-  background:
-    radial-gradient(80% 120% at 0% 0%, color-mix(in srgb, var(--amber) 22%, transparent), transparent 60%),
-    radial-gradient(70% 110% at 100% 100%, color-mix(in srgb, var(--voice) 18%, transparent), transparent 60%),
-    var(--oak-2);
-  border: 1px solid var(--rivet-2);
+/* ---------- волна (wave.js): эфир сверху, шкала приёмника снизу ---------- */
+.library.wave-on .search, .library.wave-on .collections-wrap, .library.wave-on .lib-head { display: none; }
+.wave-hero { position: relative; margin: 0 0 8px; }
+
+/* эфир: линии на всю ширину, слово «волна» лежит на средней линии */
+.wave-air { position: relative; height: clamp(170px, 30vh, 250px); margin: 0 -12px; }
+.wave-canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.wave-word {
+  /* низ букв — на средней линии эфира (50% высоты): слово стоит на волне, как на воде */
+  position: absolute; left: 12px; top: 50%; margin: 0; transform: translateY(-86%);
+  display: flex; gap: .02em; pointer-events: none;
+  font: 700 clamp(64px, 11vw, 132px)/1 var(--display); letter-spacing: -0.045em; color: var(--text);
+  text-transform: lowercase;
 }
-.wave-canvas { position: absolute; left: 0; right: 0; top: 0; height: 64px; width: 100%; pointer-events: none; opacity: .85; }
-.wave-main { position: relative; display: flex; align-items: center; gap: 18px; min-height: 104px; }
+.wave-word span { display: inline-block; will-change: transform; text-shadow: 0 0 0 var(--oak), 0 6px 26px var(--oak); }
+
+/* пульт: круглая кнопка-иллюминатор, что играет, оценка */
+.wave-deck { display: flex; align-items: center; gap: 18px; margin-top: 4px; min-height: 72px; }
 .wave-go {
-  width: 76px; height: 76px; flex: none; border-radius: 50%; display: grid; place-items: center;
-  background: var(--amber); color: var(--oak); box-shadow: 0 14px 34px color-mix(in srgb, var(--amber) 40%, transparent);
-  transition: transform .15s ease;
+  position: relative; width: 68px; height: 68px; flex: none; border-radius: 50%; display: grid; place-items: center;
+  background: var(--amber); color: var(--oak);
+  box-shadow: 0 0 0 6px var(--oak), 0 0 0 7px color-mix(in srgb, var(--amber) 45%, transparent);
+  transition: transform .15s ease, box-shadow .3s ease;
 }
-.wave-go:hover { transform: scale(1.05); }
-.wave-go svg { width: 30px; height: 30px; }
-.wave-now { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
-.wave-now b { font: 700 26px/1.1 var(--display); letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wave-now span { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.wave-rate { display: flex; gap: 6px; }
-.wave-rate .icon-btn { width: 42px; height: 42px; background: var(--rivet); }
-.wave-rate .icon-btn:hover { color: var(--amber); }
-.wave-opts { position: relative; display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
-.wave-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-.wave-row > span { width: 96px; flex: none; color: var(--text-3); font-size: 13px; }
-.wave-seg { display: flex; flex-wrap: wrap; gap: 6px; }
-.wave-seg button { padding: 6px 14px; border-radius: 99px; background: var(--rivet); color: var(--text-2); font-size: 13px; font-weight: 500; transition: background .15s, color .15s; }
-.wave-seg button:hover { background: var(--rivet-2); color: var(--text); }
-.wave-seg button.on { background: var(--text); color: var(--oak); }
-.wave-voice { height: 32px; max-width: 280px; }
-html.mobile .wave-hero { margin: 4px 0 14px; padding: 18px 16px 16px; }
-html.mobile .wave-now b { font-size: 20px; }
-html.mobile .wave-go { width: 64px; height: 64px; }
-html.mobile .wave-row > span { width: 100%; }
+.wave-go:hover { transform: scale(1.04); }
+.wave-go:active { transform: scale(.96); }
+.wave-go svg { width: 26px; height: 26px; }
+.wave-hero.live .wave-go { box-shadow: 0 0 0 6px var(--oak), 0 0 0 7px var(--amber), 0 0 30px color-mix(in srgb, var(--amber) 45%, transparent); }
+.wave-hero.dj-on .wave-go { box-shadow: 0 0 0 6px var(--oak), 0 0 0 7px var(--voice), 0 0 30px color-mix(in srgb, var(--voice) 45%, transparent); }
+.wave-now { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.wave-now b { font: 600 19px/1.25 var(--ui); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wave-now span { color: var(--text-2); font-size: 14px; line-height: 1.45; max-width: 60ch; }
+.wave-rate { display: flex; gap: 4px; }
+.wave-rate .icon-btn { width: 42px; height: 42px; }
+.wave-rate .icon-btn:hover { color: var(--amber); background: var(--rivet); }
+
+/* шкала приёмника: деления, подписи под ними, янтарная стрелка переезжает к выбранному */
+.wave-tuner { display: flex; flex-direction: column; gap: 18px; margin: 30px 0 8px; max-width: 760px; }
+.tuner { display: grid; grid-template-columns: 110px minmax(0, 1fr); align-items: end; gap: 16px; }
+.tuner-name { color: var(--text-3); font-size: 13px; padding-bottom: 3px; }
+.tuner-band {
+  position: relative; display: grid; grid-template-columns: repeat(var(--n), minmax(0, 1fr));
+  padding-top: 18px;
+  /* мелкие деления по всей шкале и крупные — под каждой подписью */
+  background:
+    repeating-linear-gradient(90deg, color-mix(in srgb, var(--text-3) 45%, transparent) 0 1px, transparent 1px 9px) top / 100% 7px no-repeat,
+    linear-gradient(var(--rivet-2), var(--rivet-2)) 0 7px / 100% 1px no-repeat;
+}
+.tuner-band button {
+  position: relative; padding: 2px 4px 3px; text-align: center; font-size: 13px; font-weight: 500; color: var(--text-3);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: color .2s ease;
+}
+.tuner-band button::before { content: ""; position: absolute; left: 50%; top: -18px; width: 1px; height: 12px; background: var(--text-3); opacity: .8; }
+.tuner-band button:hover { color: var(--text); }
+.tuner-band button.on { color: var(--text); }
+.tuner-needle {
+  position: absolute; top: -4px; width: 2px; height: 22px; margin-left: -1px; border-radius: 1px; pointer-events: none;
+  left: calc((var(--at) + .5) / var(--n) * 100%);
+  background: var(--amber); box-shadow: 0 0 10px var(--amber);
+  transition: left .45s cubic-bezier(.2, .9, .25, 1.1);
+}
+.tuner[data-wave="djStop"] .tuner-needle { background: var(--voice); box-shadow: 0 0 10px var(--voice); }
+.tuner-voice { display: grid; grid-template-columns: 110px minmax(0, 320px); align-items: center; gap: 16px; }
+.wave-voice { height: 32px; }
+
+.wave-next { margin: 26px 0 6px; font: 600 15px var(--ui); color: var(--text-2); }
+
+@media (prefers-reduced-motion: reduce) { .tuner-needle { transition: none; } }
+html.mobile .wave-air { height: 160px; margin: 14px -16px 0; }
+html.mobile .wave-word { left: 16px; font-size: 64px; }
+html.mobile .wave-go { width: 60px; height: 60px; }
+html.mobile .tuner, html.mobile .tuner-voice { grid-template-columns: 1fr; gap: 6px; }
+html.mobile .tuner-band button { font-size: 11.5px; padding: 2px 1px 3px; }
 
 /* ---------- профиль друга ---------- */
 .fp-body { gap: 14px; max-height: min(560px, calc(100vh - 220px)); }
