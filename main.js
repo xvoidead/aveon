@@ -58,6 +58,10 @@ protocol.registerSchemesAsPrivileged([
   }
 })();
 
+// Живые обои висят за иконками рабочего стола — Windows считает такое окно закрытым, и Chromium
+// перестаёт его рисовать (спектр и строка текста замирают). Проверку перекрытия выключаем
+app.commandLine.appendSwitch('disable-features', 'CalculateNativeWinOcclusion');
+
 if (!app.requestSingleInstanceLock()) app.quit();
 
 let win = null;

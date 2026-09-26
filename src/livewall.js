@@ -73,6 +73,7 @@ async function open() {
     },
   });
   win.on('closed', () => { win = null; ready = false; });
+  win.webContents.setBackgroundThrottling(false);
   await win.loadFile(path.join(__dirname, '..', 'renderer', 'livewall.html'));
   ready = true;
   win.webContents.send('livewall:config', cfg());
