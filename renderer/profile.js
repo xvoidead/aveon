@@ -177,7 +177,7 @@ async function loadDevices() {
 
 // ---- страница ----
 
-function heroHtml() {
+function profileHeroHtml() {
   const a = state.account;
   const name = displayName();
   const host = (a.server || '').replace(/^https?:\/\//, '');
@@ -206,7 +206,7 @@ function accountHtml() {
 }
 
 const PF_PARTS = {
-  hero: ['#pf-hero', heroHtml],
+  hero: ['#pf-hero', profileHeroHtml],
   conn: ['#pf-connected', connectionsHtml],
   devices: ['#pf-devices', devicesHtml],
   account: ['#pf-account', accountHtml],
