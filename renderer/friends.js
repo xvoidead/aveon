@@ -705,6 +705,15 @@ function buildChat(f) {
     if (e.target.closest('[data-msg-album]') && m.album) { importShare(`aveon:${m.album.code}`); return; } // share.js
     if (e.target.closest('[data-msg-play]') && m.track) { playShared(m.track); toast(`Включаю «${m.track.title}»`); }
   };
+  // двойной клик: по сообщению друга — ❤️ (ещё раз — снять), по своему — изменить
+  list.ondblclick = (e) => {
+    const m = msgOf(e.target);
+    if (!m || m.pending || e.target.closest('button')) return;
+    window.getSelection()?.removeAllRanges(); // двойной клик выделяет слово — не нужно
+    if (m.mine) { if (!m.album) startEdit(m); return; }
+    heartBurst(e.target.closest('[data-mid]'));
+    reactMsg(m, '❤️');
+  };
   list.oncontextmenu = (e) => {
     const m = msgOf(e.target);
     if (!m || m.pending) return;
@@ -1075,4 +1084,14 @@ async function saveEdit(text) {
     stopEdit(true);
     renderFriends();
   } catch (e) { toast(e.message, 'err'); }
+}
+
+// большое сердечко над сообщением на миг — как в Instagram
+function heartBurst(node) {
+  if (!node) return;
+  const h = document.createElement('span');
+  h.className = 'msg-heart';
+  h.innerHTML = emo('❤️');
+  node.append(h);
+  setTimeout(() => h.remove(), 700);
 }
