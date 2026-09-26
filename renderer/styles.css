@@ -1007,3 +1007,55 @@ kbd {
 }
 .together-face:first-child { margin-left: 0; }
 
+
+/* ---------- друзья ---------- */
+/* панель на месте «Слушать вместе»; подтверждения (#dialog) — поверх неё */
+#dialog { z-index: 38; }
+.friends { max-height: calc(100vh - 110px); width: 340px; }
+.fr-scroll { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; margin: 0 -8px; padding: 0 8px; }
+.fr-scroll > .spinner { margin: 8px auto; }
+.fr-empty { margin: 0; }
+.fr-mine {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-top: -4px;
+  color: var(--text-3); font-size: 12px; text-align: left;
+}
+.fr-mine b { color: var(--text-2); font-weight: 600; text-transform: none; }
+.fr-mine svg { width: 15px; height: 15px; flex: none; }
+.fr-mine:hover, .fr-mine:hover b { color: var(--text); }
+.fr-sub { display: flex; align-items: baseline; gap: 6px; margin: 4px 0 -2px; color: var(--text-3); font: 500 12px var(--ui); }
+.fr-sub span { color: var(--text-3); opacity: .7; }
+.fr-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.fr-item { display: flex; align-items: center; gap: 4px; }
+.fr-main {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 10px; padding: 6px 8px; margin-left: -8px;
+  border-radius: 10px; text-align: left; color: var(--text);
+}
+button.fr-main:not(:disabled):hover { background: var(--rivet); }
+.fr-main:disabled { cursor: default; opacity: 1; }
+.fr-avatar { position: relative; width: 34px; height: 34px; font-size: 13px; overflow: visible; }
+.fr-avatar img { border-radius: 50%; }
+.fr-live {
+  position: absolute; right: -1px; bottom: -1px; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--voice); box-shadow: 0 0 0 2px var(--oak-2); animation: tg-pulse 2s ease-in-out infinite;
+}
+.fr-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.fr-text b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: none; }
+.fr-status { display: flex; align-items: center; gap: 5px; min-width: 0; color: var(--text-3); font-size: 12px; }
+.fr-status span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fr-status.live { color: var(--voice); }
+.fr-status svg { width: 10px; height: 10px; flex: none; }
+.fr-bar { display: block; height: 2px; border-radius: 1px; background: var(--rivet-2); overflow: hidden; margin-top: 2px; }
+.fr-bar i { display: block; height: 100%; background: var(--voice); transition: width 1s linear; }
+.fr-btn { height: 28px; padding: 0 12px; font-size: 12px; }
+.fr-share { grid-template-columns: 1fr auto; margin: 0; padding-top: 12px; border-top: 1px solid var(--rivet-2); font-size: 13px; }
+@media (prefers-reduced-motion: reduce) { .fr-live { animation: none; } .fr-bar i { transition: none; } }
+
+/* ---------- рума на сцене ---------- */
+/* плашка всегда на виду: без румы — тихая «слушать вместе», в руме — лица и имена */
+.together.on-stage { right: auto; top: 0; left: 0; }
+.together-chip-icon { display: none; width: 15px; height: 15px; flex: none; }
+.together-chip.idle { color: var(--text-3); background: transparent; box-shadow: inset 0 0 0 1px var(--rivet-2); }
+.together-chip.idle:hover, .together-chip.idle[aria-expanded="true"] { color: var(--text); background: var(--rivet); }
+.together-chip.idle .together-chip-icon { display: block; }
+.together-chip.idle .together-dot { display: none; }
+.together-chip[aria-expanded="true"]:not(.idle) { background: color-mix(in srgb, var(--voice) 22%, transparent); }

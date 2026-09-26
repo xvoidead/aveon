@@ -16,6 +16,7 @@ const thumbar = require('./src/thumbar');
 const censor = require('./src/censor');
 const account = require('./src/account');
 const together = require('./src/together');
+const friends = require('./src/friends');
 const discord = require('./src/discord');
 const eqpop = require('./src/eqpop');
 
@@ -269,6 +270,7 @@ function registerIpc() {
     if (patch.duck?.targets) duck.setTargets(config.get().duck.targets);
     account.settingsChanged(patch);
     if (patch.discord) discord.settingsChanged();
+    if (patch.friends) friends.settingsChanged();
     return config.publicView();
   });
   handle('cfg:secret', (key, value) => {
@@ -361,16 +363,16 @@ function registerIpc() {
 
   // Аккаунт и синхронизация
   handle('acc:status', () => account.status());
-  handle('acc:register', (server, login, password, name) => account.register(server, login, password, name));
-  handle('acc:login', (server, login, password) => account.login(server, login, password));
+  handle('acc:register', (server, login, password, name) => { friends.reset(); return account.register(server, login, password, name); });
+  handle('acc:login', (server, login, password) => { friends.reset(); return account.login(server, login, password); });
   handle('acc:logoutAll', () => account.logoutAll());
   handle('acc:me', () => account.me());
   handle('acc:rename', (name) => account.rename(name));
   handle('acc:avatar', (dataUrl) => account.setAvatar(dataUrl));
   handle('acc:password', (old, next) => account.changePassword(old, next));
-  handle('acc:delete', (password) => account.remove(password));
+  handle('acc:delete', (password) => { friends.reset(); return account.remove(password); });
   handle('acc:sync', () => account.sync());
-  handle('acc:logout', async () => { together.leave(); return account.logout(); });
+  handle('acc:logout', async () => { together.leave(); await friends.offline(); return account.logout(); });
 
   // Слушать вместе
   handle('tg:create', () => together.create());
@@ -380,6 +382,14 @@ function registerIpc() {
   handle('tg:stream', (track) => sharedStream(track));
   handle('tg:avatar', (userId, at) => account.avatarOf(userId, at));
   ipcMain.on('tg:send', (e, state, beat) => together.send(state, beat));
+
+  // Друзья: заявки по логину и что они слушают
+  handle('fr:list', () => friends.list());
+  handle('fr:add', (login) => friends.add(login));
+  handle('fr:accept', (id) => friends.accept(id));
+  handle('fr:remove', (id) => friends.remove(id));
+  handle('fr:avatar', (userId, at) => account.avatarOf(userId, at));
+  ipcMain.on('fr:now', (e, p) => friends.now(p));
 
   // Эквалайзер в своём окне (src/eqpop.js). Попап сохраняет настройки сам (cfg:set), а окну плеера
   // пересылает их для звука; «поделиться» и «вставить код» делает окно плеера
@@ -446,6 +456,7 @@ app.whenReady().then(() => {
   together.init((ev) => send('together:event', ev));
   eqpop.init((open) => send('eqpop:shown', open));
   discord.init();
+  friends.init();
   account.init((ev) => {
     if (ev.changed?.albums) local.allowFiles(albums.localPaths());
     if (ev.changed?.settings) duck.setTargets(config.get().duck.targets);
@@ -453,10 +464,12 @@ app.whenReady().then(() => {
   });
 });
 
-app.on('window-all-closed', () => {
+app.on('window-all-closed', async () => {
   eqpop.destroy();
   duck.stop();
   discord.stop();
   config.flush();
+  // друзья сразу видят, что плеер закрыт; сеть не отвечает — не держим выход дольше секунды
+  await Promise.race([friends.offline(), new Promise((r) => setTimeout(r, 1000))]);
   app.quit();
 });

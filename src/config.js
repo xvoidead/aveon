@@ -11,6 +11,7 @@ const DEFAULTS = {
   repeat: 'off', // off | all | one
   view: 'local',
   discord: { enabled: true }, // статус «Слушает» в Discord
+  friends: { share: true }, // друзья авеона видят, что я слушаю
   crossfade: 6, // с — плавный переход между треками, 0 — выключен
   ui: {
     keepTitles: false, // true — названия треков без строчного стиля

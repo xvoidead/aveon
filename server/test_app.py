@@ -224,3 +224,65 @@ def test_avatar(client):
     assert client.put("/api/me/avatar", json={"avatar": ""}, headers=h(token)).status_code == 200
     assert client.get(f"/api/avatar/{me['id']}", headers=h(other)).status_code == 404
 
+
+
+# ---------- друзья ----------
+
+def uid(client, token):
+    return client.get("/api/me", headers=h(token)).json()["user"]["id"]
+
+
+def test_friends_request_accept_remove(client):
+    t1, l1 = register(client)
+    t2, l2 = register(client)
+    id1, id2 = uid(client, t1), uid(client, t2)
+
+    assert client.post("/api/friends", json={"login": "nobody-here"}, headers=h(t1)).status_code == 404
+    assert client.post("/api/friends", json={"login": l1}, headers=h(t1)).status_code == 400
+    r = client.post("/api/friends", json={"login": "@" + l2.upper()}, headers=h(t1))
+    assert r.json() == {"status": "sent"}
+
+    lst = client.get("/api/friends", headers=h(t2)).json()
+    assert lst["incoming"][0]["id"] == id1 and lst["friends"] == []
+    assert client.get("/api/friends", headers=h(t1)).json()["outgoing"][0]["login"] == l2
+
+    # до дружбы трек не виден
+    client.put("/api/now", json={"track": {"id": "ym:1", "title": "Трек"}, "playing": True, "pos": 3}, headers=h(t2))
+    assert client.get("/api/friends", headers=h(t1)).json()["friends"] == []
+
+    assert client.post(f"/api/friends/{id2}/accept", headers=h(t1)).status_code == 404  # свою заявку принять нельзя
+    assert client.post(f"/api/friends/{id1}/accept", headers=h(t2)).status_code == 200
+    f = client.get("/api/friends", headers=h(t1)).json()
+    assert f["outgoing"] == [] and f["friends"][0]["id"] == id2
+    now = f["friends"][0]["now"]
+    assert now["track"]["title"] == "Трек" and now["playing"] and now["live"] and now["pos"] == 3
+    assert client.post("/api/friends", json={"login": l2}, headers=h(t1)).status_code == 409
+
+    client.put("/api/now", json={"track": None}, headers=h(t2))
+    assert client.get("/api/friends", headers=h(t1)).json()["friends"][0]["now"] is None
+
+    assert client.delete(f"/api/friends/{id1}", headers=h(t2)).status_code == 200
+    assert client.get("/api/friends", headers=h(t1)).json()["friends"] == []
+
+
+def test_friends_mutual_requests(client):
+    t1, l1 = register(client)
+    t2, l2 = register(client)
+    assert client.post("/api/friends", json={"login": l2}, headers=h(t1)).json()["status"] == "sent"
+    assert client.post("/api/friends", json={"login": l1}, headers=h(t2)).json()["status"] == "friends"
+    assert len(client.get("/api/friends", headers=h(t1)).json()["friends"]) == 1
+
+
+def test_now_stale_and_validation(client):
+    from aveon_api import db
+    t1, l1 = register(client)
+    t2, l2 = register(client)
+    client.post("/api/friends", json={"login": l2}, headers=h(t1))
+    client.post("/api/friends", json={"login": l1}, headers=h(t2))
+    assert client.put("/api/now", json={"track": {"id": "x"}, "playing": True}, headers=h(t2)).status_code == 400
+    assert client.put("/api/now", json={"track": {"title": "a"}}).status_code == 401
+    client.put("/api/now", json={"track": {"id": "x", "title": "Старое"}, "playing": True, "pos": 1}, headers=h(t2))
+    with db.tx() as conn:
+        conn.execute("UPDATE nowplaying SET at = at - 3600000 WHERE user_id = ?", (uid(client, t2),))
+    now = client.get("/api/friends", headers=h(t1)).json()["friends"][0]["now"]
+    assert now["track"]["title"] == "Старое" and not now["live"] and not now["playing"]

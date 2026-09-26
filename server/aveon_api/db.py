@@ -54,6 +54,31 @@ CREATE TABLE IF NOT EXISTS shares (
     created    INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS shares_user ON shares(user_id, created);
+
+-- друзья: заявка from_id → to_id; принятая дружба лежит двумя строками (a→b и b→a)
+CREATE TABLE IF NOT EXISTS friend_requests (
+    from_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    to_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created    INTEGER NOT NULL,
+    PRIMARY KEY (from_id, to_id)
+);
+CREATE INDEX IF NOT EXISTS friend_requests_to ON friend_requests(to_id);
+
+CREATE TABLE IF NOT EXISTS friends (
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    friend_id  INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    since      INTEGER NOT NULL,
+    PRIMARY KEY (user_id, friend_id)
+);
+
+-- что сейчас играет у пользователя: видят только его друзья
+CREATE TABLE IF NOT EXISTS nowplaying (
+    user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+    track      TEXT NOT NULL,     -- JSON трека без путей к файлам
+    playing    INTEGER NOT NULL,
+    pos        REAL NOT NULL,     -- позиция, с, в момент at
+    at         INTEGER NOT NULL   -- мс, серверное время
+);
 """
 
 

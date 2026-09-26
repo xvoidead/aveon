@@ -80,6 +80,14 @@ contextBridge.exposeInMainWorld('tishe', {
     send: (state, beat) => ipcRenderer.send('tg:send', state, beat),
     onEvent: (cb) => on('together:event', cb),
   },
+  friends: {
+    list: () => call('fr:list'),
+    add: (login) => call('fr:add', login),
+    accept: (id) => call('fr:accept', id),
+    remove: (id) => call('fr:remove', id),
+    avatar: (userId, at) => call('fr:avatar', userId, at),
+    now: (p) => ipcRenderer.send('fr:now', p),
+  },
   store: {
     get: (name) => call('store:get', name),
     set: (name, data) => call('store:set', name, data),

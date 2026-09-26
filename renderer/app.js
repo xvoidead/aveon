@@ -453,7 +453,7 @@ async function loadTrack(track, { autoplay = true, startAt = 0, quiet = false } 
     Together.loadFailed();
     if (seq === loadSeq) startFade(); // хвост не должен играть вечно
     if (seq !== loadSeq || quiet) return;
-    if (track.shared && Together.active()) { toast(`${track.title}: ${e.message}`, 'err'); return; } // трек друга в комнате: ждём следующий от него
+    if (track.shared && Together.active()) { toast(`${track.title}: ${e.message}`, 'err'); return; } // трек друга в руме: ждём следующий от него
     failStreak++;
     toast(`${track.title}: ${e.message}`, 'err');
     if (failStreak < 5 && state.queue.length > 1) setTimeout(() => next(true), 600);
