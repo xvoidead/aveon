@@ -61,14 +61,20 @@ function islandNotify(text, kind = 'info') {
       else if (r.synced) lyr.lines = parseLRC(r.synced); // extras.js
     } catch {}
   }
-  function lyricLine() {
+  // Строки вокруг текущей: остров показывает текущую, раскрытый — ещё предыдущую и следующую.
+  // gap — проигрыш: до первой строки или пустая строка в LRC
+  function lyricNow() {
     const t = state.track;
-    if (!t || !(islandOpt('lyrics') || state.cfg?.mini?.lyrics !== false)) return '';
-    if (lyr.id !== t.id) { loadLyr(t); return ''; }
+    const none = { prev: '', cur: '', next: '', gap: false, has: false };
+    if (!t || !(islandOpt('lyrics') || state.cfg?.mini?.lyrics !== false)) return none;
+    if (lyr.id !== t.id) { loadLyr(t); return none; }
+    if (!lyr.lines.length) return none;
     const now = audio.currentTime + 0.2;
-    let line = '';
-    for (const l of lyr.lines) { if (l.t <= now) line = l.text; else break; }
-    return line;
+    let i = -1;
+    while (i + 1 < lyr.lines.length && lyr.lines[i + 1].t <= now) i++;
+    const text = (k) => (lyr.lines[k]?.text || '').trim();
+    const cur = text(i);
+    return { prev: i > 0 ? text(i - 1) : '', cur, next: text(i + 1), gap: !cur, has: true };
   }
 
   // ---- друзья: кто слушает прямо сейчас, и кто из них только что включил новый трек ----
@@ -118,7 +124,7 @@ function islandNotify(text, kind = 'info') {
       voice: vizColor('voice'),
       bars,
       spec: full,
-      line: lyricLine(),
+      ...(() => { const l = lyricNow(); return { line: l.cur, lyric: l }; })(),
       friends: friendsNow(),
       opts: { pulse: islandOpt('pulse'), rainbow: islandOpt('rainbow'), lyrics: islandOpt('lyrics'), miniLyrics: state.cfg?.mini?.lyrics !== false },
     };
