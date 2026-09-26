@@ -959,29 +959,6 @@ kbd {
   .settings-sheet .field { grid-template-columns: 1fr; gap: 6px; }
 }
 
-/* ---------- liquid glass (glass.js) ---------- */
-/* Только всплывающие панели (.lg): фон и остальной интерфейс не меняются */
-body.liquid-glass .modal { background: rgb(10 7 5 / .3); }
-/* Кромку и блик рисует фильтр (порт шейдера), здесь только подложка для текста — TINT_COLOR */
-.lg {
-  background: color-mix(in srgb, var(--oak-2) var(--lg-tint, 55%), transparent) !important;
-  border-color: transparent !important;
-  box-shadow: 0 18px 50px rgb(0 0 0 / .35) !important;
-}
-.sheet.lg, .toast.lg { position: relative; }
-/* Обод: |dot(нормаль, свет)| при свете из (−1, 1) — ярче сверху-слева и снизу-справа, в других
-   углах гаснет. Плюс немного «отражения» (bloom в шейдере), чтобы кромку было видно на тёмном */
-.lg::after {
-  content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1.5px; pointer-events: none; z-index: 5;
-  background: conic-gradient(from 0deg,
-    rgb(255 255 255 / .26) 0deg, rgb(255 255 255 / .08) 45deg, rgb(255 255 255 / .26) 90deg,
-    rgb(255 255 255 / .42) 135deg, rgb(255 255 255 / .26) 180deg, rgb(255 255 255 / .08) 225deg,
-    rgb(255 255 255 / .26) 270deg, rgb(255 255 255 / .42) 315deg, rgb(255 255 255 / .26) 360deg);
-  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
-}
-.settings-sheet.lg .set-nav { background: rgb(0 0 0 / .12); }
-.settings-sheet.lg .sec, .lg .seg, .lg .input { background: color-mix(in srgb, var(--oak) 45%, transparent); }
-
 /* ---------- подсказка времени над полосой прогресса ---------- */
 .seek-tip {
   position: absolute; bottom: calc(100% + 4px); padding: 3px 8px; border-radius: 7px; pointer-events: none;
@@ -997,7 +974,6 @@ body.liquid-glass .modal { background: rgb(10 7 5 / .3); }
 .barrel { width: min(100%, 300px, calc(100vh - 470px)); min-width: 150px; }
 .stage-foot .call.off { margin-top: -10px; }
 .stage > .barrel { margin-top: auto; } /* плеер посередине между верхом и подвалом */
-.sheet.eq-sheet.lg { position: fixed; } /* попап эквалайзера остаётся у кнопки и со стеклом */
 
 /* ---------- аватар ---------- */
 .me-avatar.has-pic, .pf-avatar.has-pic { background-size: cover; background-position: center; }
@@ -1008,17 +984,4 @@ body.liquid-glass .modal { background: rgb(10 7 5 / .3); }
 }
 .pf-avatar:hover::after, .pf-avatar[aria-expanded="true"]::after, .pf-avatar:focus-visible::after { opacity: 1; }
 
-/* ---------- эквалайзер в своём окне поверх нативного стекла (eqpop.html) ---------- */
-/* Окно прозрачное: преломлённый фон рисует стеклянная панель под ним, здесь — подложка, обод и ручки */
-body.eqpop { display: block; height: 100vh; background: transparent; overflow: hidden; }
-body.eqpop .eq-sheet.lg {
-  position: fixed; inset: 0; width: auto; max-height: none; border-radius: 16px;
-  --lg-tint: 54%; box-shadow: none !important; animation: none;
-}
-body.eqpop .eq-sheet.appear { animation: eqpop-in .18s cubic-bezier(.2, .9, .3, 1.1); }
-@keyframes eqpop-in { from { opacity: 0; transform: scale(.98); } }
-body.eqpop .eq-panel { height: auto; flex: 1; min-height: 0; }
-body.eqpop .eq-body { height: calc(100% - 58px); }
-.eq-name { display: flex; gap: 8px; margin-top: -6px; }
-.eq-name .input { height: 32px; }
 

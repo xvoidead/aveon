@@ -1635,11 +1635,6 @@ async function renderSettings() {
       <h3 class="sec-title">Вид</h3>
       <p class="sec-desc">Интерфейс написан строчными буквами. Названия треков, артистов и тексты песен тоже, но их можно оставить как есть.</p>
       <div class="field"><label>Названия треков как есть</label><div class="ctl"><label class="switch"><input type="checkbox" id="keep-titles" ${c.ui?.keepTitles ? 'checked' : ''} aria-label="Названия треков как есть"><span></span></label></div></div>
-      <div class="field"><label>Liquid glass</label><div class="ctl"><label class="switch"><input type="checkbox" id="glass-on" ${c.ui?.glass ? 'checked' : ''} aria-label="Liquid glass"><span></span></label>
-        <span class="set-note">окна, меню и уведомления — стекло, которое преломляет то, что под ним</span></div></div>
-      <div class="field" ${c.ui?.glass ? '' : 'hidden'}><label for="glass-strength">Сила преломления</label><div class="ctl">
-        <input id="glass-strength" type="range" min="0.2" max="1.6" step="0.1" value="${+c.ui?.glassStrength || 1}">
-        <span class="val" id="glass-strength-val">${Math.round((+c.ui?.glassStrength || 1) * 100)}%</span></div></div>
       <div class="field"><label>Прятать кнопки окна</label><div class="ctl"><label class="switch"><input type="checkbox" id="autohide-win" ${c.ui?.autoHideWin !== false ? 'checked' : ''} aria-label="Прятать кнопки окна"><span></span></label></div></div>
     </section>
 
@@ -1748,18 +1743,6 @@ ${censorSettingsHtml()}
     $('#crossfade-val', body).textContent = fadeLabel(+e.target.value);
   };
   $('#crossfade', body).onchange = (e) => saveCfg({ crossfade: +e.target.value });
-  $('#glass-on', body).onchange = async (e) => {
-    await saveCfg({ ui: { glass: e.target.checked } });
-    applyGlass(); // glass.js
-    renderSettings();
-  };
-  $('#glass-strength', body).oninput = (e) => {
-    $('#glass-strength-val', body).textContent = `${Math.round(+e.target.value * 100)}%`;
-  };
-  $('#glass-strength', body).onchange = async (e) => {
-    await saveCfg({ ui: { glassStrength: +e.target.value } });
-    applyGlass();
-  };
   $('#autohide-win', body).onchange = (e) => {
     state.cfg.ui.autoHideWin = e.target.checked;
     applyWinAutohide();
@@ -1901,7 +1884,6 @@ function applySynced(changed) {
       state.cfg = cfg;
       document.body.classList.toggle('keep-titles', !!cfg.ui?.keepTitles);
       applyWinAutohide();
-      applyGlass();
       renderMe(); // profile.js: аватар и имя
       syncDuckSwitch();
       eqApply(); // eq.js: эквалайзер и свои пресеты тоже приходят с других компьютеров
@@ -2213,7 +2195,6 @@ async function init() {
   if (!state.account.loggedIn) showAuth();
   document.body.classList.toggle('keep-titles', !!state.cfg.ui?.keepTitles);
   applyWinAutohide();
-  applyGlass(); // glass.js
   renderMe(); // profile.js
   syncDuckSwitch();
   renderModes();

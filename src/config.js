@@ -15,8 +15,6 @@ const DEFAULTS = {
   ui: {
     keepTitles: false, // true — названия треков без строчного стиля
     autoHideWin: true, // кнопки окна появляются, только когда к ним подводишь курсор
-    glass: false, // liquid glass: панели — преломляющее стекло поверх размытой обложки
-    glassStrength: 1, // сила преломления, 0.2…1.6
     avatar: '', // аватар профиля: data:image/jpeg, 256×256; синхронизируется вместе с «ui»
   },
   localFolders: [],
