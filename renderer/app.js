@@ -661,6 +661,7 @@ function markPlaying() {
 
 const viz = $('#viz');
 let vizRunning = false;
+let vizShown = [];
 
 function startViz() {
   if (vizRunning || !fx.analyser) return;
@@ -677,7 +678,9 @@ function startViz() {
     const cx = w / 2, cy = h / 2;
     const inner = w * 0.43;       // чуть снаружи внешнего обруча
     const reach = w * 0.065 * ((window.LOOK?.vizPower ?? 100) / 100); // look.js: длина лучей
+    const gain = reactGain(); // look.js: чувствительность
     const bars = 96;
+    if (vizShown.length !== bars) vizShown = new Array(bars).fill(0);
     const m = duck.m;
     g.lineCap = 'round';
     g.lineWidth = Math.max(1.5, w / 260);
@@ -689,6 +692,8 @@ function startViz() {
       const hi = Math.max(lo + 1, Math.floor(Math.pow(f + 2 / bars, 1.8) * data.length * 0.7));
       let v = 0;
       for (let k = lo; k < hi; k++) v = Math.max(v, data[k]);
+      vizShown[i] = reactStep(vizShown[i], Math.min(1, (v / 255) * gain)); // look.js: плавность
+      v = vizShown[i] * 255;
       const len = Math.pow(v / 255, 1.5) * reach + 1;
       const a = (i / bars) * Math.PI * 2 - Math.PI / 2;
       const cos = Math.cos(a), sin = Math.sin(a);
@@ -1542,7 +1547,7 @@ const SET_TABS = [
 ].filter(([id]) => !(IS_MOBILE && (id === 'keys' || id === 'desk'))); // на телефоне нет клавиатуры и окон // на телефоне клавиатуры нет
 const SEC_TAB = {
   island: 'desk', mini: 'desk', tray: 'desk', hotkeys: 'desk', livewall: 'desk', // desk.js
-  dock: 'style', theme: 'style', colors: 'style', type: 'style', bg: 'style', barrel: 'style', list: 'style', lyricslook: 'style', fsmode: 'style', motion: 'style', // look.js
+  dock: 'style', react: 'style', theme: 'style', colors: 'style', type: 'style', bg: 'style', barrel: 'style', list: 'style', lyricslook: 'style', fsmode: 'style', motion: 'style', // look.js
   sound: 'look', duck: 'call', mic: 'call', ext: 'call', censor: 'censor', ym: 'services', sc: 'services', sp: 'services', discord: 'services', local: 'library', cache: 'cache', keys: 'keys' };
 let settingsTab = 'style';
 

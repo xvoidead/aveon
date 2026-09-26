@@ -1233,3 +1233,13 @@ html.look-fs-cinema.look-fs-no-lyrics .fs-cover { width: 38vh; }
 .hk.hk-fail { border-color: var(--danger); color: var(--danger); }
 .sec-desc.err { color: var(--danger); }
 html.look-fs-cinema .fs-lyrics .lyrics-empty { margin: 0 auto; text-align: center; }
+
+/* ---------- реакция на звук (look.js → --beat, --level) ---------- */
+html.look-react-cover .porthole { transform: scale(calc(1 + var(--beat, 0) * .07)); }
+html.look-react-glow .stage {
+  background:
+    radial-gradient(120% 60% at 50% 34%, color-mix(in srgb, var(--amber) calc(6% + var(--level, 0) * 38%), transparent), transparent 70%),
+    var(--oak-2);
+}
+html.look-react-hoops .hoop-outer { stroke-width: calc(2 + var(--m) * 3 + var(--beat, 0) * 5); }
+html.look-react-hoops .hoops { transform: scale(calc(1 - var(--m) * 0.07 + var(--beat, 0) * 0.035)); }

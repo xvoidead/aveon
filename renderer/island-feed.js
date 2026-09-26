@@ -29,8 +29,8 @@ function islandNotify(text, kind = 'info') {
     for (let b = 0; b < 5; b++) {
       let v = 0;
       for (let k = edges[b]; k < Math.min(edges[b + 1], data.length); k++) v = Math.max(v, data[k]);
-      const x = Math.pow(v / 255, 1.6);
-      smooth[b] = x > smooth[b] ? x : smooth[b] * 0.72 + x * 0.28;
+      const x = Math.min(1, Math.pow(v / 255, 1.6) * reactGain()); // look.js: реакция на звук
+      smooth[b] = reactStep(smooth[b], x);
     }
     return smooth.map((v) => +v.toFixed(2));
   }
@@ -43,8 +43,8 @@ function islandNotify(text, kind = 'info') {
       const hi = Math.max(lo + 1, Math.floor(Math.pow((i + 1) / n, 1.8) * data.length * 0.7));
       let v = 0;
       for (let k = lo; k < hi; k++) v = Math.max(v, data[k]);
-      const x = Math.pow(v / 255, 1.4);
-      spec[i] = x > spec[i] ? x : spec[i] * 0.8 + x * 0.2;
+      const x = Math.min(1, Math.pow(v / 255, 1.4) * reactGain());
+      spec[i] = reactStep(spec[i], x);
     }
     return spec.map((v) => +v.toFixed(2));
   }

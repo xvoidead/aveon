@@ -36,6 +36,11 @@ const LOOK_DEFAULTS = {
   startView: 'last',     // last — где остановился; иначе id вкладки
   badge: true,           // плашка «в бочке» на обложке
   dock: 'left',          // где плеер на компьютере: left | right | bottom | top
+  reactGain: 100,        // реакция на звук: чувствительность, % (спектр, остров, обои, пульс)
+  reactSmooth: 70,       // плавность: 0 — дёргается за каждым ударом, 90 — течёт медленно
+  reactCover: false,     // обложка в бочке пульсирует на басах
+  reactGlow: false,      // свечение за бочкой дышит с громкостью
+  reactHoops: false,     // обручи бочки вздрагивают на басах
   fsStyle: 'classic',    // во весь экран: classic — обложка слева, текст справа; cinema — «кино», всё по центру
   fsBg: 'cover',         // cover — размытая обложка; gradient — переливы цветов обложки; plain — ровный фон
   fsMotion: true,        // фон медленно плывёт
@@ -117,6 +122,7 @@ function applyLook() {
     'look-stage-cover': look.stageBg === 'cover', 'look-stage-flat': look.stageBg === 'flat',
     'look-wall': look.wallpaper && !!wallpaperUrl, 'look-lyrics-center': look.lyricsAlign === 'center',
     'look-lyrics-sharp': !look.lyricsBlur, 'look-no-badge': !look.badge,
+    'look-react-cover': look.reactCover, 'look-react-glow': look.reactGlow, 'look-react-hoops': look.reactHoops,
     // префикс look-: классы на <html> не должны совпадать с классами элементов (у часов — .fs-clock)
     'look-fs-cinema': look.fsStyle === 'cinema', 'look-fs-gradient': look.fsBg === 'gradient', 'look-fs-plain': look.fsBg === 'plain',
     'look-fs-motion': look.fsMotion, 'look-fs-clock': look.fsClock, 'look-fs-no-lyrics': !look.fsLyrics,
@@ -338,6 +344,16 @@ function lookSection() {
     ${sw('badge', 'Надпись «в бочке»', l.badge)}
   </section>
 
+  <section class="sec" data-sec="react">
+    <h3 class="sec-title">Реакция на звук</h3>
+    <p class="sec-desc">Как сильно и как плавно всё отвечает на музыку: спектр вокруг бочки, остров, живые обои. Ниже — что ещё качает в такт.</p>
+    ${range('reactGain', 'Чувствительность', 30, 300, 10, l.reactGain, '%')}
+    ${range('reactSmooth', 'Плавность', 0, 90, 5, l.reactSmooth, '%')}
+    ${sw('reactCover', 'Обложка пульсирует на басах', l.reactCover)}
+    ${sw('reactGlow', 'Свечение за бочкой дышит', l.reactGlow)}
+    ${sw('reactHoops', 'Обручи вздрагивают на басах', l.reactHoops)}
+  </section>
+
   <section class="sec" data-sec="list">
     <h3 class="sec-title">Библиотека</h3>
     <div class="field"><label>Плотность списка</label><div class="ctl">${seg('density', [['compact', 'Плотно'], ['normal', 'Обычно'], ['cozy', 'Просторно']], l.density)}</div></div>
@@ -404,7 +420,7 @@ function rerenderLook() {
 }
 
 function bindLook(body) {
-  $$('[data-sec="dock"], [data-sec="theme"], [data-sec="colors"], [data-sec="type"], [data-sec="bg"], [data-sec="barrel"], [data-sec="list"], [data-sec="lyricslook"], [data-sec="fsmode"], [data-sec="motion"]', body)
+  $$('[data-sec="dock"], [data-sec="theme"], [data-sec="colors"], [data-sec="type"], [data-sec="bg"], [data-sec="barrel"], [data-sec="react"], [data-sec="list"], [data-sec="lyricslook"], [data-sec="fsmode"], [data-sec="motion"]', body)
     .forEach((s) => { s.dataset.lookRoot = '1'; });
 
   $$('[data-theme]', body).forEach((b) => { b.onclick = async () => { await saveLook({ theme: b.dataset.theme }); rerenderLook(); }; });
@@ -486,3 +502,37 @@ function bindLook(body) {
 }
 
 loadWallpaper();
+
+// ---------- реакция на звук: басы и громкость → CSS (--beat, --level) ----------
+// Считаем прямо из анализатора звука (app.js → fx.analyser), только пока что-то из этого включено
+const reactBins = new Uint8Array(2048);
+let beat = 0, level = 0;
+
+// Общие для всех: чувствительность и сглаживание (спектр в app.js, остров в island-feed.js)
+const reactGain = () => (window.LOOK?.reactGain ?? 100) / 100;
+const reactSmooth = () => Math.min(0.95, (window.LOOK?.reactSmooth ?? 70) / 100);
+function reactStep(prev, x) {
+  const s = reactSmooth();
+  return x > prev ? prev + (x - prev) * (1 - s * 0.6) : prev * s + x * (1 - s);
+}
+
+function reactLoop() {
+  const on = look.reactCover || look.reactGlow || look.reactHoops;
+  const root = document.documentElement.style;
+  if (on && fx.analyser && !audio.paused && !document.hidden) {
+    const data = reactBins.subarray(0, fx.analyser.frequencyBinCount);
+    fx.analyser.getByteFrequencyData(data);
+    let b = 0, sum = 0;
+    for (let k = 1; k < 8; k++) b = Math.max(b, data[k]);
+    for (let k = 0; k < 200; k++) sum += data[k];
+    beat = reactStep(beat, Math.min(1, Math.pow(b / 255, 2.2) * reactGain()));
+    level = reactStep(level, Math.min(1, (sum / 200 / 255) * 1.6 * reactGain()));
+  } else {
+    beat *= 0.85;
+    level *= 0.85;
+  }
+  root.setProperty('--beat', beat.toFixed(3));
+  root.setProperty('--level', level.toFixed(3));
+  requestAnimationFrame(reactLoop);
+}
+requestAnimationFrame(reactLoop);
