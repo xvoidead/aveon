@@ -362,7 +362,8 @@ function registerIpc() {
   handle('adm:kick', (id) => account.adminApi.kick(id));
   handle('adm:ban', (id, banned) => account.adminApi.ban(id, banned));
   handle('adm:rename', (id, name) => account.adminApi.rename(id, name));
-  handle('adm:announce', (text) => account.adminApi.announce(text));
+  handle('adm:announce', (text, track) => account.adminApi.announce(text, track));
+  handle('adm:notify', (id, text) => account.adminApi.notify(id, text));
   handle('acc:announcement', () => account.announcement());
   handle('fr:send', (id, body) => friends.send(id, body));
   handle('fr:unknock', (id) => friends.unknock(id));

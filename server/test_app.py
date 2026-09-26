@@ -390,5 +390,9 @@ def test_admin(client):
         assert client.get("/api/announce", headers=h(t_user2)).json()["announce"]["text"].startswith("сервер")
         client.put("/api/admin/announce", json={"text": ""}, headers=h(t_adm))
         assert client.get("/api/announce", headers=h(t_user2)).json()["announce"] is None
+        o = client.get("/api/admin/overview", headers=h(t_adm)).json()
+        assert len(o["series"]["users"]) == 30 and o["series"]["users"][-1] >= 2 and "leaders" in o["top"]
+        assert client.post(f"/api/admin/users/{uid(client, t_user2)}/notify", json={"text": "привет"}, headers=h(t_adm)).status_code == 200
+        assert client.get("/api/announce", headers=h(t_user2)).json()["notice"]["text"] == "привет"
     finally:
         srv.ADMINS.discard(login)

@@ -265,7 +265,8 @@ const api = {
     kick: call((id) => account.adminApi.kick(id)),
     ban: call((id, banned) => account.adminApi.ban(id, banned)),
     rename: call((id, name) => account.adminApi.rename(id, name)),
-    announce: call((text) => account.adminApi.announce(text)),
+    announce: call((text, track) => account.adminApi.announce(text, track)),
+    notify: call((id, text) => account.adminApi.notify(id, text)),
   },
   announcement: call(() => account.announcement()),
   friends: {

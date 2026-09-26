@@ -176,7 +176,8 @@ contextBridge.exposeInMainWorld('tishe', {
     kick: (id) => call('adm:kick', id),
     ban: (id, banned) => call('adm:ban', id, banned),
     rename: (id, name) => call('adm:rename', id, name),
-    announce: (text) => call('adm:announce', text),
+    announce: (text, track) => call('adm:announce', text, track),
+    notify: (id, text) => call('adm:notify', id, text),
   },
   announcement: () => call('acc:announcement'),
   popup: { rect: (r) => ipcRenderer.send('popup:rect', r) }, // всплывающие окна: где панель (src/hover.js)

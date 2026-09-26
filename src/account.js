@@ -354,12 +354,13 @@ const adminApi = {
   kick: (id) => api('POST', `/api/admin/users/${encodeURIComponent(id)}/logout`),
   ban: (id, banned) => api('POST', `/api/admin/users/${encodeURIComponent(id)}/ban`, { banned }),
   rename: (id, name) => api('POST', `/api/admin/users/${encodeURIComponent(id)}/rename`, { name }),
-  announce: (text) => api('PUT', '/api/admin/announce', { text }),
+  announce: (text, track) => api('PUT', '/api/admin/announce', { text, track: track || null }),
+  notify: (id, text) => api('POST', `/api/admin/users/${encodeURIComponent(id)}/notify`, { text }),
 };
 
 async function announcement() {
   if (!config.getSecret('acc.token')) return null;
-  try { return (await api('GET', '/api/announce')).announce; } catch { return null; } // старый сервер — объявлений нет
+  try { return await api('GET', '/api/announce'); } catch { return null; } // { announce, notice }; старый сервер — объявлений нет
 }
 
 module.exports = {
