@@ -175,7 +175,7 @@ private fun topLine(pl: Player): String = when {
 private fun Chips(pl: Player, nav: Nav) {
     val p = LocalPal.current
     val chips = buildList {
-        if (pl.sleep != 0) add(Triple(AIcons.moon, if (pl.sleep < 0) "сон — до конца трека" else "сон через ${fmt(pl.sleep.toDouble())}", "modes"))
+        if (pl.sleep != 0) add(Triple(AIcons.moon, if (pl.sleep < 0) "сон — до конца трека" else "сон через ${fmt(pl.sleep.toDouble())}", "sleep"))
         pl.focus?.let { f -> add(Triple(AIcons.focus, "${if (f.phase == "work") "фокус" else "перерыв"} ${fmt(f.left.toDouble())}${if (f.paused) " · пауза" else ""}", "focus")) }
         if (pl.call) add(Triple(AIcons.phone, if (pl.duckOn) "звонок · бочка включится" else "звонок · бочка выключена", "duck"))
     }
@@ -184,7 +184,13 @@ private fun Chips(pl: Player, nav: Nav) {
         for ((icon, s, act) in chips) {
             Row(
                 Modifier.clip(RoundedCornerShape(99.dp)).background(p.soft).press {
-                    when (act) { "duck" -> Engine.send("duckEnabled", !pl.duckOn); else -> Engine.send("modes") }
+                    // как плашки на компьютере: сон — отменить, фокус — открыть панель
+                    when (act) {
+                        "duck" -> Engine.send("duckEnabled", !pl.duckOn)
+                        "sleep" -> Engine.send("sleepCancel")
+                        "focus" -> Engine.send("focusPanel")
+                        else -> Engine.send("modes")
+                    }
                 }.padding(horizontal = 12.dp, vertical = 7.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {

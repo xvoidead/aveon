@@ -182,6 +182,7 @@ private fun Root() {
         for (panel in panels) PanelHost(panel)
         Overlay(nav.viz) { VisualizerScreen { nav.viz = false } }
         nav.wrapped?.let { w -> Overlay(true) { WrappedScreen(w) { nav.wrapped = null } } }
+        Reactions()
         MenuSheet(menu)
         AskDialog(ask)
         Toasts(Modifier.align(Alignment.TopCenter))
@@ -507,4 +508,54 @@ private fun Toasts(modifier: Modifier) {
 @Composable
 fun BoxScope.CloseButton(onClick: () -> Unit) {
     IconBtn(AIcons.close, Modifier.align(Alignment.TopEnd).statusBarsPadding().padding(10.dp), bg = Color.Black.copy(alpha = 0.25f), onClick = onClick)
+}
+
+// ---------- реакции в руме: эмодзи взлетают над экраном у всех ----------
+
+private class Flying(val id: Long, val e: String, val who: String, val x: Float, val dx: Float, val rot: Float)
+
+@Composable
+private fun Reactions() {
+    val p = LocalPal.current
+    val list = remember { androidx.compose.runtime.mutableStateListOf<Flying>() }
+    LaunchedEffect(Unit) {
+        var n = 0L
+        Engine.reactions.collect { (e, who) ->
+            val r = kotlin.random.Random
+            list.add(Flying(n++, e, who, 0.25f + r.nextFloat() * 0.5f, (r.nextFloat() - 0.5f) * 140f, (r.nextFloat() - 0.5f) * 40f))
+            if (list.size > 24) list.removeAt(0)
+        }
+    }
+    androidx.compose.foundation.layout.BoxWithConstraints(Modifier.fillMaxSize()) {
+        val w = constraints.maxWidth.toFloat()
+        val h = constraints.maxHeight.toFloat()
+        for (f in list) {
+            androidx.compose.runtime.key(f.id) {
+                val a = remember { Animatable(0f) }
+                LaunchedEffect(Unit) {
+                    a.animateTo(1f, tween(2500, easing = androidx.compose.animation.core.FastOutSlowInEasing))
+                    list.remove(f)
+                }
+                Column(
+                    Modifier.graphicsLayer {
+                        val k = a.value
+                        translationX = w * f.x + f.dx * k
+                        translationY = h * 0.62f - h * 0.35f * k
+                        alpha = if (k < 0.12f) k / 0.12f else 1f - ((k - 0.12f) / 0.88f)
+                        val s = if (k < 0.12f) 0.4f + k / 0.12f * 0.75f else 1.15f - (k - 0.12f) * 0.3f
+                        scaleX = s; scaleY = s
+                        rotationZ = f.rot * k
+                    },
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                ) {
+                    Txt(f.e, T.display(40.sp, FontWeight.Normal, 0.sp), Color.White)
+                    if (f.who.isNotEmpty()) {
+                        Box(Modifier.clip(RoundedCornerShape(99.dp)).background(Color.Black.copy(alpha = 0.55f)).padding(horizontal = 7.dp, vertical = 1.dp)) {
+                            Txt(f.who, T.tiny, Color.White)
+                        }
+                    }
+                }
+            }
+        }
+    }
 }

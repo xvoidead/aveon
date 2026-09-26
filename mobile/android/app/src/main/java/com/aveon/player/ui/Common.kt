@@ -282,6 +282,7 @@ fun TrackRow(
     modifier: Modifier = Modifier,
     showSource: Boolean = true,
     index: Int? = null,
+    longMenu: Boolean = true,
     onMore: (() -> Unit)? = null,
     onClick: () -> Unit,
 ) {
@@ -292,7 +293,7 @@ fun TrackRow(
             .clip(RoundedCornerShape(14.dp))
             .background(if (current) p.soft else Color.Transparent)
             .graphicsLayer { alpha = if (t.playable) 1f else 0.45f }
-            .press(onLong = onMore, onClick = onClick)
+            .press(onLong = if (longMenu) onMore else null, onClick = onClick)
             .padding(horizontal = 8.dp, vertical = 7.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

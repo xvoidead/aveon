@@ -45,6 +45,7 @@ object Engine {
     val spectrum = MutableStateFlow(FloatArray(48))
     val opens = MutableSharedFlow<JSONObject>(extraBufferCapacity = 8) // визуализатор, итоги года
     val homeChanged = MutableSharedFlow<Unit>(extraBufferCapacity = 4)
+    val reactions = MutableSharedFlow<Pair<String, String>>(extraBufferCapacity = 16) // эмодзи и кто прислал
 
     private val seq = AtomicInteger(0)
     private val toastSeq = AtomicLong(0)
@@ -129,6 +130,7 @@ object Engine {
             }
             "open" -> opens.tryEmit(JSONObject(json))
             "homeChanged" -> homeChanged.tryEmit(Unit)
+            "react" -> JSONObject(json).let { reactions.tryEmit(it.str("e") to it.str("who")) }
         }
     }
 

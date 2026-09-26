@@ -206,6 +206,8 @@
     profile: () => openProfile(),
     settings: (sec) => openSettings(sec || undefined),
     react: (e) => sendReact(e),
+    sleepCancel: () => cancelSleep(),
+    focusPanel: () => openFocus(),
     karaokeOff: () => { if (karaoke.on) toggleKaraoke(false); if (!$('#fs').hidden) exitFs(); },
     ready: () => ready,
   });
@@ -238,6 +240,14 @@
     if (!vinyl.held) return;
     vinyl.held = false;
     vinyl.node?.port.postMessage({ type: 'stop' }); // ответит сдвигом → finishScratch
+  };
+
+  // ---------- реакции в руме: летят и над Compose-экраном ----------
+
+  const origFly = flyReact;
+  window.flyReact = (e, who) => {
+    origFly(e, who); // бочка от 🛢 и прочее — в движке
+    if (TG_REACTS.includes(e)) emit('react', { e, who: who || '' });
   };
 
   // ---------- текст песни ----------

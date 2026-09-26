@@ -43,6 +43,13 @@ import com.aveon.player.Card
 import com.aveon.player.Engine
 import com.aveon.player.Library
 import kotlinx.coroutines.delay
+import androidx.compose.foundation.gestures.detectDragGesturesAfterLongPress
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.zIndex
+import kotlin.math.roundToInt
 
 private val LIB_VIEWS = listOf("local" to "мои файлы", "albums" to "альбомы", "artists" to "артисты", "ym" to "яндекс", "sc" to "soundcloud", "sp" to "spotify")
 private val SEARCH_VIEWS = listOf("ym" to "яндекс", "sc" to "soundcloud", "sp" to "spotify", "local" to "мои файлы")
@@ -55,6 +62,8 @@ fun LibraryScreen(nav: Nav, search: Boolean) {
     val pl by Engine.player.collectAsState()
     val views = if (search) SEARCH_VIEWS else LIB_VIEWS
     val listState = rememberLazyListState()
+    val reorder = remember { Reorder() }
+    val rowPx = with(androidx.compose.ui.platform.LocalDensity.current) { 64.dp.toPx() }
 
     // Вход на вкладку: если движок уже в одном из этих разделов (открыли с главной, из меню) — остаёмся
     LaunchedEffect(search) {
@@ -130,7 +139,7 @@ fun LibraryScreen(nav: Nav, search: Boolean) {
             }
         }
         lib.empty?.let { e -> item { EmptyCard(e) } }
-        for (b in lib.blocks) blockItems(b, lib, pl.track?.id, pl.playing)
+        for (b in lib.blocks) blockItems(b, lib, pl.track?.id, pl.playing, reorder, rowPx)
     }
 }
 
@@ -150,14 +159,36 @@ private fun EmptyCard(e: com.aveon.player.Empty) {
     }
 }
 
-private fun androidx.compose.foundation.lazy.LazyListScope.blockItems(b: Block, lib: Library, current: String?, playing: Boolean) {
+/** Перетаскивание треков в своём альбоме: подержать и тянуть (как на компьютере мышью). */
+private class Reorder {
+    var from by mutableIntStateOf(-1)
+    var dy by mutableFloatStateOf(0f)
+}
+
+private fun androidx.compose.foundation.lazy.LazyListScope.blockItems(b: Block, lib: Library, current: String?, playing: Boolean, ro: Reorder, rowPx: Float) {
     when (b) {
         is Block.Rows -> items(b.n, key = { k -> "r${b.from + k}:${lib.tracks.getOrNull(b.from + k)?.id}" }) { k ->
             val i = b.from + k
             val t = lib.tracks.getOrNull(i) ?: return@items
+            val drag = if (!lib.reorder) Modifier else Modifier
+                .zIndex(if (ro.from == i) 1f else 0f)
+                .graphicsLayer { if (ro.from == i) { translationY = ro.dy; shadowElevation = 12f } }
+                .pointerInput(i, lib.tracks.size) {
+                    detectDragGesturesAfterLongPress(
+                        onDragStart = { ro.from = i; ro.dy = 0f },
+                        onDragEnd = {
+                            val to = (i + (ro.dy / rowPx).roundToInt()).coerceIn(0, lib.tracks.size - 1)
+                            if (to != i) Engine.send("albumMove", i, to)
+                            ro.from = -1
+                            ro.dy = 0f
+                        },
+                        onDragCancel = { ro.from = -1; ro.dy = 0f },
+                    ) { ch, amount -> ch.consume(); ro.dy += amount.y }
+                }
             TrackRow(
-                t, t.id == current, playing, Modifier.padding(horizontal = 10.dp),
+                t, t.id == current, playing, Modifier.padding(horizontal = 10.dp).then(drag),
                 showSource = t.source != lib.view,
+                longMenu = !lib.reorder,
                 onMore = { Engine.send("rowMenu", i) },
             ) { Engine.send("row", i) }
         }
