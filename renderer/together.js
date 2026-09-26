@@ -159,7 +159,6 @@ function renderTogetherChip() {
   const r = Together.room;
   const chip = $('#together-chip');
   $('#together-badge').hidden = !r;
-  renderUpNext(); // app.js: пока слушаете вместе, «дальше» решает ведущий
   togetherBtn.classList.toggle('on', !!r);
   if (!r) { chip.hidden = true; return; }
   const others = memberNames();

@@ -56,8 +56,22 @@ function eqApply() {
 const eqEl = $('#eq');
 const eqOpen = () => !eqEl.hidden;
 
+// Эквалайзер — всплывающая панель у своей кнопки, как «Слушать вместе»: без затемнения,
+// плеер за ней работает, закрывается кликом мимо
+function placeEq() {
+  const sheet = $('.eq-sheet', eqEl);
+  const b = $('#btn-eq').getBoundingClientRect();
+  const w = sheet.offsetWidth, h = sheet.offsetHeight;
+  // над кнопкой, левым краем чуть левее неё; не вылезаем за окно
+  const left = Math.max(12, Math.min(b.left - 24, innerWidth - w - 12));
+  const top = Math.max(44, Math.min(b.top - h - 12, innerHeight - h - 12));
+  sheet.style.left = `${left}px`;
+  sheet.style.top = `${top}px`;
+}
+
 function openEq() {
   eqEl.hidden = false;
+  placeEq();
   $('#btn-eq').setAttribute('aria-pressed', 'true');
   renderEq();
   requestAnimationFrame(drawEqCurve); // кривой нужны размеры ползунков после раскладки окна
@@ -284,7 +298,12 @@ $('#eq-reset').onclick = async () => {
 
 $('#btn-eq').onclick = () => (eqOpen() ? closeEq() : openEq());
 $('#eq-close').onclick = closeEq;
-eqEl.addEventListener('pointerdown', (e) => { if (e.target === eqEl) closeEq(); }); // клик мимо окна
+// Клик мимо панели закрывает её; меню пресетов и диалоги (свой пресет, код) — не «мимо»
+document.addEventListener('pointerdown', (e) => {
+  if (!eqOpen() || e.target.closest('.eq-sheet, #btn-eq, #menu, #dialog')) return;
+  closeEq();
+});
+window.addEventListener('resize', () => { if (eqOpen()) placeEq(); });
 document.addEventListener('keydown', (e) => {
   if (locked()) return; // под экраном входа (app.js) клавиши плеера не работают
   if (e.key === 'Escape' && eqOpen()) { e.stopPropagation(); closeEq(); return; }

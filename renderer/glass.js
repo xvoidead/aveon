@@ -7,8 +7,7 @@
 //    сдвиг — внутрь, против нормали, до REFR_MAG от размера окна;
 //  - у каждого канала свой показатель преломления (REFR_IOR, усиленный REFR_ABERRATION) —
 //    отсюда радужная кромка;
-//  - тонкий обод EDGE_DIM: направленный блик (RIM_LIGHT) и отражение яркого фона (bloom),
-//    смешанные «экраном» и наложенные «светлее».
+//  - тонкий обод: направленный блик (RIM_LIGHT) — CSS-кольцо .lg::after.
 // Фон здесь — живое содержимое окна: карта смещений и обод считаются на canvas из SDF
 // скруглённого прямоугольника панели и подключаются SVG-фильтром через backdrop-filter.
 
@@ -47,25 +46,29 @@ const GLASS_TARGETS = [
 const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 const lerpN = (min, max, v) => Math.min(1, Math.max(0, (v - min) / (max - min)));
 
-// Карты для одной панели: смещение для R, G, B (x и y в красном и зелёном), цвет блика и маска обода
+// Карты смещения считаются в MAP_K раз мельче панели и растягиваются фильтром: картинка в feImage
+// обрабатывается каждый кадр, и её размер решает всё (в полном разрешении — единицы кадров в секунду).
+// Смещение по кромке плавное, поэтому на глаз разницы нет. Тонкий обод рисует CSS (.lg::after).
+const MAP_K = 4;
+
+// Карты для одной панели: смещение для R, G, B — x в красном канале картинки, y в зелёном
 function glassMaps(w, h, r, W, H, strength) {
   const EPS = LG.EPS_PIX;
   const DIM = LG.REFR_DIM * H;
-  const EDGE = Math.max(1, LG.EDGE_DIM * H);
   const g = LG.REFR_IOR[1];
   const ior = LG.REFR_IOR.map((v) => g + (v - g) * LG.REFR_ABERRATION); // mix(vec3(ior.g), ior, ABERRATION)
   const magX = LG.REFR_MAG * W * strength, magY = LG.REFR_MAG * H * strength;
   const scale = 2 * Math.max(magX, magY) + 2; // feDisplacementMap: сдвиг = scale · (C − 0.5)
-  const mk = () => { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); return { c, x, img: x.createImageData(w, h) }; };
+  const mw = Math.max(2, Math.ceil(w / MAP_K)), mh = Math.max(2, Math.ceil(h / MAP_K));
+  const mk = () => { const c = document.createElement('canvas'); c.width = mw; c.height = mh; const x = c.getContext('2d'); return { c, x, img: x.createImageData(mw, mh) }; };
   const maps = [mk(), mk(), mk()];
-  const rim = mk(), mask = mk();
   const hx = w / 2, hy = h / 2;
   r = Math.min(r, hx, hy);
   const bx = hx - r, by = hy - r;
-  for (let y = 0; y < h; y++) {
-    const py = y + 0.5 - hy;
-    for (let x = 0; x < w; x++) {
-      const px = x + 0.5 - hx;
+  for (let my = 0; my < mh; my++) {
+    const py = ((my + 0.5) / mh) * h - hy;
+    for (let mx = 0; mx < mw; mx++) {
+      const px = ((mx + 0.5) / mw) * w - hx;
       // sdgBox: расстояние до кромки (минус внутри) и градиент — нормаль наружу
       const wx = Math.abs(px) - bx, wy = Math.abs(py) - by;
       const sx = px < 0 ? -1 : 1, sy = py < 0 ? -1 : 1;
@@ -78,8 +81,8 @@ function glassMaps(w, h, r, W, H, strength) {
         d = gmax - r;
         if (wx > wy) { nx = sx; ny = 0; } else { nx = 0; ny = sy; }
       }
-      const i = (y * w + x) * 4;
-      // refractionLayer
+      const i = (my * mw + mx) * 4;
+      // refractionLayer: 0 в глубине, 1 у кромки, рост по 1 − cos
       let boundary = lerpN(-DIM, EPS, d);
       boundary *= 1 - smooth(0, EPS, d);
       const cosB = 1 - Math.cos(boundary * Math.PI / 2);
@@ -90,18 +93,10 @@ function glassMaps(w, h, r, W, H, strength) {
         m[i + 1] = Math.round(255 * (0.5 - (ny * magY * ratio) / scale));
         m[i + 2] = 128; m[i + 3] = 255;
       }
-      // tintLayer: обод и направленный блик
-      const edge = Math.min(smooth(EPS, 0, d), lerpN(-EDGE, 0, d));
-      const cosE = 1 - Math.cos(edge * Math.PI / 2);
-      const light = Math.round(255 * LG.RIM_ALPHA * Math.abs(nx * LG.RIM_LIGHT[0] + ny * LG.RIM_LIGHT[1]));
-      const rd = rim.img.data;
-      rd[i] = rd[i + 1] = rd[i + 2] = light; rd[i + 3] = 255;
-      const md = mask.img.data;
-      md[i] = md[i + 1] = md[i + 2] = 255; md[i + 3] = Math.round(255 * cosE);
     }
   }
   const url = (m) => { m.x.putImageData(m.img, 0, 0); return m.c.toDataURL(); };
-  return { maps: maps.map(url), rim: url(rim), mask: url(mask), scale };
+  return { maps: maps.map(url), scale };
 }
 
 function glassFilter(w, h, r, opts) {
@@ -130,18 +125,7 @@ function glassFilter(w, h, r, opts) {
     <feColorMatrix in="dg" type="matrix" values="${only(1)}" result="g"/>
     <feColorMatrix in="db" type="matrix" values="${only(2)}" result="b"/>
     <feBlend in="r" in2="g" mode="screen" result="rg"/>
-    <feBlend in="rg" in2="b" mode="screen" result="col"/>
-    <feGaussianBlur in="SourceGraphic" stdDeviation="6" edgeMode="duplicate" result="soft"/>
-    <feComponentTransfer in="soft" result="hi">
-      <feFuncR type="linear" slope="1.25" intercept="-0.25"/><feFuncG type="linear" slope="1.25" intercept="-0.25"/><feFuncB type="linear" slope="1.25" intercept="-0.25"/>
-    </feComponentTransfer>
-    <feBlend in="SourceGraphic" in2="hi" mode="screen" result="refl"/>
-    ${img(m.rim, 'rim')}
-    <feBlend in="refl" in2="rim" mode="screen" result="merged"/>
-    <feBlend in="col" in2="merged" mode="lighten" result="edgeCol"/>
-    ${img(m.mask, 'mask')}
-    <feComposite in="edgeCol" in2="mask" operator="in" result="edgeOnly"/>
-    <feComposite in="edgeOnly" in2="col" operator="over"/>`;
+    <feBlend in="rg" in2="b" mode="screen"/>`;
   glass.defs.append(f);
   glass.filters.set(key, id);
   return id;
