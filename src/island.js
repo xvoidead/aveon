@@ -160,6 +160,9 @@ function update() {
   if (!wanted()) {
     if (win && !win.isDestroyed() && win.isVisible()) {
       hoverWatch.reset(win); // спрятали под курсором — mouseleave не придёт
+      // и острову сказать: свернуться и забыть «раскрыт». Иначе после показа он считал себя
+      // раскрытым, не просил ловить мышь заново — и кнопки переставали нажиматься
+      if (ready) win.webContents.send('island:pointer', 'reset');
       win.hide();
     }
     return;

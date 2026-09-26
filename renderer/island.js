@@ -263,7 +263,7 @@ requestAnimationFrame(tick);
 // свои mouseenter/mouseleave здесь врут, когда окно переключается «пропускать клики / ловить»
 function pointerIn() {
   clearTimeout(leaveTimer);
-  if (is('open')) return;
+  if (is('open')) { api.island.hover(true); return; } // уже раскрыт — но ловить мышь напомнить (вдруг сбросили)
   pill.classList.remove('peek', 'notice');
   pill.classList.add('open');
   renderLabel();
@@ -291,7 +291,16 @@ pill.addEventListener('mouseenter', pointerIn); // быстрее часов г�
 pill.addEventListener('mouseleave', () => { if (is('open')) pointerOut(); });
 document.addEventListener('mouseleave', () => { if (is('open')) pointerOut(); });
 // главный процесс: зашёл — раскрыть; «ушёл» у раскрытого проверяем по :hover (окно в это время ловит мышь)
-api.island.onPointer((on) => (on ? pointerIn() : !pill.matches(':hover') && pointerOut()));
+api.island.onPointer((on) => {
+  if (on === 'reset') { // окно прячут: свернуться сразу, без задержки и без проверки :hover
+    clearTimeout(leaveTimer);
+    pill.classList.remove('open');
+    pendingNotice = null;
+    renderLabel();
+    return;
+  }
+  if (on) pointerIn(); else if (!pill.matches(':hover')) pointerOut();
+});
 
 const act = (type, extra) => api.island.action({ type, ...extra });
 $('#b-play').onclick = () => act('thumb', { action: 'toggle' });
