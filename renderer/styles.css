@@ -1580,7 +1580,6 @@ body.is-scratching { user-select: none; }
 /* ---------- анимации чата и переходов в «Друзьях» ---------- */
 @keyframes msg-in { from { opacity: 0; transform: translateX(-14px) scale(.94); } }
 @keyframes msg-in-mine { from { opacity: 0; transform: translateX(14px) scale(.94); } }
-@keyframes msg-sent { from { opacity: .5; } }
 @keyframes view-in { from { opacity: 0; transform: translateX(18px); } }
 @keyframes view-back { from { opacity: 0; transform: translateX(-18px); } }
 @keyframes badge-pop { 0% { transform: scale(.3); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
@@ -1590,24 +1589,66 @@ body.is-scratching { user-select: none; }
 .fr-msg.enter { animation: msg-in .34s cubic-bezier(.2, .8, .2, 1) both; animation-delay: var(--d, 0ms); }
 .fr-msg.mine.enter { animation-name: msg-in-mine; }
 .fr-msg.pending { opacity: .5; }
-.fr-msg.sent { animation: msg-sent .4s ease; }
 .fr-msg .fr-track { transition: transform .15s ease, background .15s ease; }
 .fr-msg .fr-track:hover { transform: translateY(-1px); }
 .fr-msg .fr-track:active { transform: scale(.98); }
 
-.together.friends.view-in > * { animation: view-in .28s cubic-bezier(.2, .8, .2, 1) both; }
-.together.friends.view-back > * { animation: view-back .28s cubic-bezier(.2, .8, .2, 1) both; }
-.together.friends.view-in > :nth-child(2), .together.friends.view-back > :nth-child(2) { animation-delay: .03s; }
-.together.friends.view-in > :nth-child(n+3), .together.friends.view-back > :nth-child(n+3) { animation-delay: .06s; }
+.v-in { animation: view-in .28s cubic-bezier(.2, .8, .2, 1) both; }
+.v-back { animation: view-back .28s cubic-bezier(.2, .8, .2, 1) both; }
+:is(.v-in, .v-back):nth-child(2) { animation-delay: .03s; }
+:is(.v-in, .v-back):nth-child(n+3) { animation-delay: .06s; }
+/* лента сообщений только проявляется: сами сообщения и так едут лесенкой — двойной сдвиг выглядел криво */
+@keyframes view-fade { from { opacity: 0; } }
+.fr-msgs:is(.v-in, .v-back) { animation-name: view-fade; }
+/* своё сообщение выезжает справа на 14 px — без этого на время анимации вылезала горизонтальная прокрутка */
+.fr-msgs { overflow-x: hidden; }
+.fr-msg.leave { opacity: 0; transform: scale(.94); transition: opacity .2s ease, transform .2s ease; }
 
 .fr-unread.pop { animation: badge-pop .45s cubic-bezier(.3, 1.4, .5, 1); }
 .fr-send { transition: transform .12s ease; }
 .fr-send:active { transform: scale(.95); }
 
 @media (prefers-reduced-motion: reduce) {
-  .fr-msg.enter, .fr-msg.sent, .fr-unread.pop,
-  .together.friends.view-in > *, .together.friends.view-back > * { animation: none; }
+  .fr-msg.enter, .fr-unread.pop, .v-in, .v-back { animation: none; }
 }
 
 /* длинные наборы вариантов (переходы, цензура) переносятся на новую строку */
 .seg.wrap { flex-wrap: wrap; }
+
+/* ---------- фраза волны: смена слова и окно со всеми вариантами ---------- */
+@keyframes wave-flip { from { opacity: 0; transform: translateY(.45em); filter: blur(3px); } }
+.wave-word-opt { display: inline-block; }
+.wave-word-opt.flip { animation: wave-flip .28s cubic-bezier(.2, .8, .2, 1); }
+
+@keyframes wave-pop-in { from { opacity: 0; transform: translateY(-6px) scale(.96); } }
+@keyframes wave-pop-out { to { opacity: 0; transform: translateY(-4px) scale(.97); } }
+@keyframes wave-pop-opt { from { opacity: 0; transform: translateY(6px); } }
+.wave-pop {
+  position: fixed; z-index: 40; max-width: min(460px, calc(100vw - 24px)); padding: 14px;
+  border-radius: 20px; border: 1px solid color-mix(in srgb, var(--amber) 35%, var(--rivet-2));
+  background:
+    radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--amber) 14%, transparent), transparent 70%),
+    color-mix(in srgb, var(--oak-2) 92%, transparent);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 24px 60px rgb(0 0 0 / .5), 0 0 0 1px rgb(255 255 255 / .03) inset;
+  transform-origin: var(--ox, 50%) 0; animation: wave-pop-in .2s cubic-bezier(.2, .9, .3, 1.1);
+}
+.wave-pop.out { animation: wave-pop-out .15s ease forwards; pointer-events: none; }
+.wave-pop::before {
+  content: ""; position: absolute; top: -6px; left: calc(var(--ox, 50%) - 6px); width: 12px; height: 12px; transform: rotate(45deg);
+  background: inherit; border-left: inherit; border-top: inherit; border-radius: 3px 0 0 0;
+}
+.wave-pop-title { margin: 0 4px 10px; color: var(--text-3); font: 600 11px var(--ui); letter-spacing: .08em; text-transform: uppercase; }
+.wave-pop-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.wave-pop-opts button {
+  padding: 8px 14px; border-radius: 99px; background: var(--rivet); color: var(--text-2); font: 500 14px var(--ui);
+  border: 1px solid transparent; transition: background .15s ease, color .15s ease, transform .12s ease, border-color .15s ease;
+  animation: wave-pop-opt .22s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 25ms);
+}
+.wave-pop-opts button:hover, .wave-pop-opts button:focus-visible { background: var(--rivet-2); color: var(--text); border-color: color-mix(in srgb, var(--amber) 40%, transparent); outline: none; }
+.wave-pop-opts button:active { transform: scale(.96); }
+.wave-pop-opts button.on { background: var(--amber); color: var(--oak); font-weight: 600; }
+.wave-pop.dj { border-color: color-mix(in srgb, var(--voice) 35%, var(--rivet-2)); background: radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--voice) 14%, transparent), transparent 70%), color-mix(in srgb, var(--oak-2) 92%, transparent); }
+.wave-pop.dj .wave-pop-opts button.on { background: var(--voice); }
+.wave-pop.dj .wave-pop-opts button:hover { border-color: color-mix(in srgb, var(--voice) 40%, transparent); }
+@media (prefers-reduced-motion: reduce) { .wave-word-opt.flip, .wave-pop, .wave-pop.out, .wave-pop-opts button { animation: none; } }
