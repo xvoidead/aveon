@@ -43,12 +43,66 @@ function eqValues() {
   return e.enabled ? { gains: e.gains, preamp: e.preamp } : { gains: EQ_FREQS.map(() => 0), preamp: 0 };
 }
 
-function eqApply() {
+// glide — смена пресета: звук перетекает вместе с ползунками, а не прыгает
+function eqApply(glide = false) {
   if (!fx.eq || !state.cfg?.eq) return;
   const { gains, preamp } = eqValues();
   const t = ctx.currentTime;
-  fx.eq.forEach((f, i) => f.gain.setTargetAtTime(gains[i] || 0, t, 0.015));
-  fx.eqPre.gain.setTargetAtTime(Math.pow(10, preamp / 20), t, 0.015);
+  const tau = glide ? EQ_ANIM_MS / 1000 / 4 : 0.015;
+  fx.eq.forEach((f, i) => f.gain.setTargetAtTime(gains[i] || 0, t, tau));
+  fx.eqPre.gain.setTargetAtTime(Math.pow(10, preamp / 20), t, tau);
+}
+
+// ---------- плавная смена пресета ----------
+// Ползунки, подписи дБ, предусилитель и кривая перетекают от старых значений к новым
+
+const EQ_ANIM_MS = 360;
+let eqAnim = 0;
+
+function eqSnapshot() {
+  const { gains, preamp } = eqValues();
+  return { gains: [...gains], preamp };
+}
+
+// Сменить значения с анимацией: change() меняет state.cfg.eq, дальше всё рисуется само
+async function eqTransition(change) {
+  const from = eqSnapshot();
+  change();
+  eqApply(true);
+  await eqSave();
+  renderEq();
+  eqAnimateFrom(from);
+}
+
+function eqAnimateFrom(from) {
+  cancelAnimationFrame(eqAnim);
+  const to = eqSnapshot();
+  if (!eqOpen() || matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const inputs = $$('#eq-bands input');
+  const dbs = EQ_FREQS.map((_, i) => $(`[data-db="${i}"]`));
+  const pre = $('#eq-preamp'), preVal = $('#eq-preamp-val');
+  // пока едут — без шага 0,5 дБ, иначе ручки двигаются рывками
+  for (const el of [...inputs, pre]) el.step = 'any';
+  const t0 = performance.now();
+  const ease = (x) => 1 - Math.pow(1 - x, 3);
+  const frame = (now) => {
+    const k = ease(Math.min(1, (now - t0) / EQ_ANIM_MS));
+    const gains = to.gains.map((g, i) => from.gains[i] + (g - from.gains[i]) * k);
+    gains.forEach((g, i) => {
+      if (!inputs[i]) return;
+      inputs[i].value = g;
+      const shown = Math.round(g * 2) / 2;
+      dbs[i].textContent = fmtDb(shown);
+      dbs[i].classList.toggle('on', !!shown);
+    });
+    const p = from.preamp + (to.preamp - from.preamp) * k;
+    pre.value = p;
+    preVal.textContent = `${fmtDb(Math.round(p * 2) / 2)} дБ`;
+    drawEqCurve(gains);
+    if (k < 1) { eqAnim = requestAnimationFrame(frame); return; }
+    for (const el of [...inputs, pre]) el.step = '0.5';
+  };
+  eqAnim = requestAnimationFrame(frame);
 }
 
 // ---------- всплывающее окно ----------
@@ -169,8 +223,7 @@ async function eqSaveAs() {
 function eqUseMine(id) {
   const p = eqMine().find((x) => x.id === id);
   if (!p) return;
-  eqLive({ preset: p.id, gains: [...p.gains], preamp: p.preamp, enabled: true });
-  eqSave().then(renderEq);
+  eqTransition(() => Object.assign(state.cfg.eq, { preset: p.id, gains: [...p.gains], preamp: p.preamp, enabled: true }));
 }
 
 async function eqUpdateMine(id) {
@@ -273,9 +326,7 @@ $('#eq-presets').addEventListener('click', async (e) => {
   if (!p) return;
   // Запас по громкости: половина самого сильного подъёма, чтобы громкие места не хрипели
   const boost = Math.max(0, ...p[2]);
-  eqLive({ preset: id, gains: [...p[2]], preamp: -Math.round(boost) / 2, enabled: true });
-  await eqSave();
-  renderEq();
+  eqTransition(() => Object.assign(state.cfg.eq, { preset: id, gains: [...p[2]], preamp: -Math.round(boost) / 2, enabled: true }));
 });
 
 $('#eq-preamp').addEventListener('input', (e) => {
@@ -284,16 +335,12 @@ $('#eq-preamp').addEventListener('input', (e) => {
 });
 $('#eq-preamp').addEventListener('change', eqSave);
 
-$('#eq-enabled').addEventListener('change', async (e) => {
-  eqLive({ enabled: e.target.checked });
-  await eqSave();
-  renderEq();
+$('#eq-enabled').addEventListener('change', (e) => {
+  eqTransition(() => { state.cfg.eq.enabled = e.target.checked; });
 });
 
-$('#eq-reset').onclick = async () => {
-  eqLive({ preset: 'flat', gains: EQ_FREQS.map(() => 0), preamp: 0 });
-  await eqSave();
-  renderEq();
+$('#eq-reset').onclick = () => {
+  eqTransition(() => Object.assign(state.cfg.eq, { preset: 'flat', gains: EQ_FREQS.map(() => 0), preamp: 0 }));
 };
 
 $('#btn-eq').onclick = () => (eqOpen() ? closeEq() : openEq());
@@ -318,7 +365,8 @@ document.addEventListener('keydown', (e) => {
 
 let eqProbe = null;
 
-function drawEqCurve() {
+// gains — промежуточные значения во время анимации; без них кривая по текущим настройкам
+function drawEqCurve(gainsNow) {
   if (!eqOpen()) return;
   const cv = $('#eq-curve');
   // Кривая ровно по ходу ручек ползунков: от центра ручки на +12 до центра на −12
@@ -338,7 +386,7 @@ function drawEqCurve() {
     const oc = new OfflineAudioContext(1, 1, 48000);
     eqProbe = EQ_FREQS.map((_, i) => eqFilter(oc, i));
   }
-  const { gains } = eqValues();
+  const gains = Array.isArray(gainsNow) ? gainsNow : eqValues().gains;
   eqProbe.forEach((f, i) => { f.gain.value = gains[i] || 0; });
 
   const col = w / EQ_FREQS.length;
@@ -379,4 +427,4 @@ function drawEqCurve() {
   g.stroke();
 }
 
-window.addEventListener('resize', drawEqCurve);
+window.addEventListener('resize', () => drawEqCurve());
