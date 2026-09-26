@@ -269,11 +269,17 @@ function pointerIn() {
   renderLabel();
   fitWidth();
   window.sendPillRect?.(); // сразу, не дожидаясь кадра
+  // Пока остров раскрыт, окно ловит мышь целиком (src/hover.js → setHover), а ушёл ли курсор,
+  // решаем здесь по :hover. Раньше решал главный процесс по границе капсулы — она отставала,
+  // пока капсула росла вниз, и остров сворачивался, едва курсор доходил до кнопок ленты
+  api.island.hover(true);
 }
 function pointerOut() {
   clearTimeout(leaveTimer);
   leaveTimer = setTimeout(() => {
+    if (pill.matches(':hover')) return; // курсор всё-таки на капсуле
     pill.classList.remove('open');
+    api.island.hover(false);
     renderLabel();
     // уведомление, пришедшее под курсором, — сейчас, если ещё свежее
     const p = pendingNotice;
@@ -282,7 +288,10 @@ function pointerOut() {
   }, 220);
 }
 pill.addEventListener('mouseenter', pointerIn); // быстрее часов главного процесса, если событие пришло
-api.island.onPointer((on) => (on ? pointerIn() : pointerOut()));
+pill.addEventListener('mouseleave', () => { if (is('open')) pointerOut(); });
+document.addEventListener('mouseleave', () => { if (is('open')) pointerOut(); });
+// главный процесс: зашёл — раскрыть; «ушёл» у раскрытого проверяем по :hover (окно в это время ловит мышь)
+api.island.onPointer((on) => (on ? pointerIn() : !pill.matches(':hover') && pointerOut()));
 
 const act = (type, extra) => api.island.action({ type, ...extra });
 $('#b-play').onclick = () => act('thumb', { action: 'toggle' });
@@ -335,9 +344,11 @@ function renderEvents(list) {
     box.id = 'events';
     box.className = 'events';
     $('#friends').after(box);
-    box.addEventListener('click', (e) => {
+    // по нажатию, а не по отпусканию: строка может перерисоваться между ними — и клик терялся бы
+    box.addEventListener('pointerdown', (e) => {
       const b = e.target.closest('[data-ev]');
-      if (!b) return;
+      if (!b || e.button !== 0) return;
+      e.preventDefault();
       e.stopPropagation();
       act('event', { id: b.dataset.ev, i: b.dataset.i === undefined ? null : +b.dataset.i });
     });
