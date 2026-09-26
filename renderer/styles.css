@@ -1483,3 +1483,17 @@ html.mobile .wave-phrase { font-size: 19px; line-height: 1.7; }
 }
 .announce > svg { width: 18px; height: 18px; flex: none; color: var(--amber); }
 .announce span { line-height: 1.4; }
+
+/* ---------- обложка-пластинка и скретч (scratch.js) ---------- */
+.porthole { rotate: var(--spin, 0deg); cursor: grab; touch-action: none; }
+.porthole.scratching { cursor: grabbing; }
+/* бороздки винила поверх обложки — едва заметно, сильнее, пока держат */
+.porthole::before {
+  content: ""; position: absolute; inset: 0; z-index: 1; border-radius: inherit; pointer-events: none;
+  background:
+    radial-gradient(circle, transparent 0 13%, rgb(0 0 0 / .55) 13.5% 15%, transparent 15.5%),
+    repeating-radial-gradient(circle, rgb(255 255 255 / .05) 0 1px, transparent 1px 4px);
+  opacity: .35; transition: opacity .2s ease;
+}
+.porthole.scratching::before { opacity: .8; }
+body.is-scratching { user-select: none; }

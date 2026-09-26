@@ -235,7 +235,10 @@ function ensureGraph() {
     ctx.createMediaElementSource(el).connect(g).connect(fx.mix);
     return [el, g];
   }));
-  const src = eqBuild(fx.mix); // eq.js: 10 полос и предусилитель
+  // tap — вход эффектов; между ним и микшером встаёт скретч обложкой (scratch.js), когда загрузится
+  fx.tap = ctx.createGain();
+  fx.mix.connect(fx.tap);
+  const src = eqBuild(fx.tap); // eq.js: 10 полос и предусилитель
   fx.lp = ctx.createBiquadFilter();
   fx.lp.type = 'lowpass';
   fx.lp.frequency.value = 20000;

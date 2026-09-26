@@ -60,7 +60,7 @@
   // смахнуть вниз за верх экрана — свернуть
   let drag = null;
   stage.addEventListener('touchstart', (e) => {
-    if (stage.scrollTop > 0 || e.target.closest('.slider, input, .switch')) return;
+    if (stage.scrollTop > 0 || e.target.closest('.slider, input, .switch, .porthole')) return; // обложку крутят — не сворачиваем
     drag = { y: e.touches[0].clientY, dy: 0 };
   }, { passive: true });
   stage.addEventListener('touchmove', (e) => {
