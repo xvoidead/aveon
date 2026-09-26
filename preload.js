@@ -178,7 +178,7 @@ contextBridge.exposeInMainWorld('tishe', {
     thumbState: (st) => ipcRenderer.send('thumb:state', st),
     onThumb: (cb) => on('thumb', cb),
   },
-  app: { version: () => call('app:version'), accent: () => call('app:accent') },
+  app: { version: () => call('app:version') },
   admin: {
     overview: () => call('adm:overview'),
     users: (q) => call('adm:users', q),

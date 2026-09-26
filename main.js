@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, session, protocol, Menu, clipboard, screen, systemPreferences } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, session, protocol, Menu, clipboard, screen } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { Readable } = require('stream');
@@ -365,10 +365,6 @@ function registerIpc() {
 
   // Версия (для «Что нового»), админка и объявление
   handle('app:version', () => app.getVersion());
-  // цвет акцента из настроек Windows (дизайн «Windows 11», look.js); не Windows — пусто
-  handle('app:accent', () => {
-    try { return process.platform === 'win32' ? `#${systemPreferences.getAccentColor().slice(0, 6)}` : ''; } catch { return ''; }
-  });
   handle('adm:overview', () => account.adminApi.overview());
   handle('adm:users', (q) => account.adminApi.users(q));
   handle('adm:kick', (id) => account.adminApi.kick(id));

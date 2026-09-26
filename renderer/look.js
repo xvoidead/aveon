@@ -5,7 +5,7 @@
 // Общие глобальные из app.js: state, api, $, $$, esc, toast, ask, saveCfg, VIEWS, NAMES, IS_MOBILE, openView.
 
 const LOOK_DEFAULTS = {
-  skin: 'barrel',        // дизайн: barrel — «Бочка»; form — «Форма»; win11 — «Windows 11» (см. SKINS)
+  skin: 'barrel',        // дизайн: barrel — «Бочка»; form — «Форма» (см. SKINS)
   theme: 'oak',          // см. THEMES; custom — свой оттенок фона
   hue: 25,               // custom: оттенок фона 0…360
   sat: 30,               // custom: насыщенность фона, %
@@ -72,25 +72,7 @@ const THEMES = {
 const SKINS = {
   barrel: { name: 'Бочка', desc: 'Круглая обложка в обручах, вкладки сверху' },
   form: { name: 'Форма', desc: 'Панель навигации слева, карточки, живые формы и волны' },
-  win11: { name: 'Windows 11', desc: 'Как Медиаплеер Windows: меню слева, плеер снизу, акцент системы' },
 };
-
-// «Windows 11»: нейтральные серые Windows вместо темы (Mica тёмная), акцент — из настроек Windows
-const WIN_VARS = {
-  '--oak': '#202020', '--oak-2': '#272727', '--rivet': '#2d2d2d', '--rivet-2': '#383838',
-  '--hoop-dim': '#4a4a4a', '--hoop': '#8b8b8b', '--text': '#ffffff', '--text-2': '#c8c8c8', '--text-3': '#9d9d9d',
-};
-const WIN_FONT = '"Segoe UI Variable Text", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif';
-const WIN_DISPLAY = '"Segoe UI Variable Display", "Segoe UI Variable", "Segoe UI", system-ui, sans-serif';
-// в тёмной теме Windows красит кнопки светлым оттенком акцента — примешиваем белый
-function winAccent(hex) {
-  const n = parseInt(String(hex).slice(1), 16);
-  if (!/^#[0-9a-f]{6}$/i.test(hex) || Number.isNaN(n)) return '';
-  const mix = (c) => Math.round(c + (255 - c) * 0.42).toString(16).padStart(2, '0');
-  return `#${mix(n >> 16)}${mix((n >> 8) & 255)}${mix(n & 255)}`;
-}
-window.SYS_ACCENT = '';
-api.app?.accent?.().then((c) => { window.SYS_ACCENT = winAccent(c || ''); if (look.skin === 'win11') applyLook(); }).catch(() => {});
 
 const ACCENTS = ['#f0a63a', '#ff7b6b', '#f5d547', '#7ed49a', '#5cc8e8', '#9aa8ff', '#c792ea', '#ff8ac6', '#e8e1d5'];
 
@@ -133,17 +115,15 @@ function applyLook() {
   look = lookCfg();
   window.LOOK = look;
   const root = document.documentElement;
-  const win = look.skin === 'win11';
-  const vars = win ? { ...WIN_VARS } : themeVars(look);
+  const vars = themeVars(look);
   if (look.accentMode === 'fixed') vars['--amber'] = look.accent;
-  else if (win && window.SYS_ACCENT) vars['--amber'] = window.SYS_ACCENT;
   if (look.voice) vars['--voice'] = look.voice;
   const form = look.skin === 'form';
   // в «Форме» по умолчанию везде Manrope; свой шрифт из настроек всё равно главнее
   const display = form && look.display === LOOK_DEFAULTS.display ? 'manrope' : look.display;
   const text = form && look.text === LOOK_DEFAULTS.text ? 'manrope' : look.text;
-  vars['--display'] = win && look.display === LOOK_DEFAULTS.display ? WIN_DISPLAY : (FONTS[display] || FONTS.unbounded).css;
-  vars['--ui'] = win && look.text === LOOK_DEFAULTS.text ? WIN_FONT : (FONTS[text] || FONTS.onest).css;
+  vars['--display'] = (FONTS[display] || FONTS.unbounded).css;
+  vars['--ui'] = (FONTS[text] || FONTS.onest).css;
   vars['--lyrics-scale'] = String(look.lyricsSize / 100);
   vars['--wall-blur'] = `${look.wallBlur}px`;
   vars['--wall-dim'] = String(look.wallDim / 100);
@@ -152,7 +132,7 @@ function applyLook() {
   // Размер интерфейса: CSS zoom масштабирует всё сразу, и раскладка остаётся живой
   root.style.zoom = look.scale === 100 ? '' : String(look.scale / 100);
   const cls = {
-    'skin-form': form, 'skin-win': win,
+    'skin-form': form,
     'look-compact': look.density === 'compact', 'look-cozy': look.density === 'cozy',
     'look-no-covers': !look.covers, 'look-no-album': !look.albumCol, 'look-no-time': !look.timeCol,
     'look-calm': look.motion === 'calm', 'look-still': look.motion === 'off',
@@ -165,11 +145,10 @@ function applyLook() {
     // префикс look-: классы на <html> не должны совпадать с классами элементов (у часов — .fs-clock)
     'look-fs-cinema': look.fsStyle === 'cinema', 'look-fs-gradient': look.fsBg === 'gradient', 'look-fs-plain': look.fsBg === 'plain',
     'look-fs-motion': look.fsMotion, 'look-fs-clock': look.fsClock, 'look-fs-no-lyrics': !look.fsLyrics,
-    // в «Windows 11» плеер — полоса снизу (или сверху), как у Медиаплеера
-    'dock-right': !IS_MOBILE && !win && look.dock === 'right', 'dock-bottom': !IS_MOBILE && (look.dock === 'bottom' || (win && look.dock !== 'top')), 'dock-top': !IS_MOBILE && look.dock === 'top',
+    'dock-right': !IS_MOBILE && look.dock === 'right', 'dock-bottom': !IS_MOBILE && look.dock === 'bottom', 'dock-top': !IS_MOBILE && look.dock === 'top',
   };
   for (const [k, on] of Object.entries(cls)) root.classList.toggle(k, on);
-  applyRadius((look.radius / 100) * (form ? 1.5 : win ? 0.45 : 1)); // «Форма» круглее, в Windows — 4–8 px
+  applyRadius((look.radius / 100) * (form ? 1.5 : 1)); // «Форма» круглее
   requestAnimationFrame(() => moveSourceInk?.(true)); // app.js: вкладки то сверху, то слева
   applySources();
   reapplyTheme?.(); // extras.js: палитра из обложки знает, трогать ли акцент
@@ -318,7 +297,6 @@ function dockSection(l) {
   if (IS_MOBILE) return '';
   return `<section class="sec" data-sec="dock">
     <h3 class="sec-title">Где плеер</h3>
-    ${l.skin === 'win11' ? '<p class="sec-desc">В дизайне «Windows 11» плеер — полоса снизу, а «Сверху» ставит её наверх.</p>' : ''}
     <div class="field"><label>Плеер</label><div class="ctl">${seg('dock', [['left', 'Слева'], ['right', 'Справа'], ['bottom', 'Снизу'], ['top', 'Сверху']], l.dock)}</div></div>
   </section>`;
 }
