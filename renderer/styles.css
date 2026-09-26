@@ -144,7 +144,17 @@ svg { width: 18px; height: 18px; flex: none; }
 .call {
   margin-top: auto; width: 100%; padding: 14px 16px; border-radius: 14px;
   background: var(--rivet); border: 1px solid var(--rivet-2);
+  /* .off — не в звонке: плашка сворачивается совсем; .no-meters — шкалы не о чем показывать */
+  max-height: 160px; overflow: hidden;
+  transition: opacity .28s ease, transform .28s ease, max-height .28s ease, padding .28s ease, border-color .28s ease;
 }
+.call.off {
+  opacity: 0; transform: translateY(10px); max-height: 0;
+  padding-top: 0; padding-bottom: 0; border-color: transparent; pointer-events: none;
+}
+.call.no-meters .call-head { margin-bottom: 0; }
+.call.no-meters .meters { display: none; }
+@media (prefers-reduced-motion: reduce) { .call { transition: none; } }
 .call-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .call-state { font-weight: 500; color: var(--text-2); }
 .call-state.talk { color: var(--voice); }

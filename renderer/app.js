@@ -830,9 +830,28 @@ setInterval(duckTick, 30);
 
 const meterScale = (x) => Math.min(1, Math.sqrt(Math.max(0, x)));
 
+// Плашка со шкалами нужна только в звонке: вне звонка сцена чистая.
+// Исключение — монитор звука не запустился: об этом надо сказать, иначе эффект молча не работает.
 function renderCall(talking) {
   const d = state.cfg.duck;
   const m = duck.meter;
+  const broken = duck.ok === false;
+  const inCall = !!m.call;
+  $('#discord').classList.toggle('off', !inCall && !broken);
+  $('#discord').classList.toggle('no-meters', !inCall);
+
+  const el = $('#duck-chip');
+  let text, cls = '';
+  if (broken) { text = 'Монитор звука не запустился'; cls = 'err'; }
+  else if (!d.enabled) text = 'В звонке, эффект выключен';
+  else if (talking) { text = 'Говорят, музыка в бочке'; cls = 'talk'; }
+  else text = 'В звонке, тихо';
+  if (el.textContent !== text) el.textContent = text;
+  el.className = `call-state ${cls}`;
+  el.title = broken ? duck.error : '';
+
+  if (!inCall) return; // шкалы скрыты — считать их незачем
+
   $('#meter-fill').style.width = `${meterScale(m.o) * 100}%`;
   $('#meter-threshold').style.left = `${meterScale(d.threshold) * 100}%`;
 
@@ -844,17 +863,6 @@ function renderCall(talking) {
   $('#mic-threshold').style.left = `${Math.sqrt(0.4) * 100}%`;
   micMeter.classList.toggle('live', mic.speaking);
   micMeter.title = mic.error ? `Микрофон недоступен: ${mic.error}` : !d.includeMic ? 'Реакция на твой голос выключена' : 'Твой голос после шумоподавления';
-
-  const el = $('#duck-chip');
-  let text, cls = '';
-  if (duck.ok === false) { text = 'Монитор звука не запустился'; cls = 'err'; el.title = duck.error; }
-  else if (!m.dc) text = 'Discord не запущен';
-  else if (!m.call) text = 'Ты не в голосовом канале';
-  else if (!d.enabled) text = 'В звонке, эффект выключен';
-  else if (talking) { text = 'Говорят, музыка в бочке'; cls = 'talk'; }
-  else text = 'В звонке, тихо';
-  if (el.textContent !== text) el.textContent = text;
-  el.className = `call-state ${cls}`;
 }
 
 makeSlider($('#meter'), {
