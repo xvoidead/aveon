@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import base64
 import json
+import os
 import re
 import time
 from contextlib import asynccontextmanager
@@ -115,21 +116,30 @@ def auth(authorization: Annotated[str, Header()] = "") -> Auth:
 
 Me = Annotated[Auth, Depends(auth)]
 
+# Кто видит админку: логины через запятую в AVEON_ADMINS
+ADMINS = {x.strip().lower() for x in os.environ.get("AVEON_ADMINS", "xvoidead,htdealwme").split(",") if x.strip()}
+
+
+def is_admin(login: str) -> bool:
+    return str(login).lower() in ADMINS
+
 from .together import router as together_router  # noqa: E402 — модулю нужен auth выше
 
 from .share import router as share_router  # noqa: E402
 from .friends import router as friends_router  # noqa: E402
 from .messages import router as messages_router  # noqa: E402
+from .admin import router as admin_router  # noqa: E402
 
 app.include_router(together_router)
 app.include_router(share_router)
 app.include_router(friends_router)
 app.include_router(messages_router)
+app.include_router(admin_router)
 
 
 def user_view(row) -> dict:
     return {"id": row["id"], "login": row["login"], "name": row["name"], "created": row["created"],
-            "avatar_at": row["avatar_at"]}
+            "avatar_at": row["avatar_at"], "admin": is_admin(row["login"])}
 
 
 def get_user(conn, user_id: int):
@@ -189,6 +199,8 @@ def login(body: Login, request: Request):
     with db.tx() as conn:
         user = conn.execute("SELECT * FROM users WHERE login = ?", (login,)).fetchone()
         ok = security.check_password(body.password, user["pw_hash"] if user else security.DUMMY_HASH)
+        if user and ok and user["banned"]:
+            raise HTTPException(403, "Аккаунт заблокирован")
         if not user or not ok:
             for k in keys:
                 limiter.fail(k)

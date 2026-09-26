@@ -78,6 +78,7 @@ function status() {
     login: a.login,
     name: a.name,
     avatar: a.avatar || '',
+    admin: !!a.admin, // логин в AVEON_ADMINS на сервере — видна админка
     lastSync: a.lastSync,
     syncing: !!running,
     error: lastError,
@@ -96,7 +97,7 @@ async function enter(route, server, fields) {
   ensureDevice();
   const r = await api('POST', route, { ...fields, device: os.hostname().slice(0, 64) }, { server, token: '' });
   config.setSecret('acc.token', r.token);
-  config.set({ account: { server, login: r.user.login, name: r.user.name, avatar: '', avatarAt: 0 } });
+  config.set({ account: { server, login: r.user.login, name: r.user.name, avatar: '', avatarAt: 0, admin: !!r.user.admin } });
   lastStatsPushed = '';
   start();
   const changed = await sync().catch(() => null);
@@ -172,6 +173,7 @@ async function setAvatar(avatar) {
 async function syncAvatar(changed) {
   let me;
   try { me = (await api('GET', '/api/me')).user; } catch { return; }
+  if (!!me.admin !== !!acc().admin) { config.set({ account: { admin: !!me.admin } }); changed.avatar = true; }
   if (me.avatar_at === undefined) return; // сервер ещё без аватаров
   const old = config.get().ui?.avatar;
   if (old) {
@@ -344,7 +346,23 @@ function init(onEvent) {
   }
 }
 
+// ---- админка (server/aveon_api/admin.py) и объявление для всех ----
+
+const adminApi = {
+  overview: () => api('GET', '/api/admin/overview'),
+  users: (q) => api('GET', `/api/admin/users?q=${encodeURIComponent(q || '')}`),
+  kick: (id) => api('POST', `/api/admin/users/${encodeURIComponent(id)}/logout`),
+  ban: (id, banned) => api('POST', `/api/admin/users/${encodeURIComponent(id)}/ban`, { banned }),
+  rename: (id, name) => api('POST', `/api/admin/users/${encodeURIComponent(id)}/rename`, { name }),
+  announce: (text) => api('PUT', '/api/admin/announce', { text }),
+};
+
+async function announcement() {
+  if (!config.getSecret('acc.token')) return null;
+  try { return (await api('GET', '/api/announce')).announce; } catch { return null; } // старый сервер — объявлений нет
+}
+
 module.exports = {
   init, status, register, login, logout, logoutAll, me, rename, changePassword, remove, sync, settingsChanged,
-  sharePut, shareGet, avatarOf, setAvatar, api,
+  sharePut, shareGet, avatarOf, setAvatar, api, adminApi, announcement,
 };

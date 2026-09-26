@@ -258,6 +258,16 @@ const api = {
     send: (state, beat) => { ready.then(() => together.send(clone(state), beat)); },
     onEvent: (cb) => on('together:event', cb),
   },
+  app: { version: call(() => require('../../package.json').version) },
+  admin: {
+    overview: call(() => account.adminApi.overview()),
+    users: call((q) => account.adminApi.users(q)),
+    kick: call((id) => account.adminApi.kick(id)),
+    ban: call((id, banned) => account.adminApi.ban(id, banned)),
+    rename: call((id, name) => account.adminApi.rename(id, name)),
+    announce: call((text) => account.adminApi.announce(text)),
+  },
+  announcement: call(() => account.announcement()),
   friends: {
     list: call(() => friends.list()),
     add: call((login) => friends.add(login)),

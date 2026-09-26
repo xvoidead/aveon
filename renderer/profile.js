@@ -193,6 +193,8 @@ function profileHeroHtml() {
     <div class="pf-hero-actions">
       <button class="btn primary" id="pf-sync"${a.syncing ? ' disabled' : ''}><svg><use href="#i-refresh"/></svg>Синхронизировать</button>
       <button class="btn" id="pf-settings"><svg><use href="#i-settings"/></svg>Настройки</button>
+      <button class="btn" id="pf-changelog"><svg><use href="#i-list"/></svg>Что нового</button>
+      ${a.admin ? '<button class="btn" id="pf-admin"><svg><use href="#i-shield"/></svg>Админка</button>' : ''}
     </div>`;
 }
 
@@ -254,6 +256,8 @@ function bindProfile() {
     av.onclick = () => (av.getAttribute('aria-expanded') === 'true' ? closeMenu() : avatarMenu(av));
   }
   on('#pf-settings', () => openSettings());
+  on('#pf-changelog', () => openChangelog()); // changelog.js
+  on('#pf-admin', () => openAdmin()); // admin.js
   on('#pf-rename', async () => {
     const name = await ask({ title: 'Как тебя зовут', text: 'Имя видят друзья в «Слушать вместе» и в кодах альбомов.', value: state.account.name || '', ok: 'Сохранить' });
     if (!name || name === state.account.name) return;
@@ -317,7 +321,7 @@ $('#profile-close').onclick = closeProfile;
 // иначе обработчик app.js успел бы закрыть настройки, и тот же Esc закрыл бы и профиль
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape' || !profileOpen() || locked()) return;
-  if (['#settings', '#editor', '#dialog', '#fs'].some((id) => !$(id).hidden) || !$('#menu').hidden || !$('#together').hidden || !$('#friends').hidden) return;
+  if (['#settings', '#editor', '#dialog', '#fs', '#admin', '#changelog'].some((id) => $(id) && !$(id).hidden) || !$('#menu').hidden || !$('#together').hidden || !$('#friends').hidden) return;
   closeProfile();
 }, true);
 window.addEventListener('resize', () => { if (profileOpen()) renderStats(); });

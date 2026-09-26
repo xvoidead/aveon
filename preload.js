@@ -169,6 +169,16 @@ contextBridge.exposeInMainWorld('tishe', {
     thumbState: (st) => ipcRenderer.send('thumb:state', st),
     onThumb: (cb) => on('thumb', cb),
   },
+  app: { version: () => call('app:version') },
+  admin: {
+    overview: () => call('adm:overview'),
+    users: (q) => call('adm:users', q),
+    kick: (id) => call('adm:kick', id),
+    ban: (id, banned) => call('adm:ban', id, banned),
+    rename: (id, name) => call('adm:rename', id, name),
+    announce: (text) => call('adm:announce', text),
+  },
+  announcement: () => call('acc:announcement'),
   popup: { rect: (r) => ipcRenderer.send('popup:rect', r) }, // всплывающие окна: где панель (src/hover.js)
   openExternal: (url) => ipcRenderer.send('open:external', url),
   copy: (text) => call('clipboard:write', text),

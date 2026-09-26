@@ -354,6 +354,16 @@ function registerIpc() {
   handle('fr:knock', (id) => friends.knock(id));
   handle('fr:messages', (id, before) => friends.messages(id, before));
   handle('fr:profile', (id) => friends.profile(id));
+
+  // Версия (для «Что нового»), админка и объявление
+  handle('app:version', () => app.getVersion());
+  handle('adm:overview', () => account.adminApi.overview());
+  handle('adm:users', (q) => account.adminApi.users(q));
+  handle('adm:kick', (id) => account.adminApi.kick(id));
+  handle('adm:ban', (id, banned) => account.adminApi.ban(id, banned));
+  handle('adm:rename', (id, name) => account.adminApi.rename(id, name));
+  handle('adm:announce', (text) => account.adminApi.announce(text));
+  handle('acc:announcement', () => account.announcement());
   handle('fr:send', (id, body) => friends.send(id, body));
   handle('fr:unknock', (id) => friends.unknock(id));
   handle('fr:avatar', (userId, at) => account.avatarOf(userId, at));

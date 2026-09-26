@@ -360,3 +360,35 @@ def test_friend_profile(client):
     assert p["user"]["login"] == l2 and p["stats"]["total"] == 500 and p["stats"]["days"] == 2
     assert p["stats"]["tracks"][0]["track"]["id"] == "ym:2" and p["stats"]["tracks"][0]["sec"] == 400
     assert p["stats"]["artists"][0] == {"name": "B", "sec": 500}
+
+
+def test_admin(client):
+    import uuid
+    from aveon_api import app as srv
+    t_user, l_user = register(client)
+    login = "adm" + uuid.uuid4().hex[:6]
+    srv.ADMINS.add(login)
+    try:
+        t_adm = client.post("/api/auth/register", json={"login": login, "password": "password123"}).json()["token"]
+        assert client.get("/api/me", headers=h(t_adm)).json()["user"]["admin"] is True
+        assert client.get("/api/admin/overview", headers=h(t_user)).status_code == 403
+        o = client.get("/api/admin/overview", headers=h(t_adm)).json()
+        assert o["users"]["total"] >= 2 and "rooms" in o
+        uid_user = uid(client, t_user)
+        found = client.get(f"/api/admin/users?q={l_user}", headers=h(t_adm)).json()["users"]
+        assert found[0]["id"] == uid_user and found[0]["sessions"] == 1
+
+        assert client.post(f"/api/admin/users/{uid_user}/ban", json={"banned": True}, headers=h(t_adm)).status_code == 200
+        assert client.get("/api/me", headers=h(t_user)).status_code == 401
+        assert client.post("/api/auth/login", json={"login": l_user, "password": "password123"}).status_code == 403
+        client.post(f"/api/admin/users/{uid_user}/ban", json={"banned": False}, headers=h(t_adm))
+        assert client.post("/api/auth/login", json={"login": l_user, "password": "password123"}).status_code == 200
+        assert client.post(f"/api/admin/users/{uid(client, t_adm)}/ban", json={"banned": True}, headers=h(t_adm)).status_code == 400
+
+        client.put("/api/admin/announce", json={"text": "сервер перезапустится в 23:00"}, headers=h(t_adm))
+        t_user2, _ = register(client)
+        assert client.get("/api/announce", headers=h(t_user2)).json()["announce"]["text"].startswith("сервер")
+        client.put("/api/admin/announce", json={"text": ""}, headers=h(t_adm))
+        assert client.get("/api/announce", headers=h(t_user2)).json()["announce"] is None
+    finally:
+        srv.ADMINS.discard(login)
