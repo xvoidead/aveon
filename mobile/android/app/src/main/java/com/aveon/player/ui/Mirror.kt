@@ -64,7 +64,7 @@ fun PanelHost(panel: Panel) {
         AnimatedVisibility(shown, enter = slideInHorizontally(tween(280)) { it / 4 } + fadeIn(tween(200)), exit = fadeOut()) {
             Box(Modifier.fillMaxSize().background(p.bg).absorb()) {
                 Column(Modifier.fillMaxSize().statusBarsPadding().imePadding()) {
-                    Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 16.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Row(Modifier.fillMaxWidth().padding(start = 8.dp, end = 16.dp, top = 6.dp)) {
                         if (panel.closable) IconBtn(AIcons.chevronL) { Engine.closePanel(panel.key) } else Spacer(Modifier.width(12.dp))
                         Txt(panel.title.lowercase(), T.h1, p.text, Modifier.weight(1f).padding(start = 6.dp), maxLines = 1)
                     }
@@ -128,7 +128,7 @@ private fun MNodeView(n: MNode, panel: Panel) {
         "btn" -> MButton(n)
         "switch" -> {
             var on by remember(n.id, n.o.optBoolean("on")) { mutableStateOf(n.o.optBoolean("on")) }
-            Row(Modifier.fillMaxWidth().press { on = !on; Engine.send("setVal", n.id, on, true) }.padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(Modifier.fillMaxWidth().press { on = !on; Engine.send("setVal", n.id, on, true) }.padding(vertical = 10.dp)) {
                 Txt(n.o.optString("label"), T.bodyM, p.text, Modifier.weight(1f))
                 Toggle(on)
             }
@@ -145,14 +145,14 @@ private fun MNodeView(n: MNode, panel: Panel) {
             if (single) {
                 val sw = n.kids[0]
                 var on by remember(sw.id, sw.o.optBoolean("on")) { mutableStateOf(sw.o.optBoolean("on")) }
-                Row(Modifier.fillMaxWidth().press { on = !on; Engine.send("setVal", sw.id, on, true) }.padding(vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                Row(Modifier.fillMaxWidth().press { on = !on; Engine.send("setVal", sw.id, on, true) }.padding(vertical = 12.dp)) {
                     Txt(label, T.bodyM, p.text, Modifier.weight(1f))
                     Toggle(on)
                 }
             } else {
                 Column(Modifier.fillMaxWidth().padding(vertical = 8.dp)) {
                     if (label.isNotEmpty()) Txt(label, T.smallM, p.text2, Modifier.padding(bottom = 6.dp))
-                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         for (k in n.kids) Box { Column { MNodeView(k, panel) } }
                     }
                 }
@@ -181,7 +181,7 @@ private fun MNodeView(n: MNode, panel: Panel) {
             val row = n.o.optBoolean("row")
             val mod = if (card) Modifier.fillMaxWidth().padding(vertical = 5.dp).clip(RoundedCornerShape(20.dp)).background(p.surface).padding(14.dp) else Modifier.fillMaxWidth()
             if (row) {
-                FlowRow(mod, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+                FlowRow(mod, horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     for (k in n.kids) if (!skip(k, panel)) Box { Column { MNodeView(k, panel) } }
                 }
             } else {

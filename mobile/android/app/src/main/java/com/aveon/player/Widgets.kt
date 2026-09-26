@@ -161,7 +161,7 @@ private fun cmd(a: String) = actionRunCallback<WidgetCallback>(actionParametersO
 // ---------- оформление виджетов: тёмная плитка, янтарный акцент — как иконка приложения ----------
 
 private val Ink = Color(0xFF1B1411)
-private val Card = Color(0xFF2A201B)
+private val Tile = Color(0xFF2A201B)
 private val Amber = Color(0xFFF0A63A)
 private val Voice = Color(0xFF9AA8FF)
 private val Text1 = Color(0xFFF4E9DC)
@@ -188,18 +188,18 @@ class NowWidget : GlanceAppWidget() {
                 verticalAlignment = Alignment.CenterVertically,
             ) {
                 if (cover != null) Image(ImageProvider(cover), null, GlanceModifier.size(64.dp).cornerRadius(14.dp))
-                else Box(GlanceModifier.size(64.dp).cornerRadius(14.dp).background(Card), contentAlignment = Alignment.Center) { Text("♪", style = ts(22, Text2)) }
+                else Box(GlanceModifier.size(64.dp).cornerRadius(14.dp).background(Tile), contentAlignment = Alignment.Center) { Text("♪", style = ts(22, Text2)) }
                 Spacer(GlanceModifier.width(12.dp))
                 Column(GlanceModifier.defaultWeight()) {
                     Text(if (s.hasTrack) s.title else "авеон", style = ts(15, Text1, true), maxLines = 1)
                     Text(if (s.hasTrack) (if (s.barrel) "в бочке · " else "") + s.artist else "Нажми, чтобы включить музыку", style = ts(12, if (s.barrel) Voice else Text2), maxLines = 1)
                     Spacer(GlanceModifier.height(8.dp))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Btn(R.drawable.ic_prev, "prev", Card, 34)
+                        Btn(R.drawable.ic_prev, "prev", Tile, 34)
                         Spacer(GlanceModifier.width(8.dp))
                         Btn(if (s.playing) R.drawable.ic_pause else R.drawable.ic_play, "toggle", Amber, 40)
                         Spacer(GlanceModifier.width(8.dp))
-                        Btn(R.drawable.ic_next, "next", Card, 34)
+                        Btn(R.drawable.ic_next, "next", Tile, 34)
                     }
                 }
             }
