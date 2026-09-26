@@ -139,6 +139,23 @@ async function remove(password) {
   return status();
 }
 
+// ---- поделиться: снимок альбома или пресета по короткому коду ----
+
+async function sharePut(kind, data) {
+  if (!config.getSecret('acc.token')) throw new ApiError(401, 'Нужно войти в аккаунт');
+  return (await api('POST', '/api/share', { kind, data })).code;
+}
+
+async function shareGet(code) {
+  try {
+    return await api('GET', `/api/share/${encodeURIComponent(code)}`);
+  } catch (e) {
+    // старый сервер без «поделиться» отвечает 404 без текста ошибки
+    if (e.status === 404 && !e.body?.error) throw new Error('Сервер аккаунтов ещё не умеет открывать коды — обнови его');
+    throw e;
+  }
+}
+
 // ---- синхронизация ----
 
 // Какие настройки общие для всех компьютеров: микрофон у каждого свой
@@ -275,4 +292,5 @@ function init(onEvent) {
 
 module.exports = {
   init, status, register, login, logout, logoutAll, me, rename, changePassword, remove, sync, settingsChanged,
+  sharePut, shareGet,
 };

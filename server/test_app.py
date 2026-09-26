@@ -175,3 +175,25 @@ def test_together_room_flow(client):
     finally:
         a.__exit__(None, None, None)
         b.__exit__(None, None, None)
+
+
+def test_share_album_and_eq(client):
+    token, _ = register(client)
+    other, _ = register(client)
+    album = {"title": "в дорогу", "tracks": [{"id": "ym:1", "source": "ym", "title": "трек"}]}
+    r = client.post("/api/share", json={"kind": "album", "data": album}, headers=h(token))
+    assert r.status_code == 200, r.text
+    code = r.json()["code"]
+    assert len(code) == 8
+
+    # друг вводит код как угодно: строчными, с дефисом и пробелами
+    pretty = f"{code[:4].lower()}-{code[4:]} "
+    r = client.get(f"/api/share/{pretty}", headers=h(other))
+    assert r.status_code == 200, r.text
+    assert r.json()["kind"] == "album" and r.json()["data"] == album
+
+    assert client.get("/api/share/AAAAAAAA", headers=h(other)).status_code == 404
+    assert client.get(f"/api/share/{code}").status_code == 401
+    assert client.post("/api/share", json={"kind": "settings", "data": {}}, headers=h(token)).status_code == 400
+    r = client.post("/api/share", json={"kind": "eq", "data": {"name": "бас", "gains": [1] * 10, "preamp": -1}}, headers=h(token))
+    assert r.status_code == 200

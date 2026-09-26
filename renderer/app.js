@@ -453,7 +453,7 @@ async function loadTrack(track, { autoplay = true, startAt = 0, quiet = false } 
     Together.loadFailed();
     if (seq === loadSeq) startFade(); // хвост не должен играть вечно
     if (seq !== loadSeq || quiet) return;
-    if (track.shared) { toast(`${track.title}: ${e.message}`, 'err'); return; } // трек друга: ждём следующий от него
+    if (track.shared && Together.active()) { toast(`${track.title}: ${e.message}`, 'err'); return; } // трек друга в комнате: ждём следующий от него
     failStreak++;
     toast(`${track.title}: ${e.message}`, 'err');
     if (failStreak < 5 && state.queue.length > 1) setTimeout(() => next(true), 600);
@@ -948,7 +948,7 @@ function openTrackMenu(i, pos) {
   if (artists.length) {
     items.unshift(...artists.slice(0, 3).map((name) => ({ label: artists.length > 1 ? name : 'Перейти к артисту', icon: 'i-user', onClick: () => openArtist(name) })), { sep: true });
   }
-  if (t.source === 'local') items.unshift({ label: 'Изменить теги и обложку', icon: 'i-pencil', onClick: () => openEditor(t) }, { sep: true });
+  if (t.source === 'local' && !t.shared) items.unshift({ label: 'Изменить теги и обложку', icon: 'i-pencil', onClick: () => openEditor(t) }, { sep: true });
   if (state.view === 'albums' && state.album) {
     items.push({ sep: true }, { label: 'Убрать из альбома', icon: 'i-trash', danger: true, onClick: () => removeFromAlbum([t]) });
   }
@@ -1164,10 +1164,10 @@ function renderActions() {
     });
   }
   if (state.view === 'albums' && state.album) {
-    add('', 'i-pencil', renameAlbum).setAttribute('aria-label', 'Переименовать альбом');
-    add('', 'i-trash', deleteAlbum).setAttribute('aria-label', 'Удалить альбом');
-    box.lastElementChild.title = 'Удалить альбом';
-    box.lastElementChild.previousElementSibling.title = 'Переименовать альбом';
+    const iconBtn = (icon, fn, label) => { const b = add('', icon, fn); b.setAttribute('aria-label', label); b.title = label; };
+    iconBtn('i-share', () => shareAlbum(state.album), 'Поделиться альбомом'); // share.js
+    iconBtn('i-pencil', renameAlbum, 'Переименовать альбом');
+    iconBtn('i-trash', deleteAlbum, 'Удалить альбом');
   } else if (state.view === 'local' && state.cfg.localFolders.length) {
     add('', 'i-refresh', () => scanLocal(true)).setAttribute('aria-label', 'Пересканировать папки');
   } else if (['ym', 'sc', 'sp'].includes(state.view) && state.sub && state.sub !== 'search' && serviceReady(state.view)) {
@@ -1202,6 +1202,8 @@ function renderCollections() {
       chip(a.title, { active: state.sub === a.id, cover: a.cover, icon: 'i-list', count: a.count, onClick: () => openView('albums', a.id) });
     }
     chip('Новый альбом', { icon: 'i-plus', onClick: async () => { const a = await createAlbum(); if (a) openView('albums', a.id); } });
+    box.lastElementChild.classList.add('new');
+    chip('По коду', { icon: 'i-code', onClick: openShareCode }); // share.js: альбом, которым поделился друг
     box.lastElementChild.classList.add('new');
     return;
   }
@@ -1305,8 +1307,8 @@ async function openView(view, sub = null) {
         state.album = null;
         showEmpty({
           title: 'Собери свой первый альбом',
-          text: 'В альбом можно сложить треки откуда угодно: свои файлы, Яндекс Музыку, SoundCloud и Spotify. Слушаются они потом одной очередью.',
-          actions: [['Создать альбом', async () => { const a = await createAlbum(); if (a) openView('albums', a.id); }, true]],
+          text: 'В альбом можно сложить треки откуда угодно: свои файлы, Яндекс Музыку, SoundCloud и Spotify. Слушаются они потом одной очередью. А если друг прислал код альбома — открой его.',
+          actions: [['Создать альбом', async () => { const a = await createAlbum(); if (a) openView('albums', a.id); }, true], ['Открыть по коду', openShareCode]],
         });
         return;
       }

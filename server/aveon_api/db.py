@@ -42,6 +42,16 @@ CREATE TABLE IF NOT EXISTS docs (
     updated    INTEGER NOT NULL,
     PRIMARY KEY (user_id, kind, key)
 );
+
+-- «поделиться»: неизменяемые снимки альбомов и пресетов по короткому коду
+CREATE TABLE IF NOT EXISTS shares (
+    code       TEXT PRIMARY KEY,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    kind       TEXT NOT NULL,
+    data       TEXT NOT NULL,
+    created    INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS shares_user ON shares(user_id, created);
 """
 
 

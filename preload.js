@@ -33,6 +33,11 @@ contextBridge.exposeInMainWorld('tishe', {
     add: (id, tracks) => call('albums:add', id, tracks),
     removeTracks: (id, trackIds) => call('albums:removeTracks', id, trackIds),
     move: (id, from, to) => call('albums:move', id, from, to),
+    import: (title, tracks) => call('albums:import', title, tracks),
+  },
+  share: {
+    put: (kind, data) => call('share:put', kind, data),
+    get: (code) => call('share:get', code),
   },
   meta: {
     edit: (filePath, fields, cover) => call('meta:edit', filePath, fields, cover),

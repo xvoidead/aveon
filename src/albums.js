@@ -47,6 +47,7 @@ function clean(t) {
   return {
     id: t.id, source: t.source, title: t.title, artist: t.artist, album: t.album,
     duration: t.duration, cover: t.cover, link: t.link, playable: t.playable !== false, preview: !!t.preview, ref,
+    ...(t.shared ? { shared: true } : {}), // трек из чужого альбома: свой файл друга ищется по названию
   };
 }
 
@@ -105,6 +106,13 @@ function addTracks(id, tracks) {
   return { added, album: summary(a) };
 }
 
+// Альбом, которым поделился друг: новый альбом с копией его треков
+function importAlbum(title, tracks) {
+  const a = create(title);
+  addTracks(a.id, tracks);
+  return summary(find(a.id));
+}
+
 function removeTracks(id, trackIds) {
   const a = find(id);
   const drop = new Set(trackIds);
@@ -124,7 +132,7 @@ function moveTrack(id, from, to) {
 }
 
 function localPaths() {
-  return albums.flatMap((a) => a.tracks.filter((t) => t.source === 'local').map((t) => t.ref.path));
+  return albums.flatMap((a) => a.tracks.filter((t) => t.source === 'local' && t.ref?.path).map((t) => t.ref.path));
 }
 
 // ---- синхронизация с аккаунтом ----
@@ -165,6 +173,6 @@ function replace(next) {
 function onChange(cb) { changed = cb; }
 
 module.exports = {
-  load, list, get, create, rename, remove, addTracks, removeTracks, moveTrack, localPaths,
+  load, list, get, create, rename, remove, addTracks, importAlbum, removeTracks, moveTrack, localPaths,
   snapshot, merge, replace, onChange,
 };

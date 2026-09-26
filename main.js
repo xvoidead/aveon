@@ -291,11 +291,16 @@ function registerIpc() {
   handle('albums:rename', (id, title) => albums.rename(id, title));
   handle('albums:delete', (id) => albums.remove(id));
   handle('albums:add', (id, tracks) => {
-    local.allowFiles(tracks.filter((t) => t.source === 'local').map((t) => t.ref.path));
+    local.allowFiles(tracks.filter((t) => t.source === 'local' && t.ref?.path).map((t) => t.ref.path));
     return albums.addTracks(id, tracks);
   });
   handle('albums:removeTracks', (id, trackIds) => albums.removeTracks(id, trackIds));
   handle('albums:move', (id, from, to) => albums.moveTrack(id, from, to));
+  handle('albums:import', (title, tracks) => albums.importAlbum(title, tracks));
+
+  // Поделиться: короткий код на сервере аккаунтов
+  handle('share:put', (kind, data) => account.sharePut(kind, data));
+  handle('share:get', (code) => account.shareGet(code));
 
   handle('sc:discover', () => sc.discoverClientId());
   handle('sp:connect', () => sp.connect());

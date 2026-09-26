@@ -113,8 +113,10 @@ function renderEqMine() {
       <span>${esc(p.name)}</span>
       <button class="chip-more" data-mine-more="${esc(p.id)}" aria-label="Действия с пресетом" aria-haspopup="menu"><svg><use href="#i-more"/></svg></button>
     </span>`).join('')}
-    ${own ? '' : `<button class="chip plain new" id="eq-save-as"><svg><use href="#i-plus"/></svg><span>${mine.length ? 'Сохранить текущий' : 'Сохранить как свой пресет'}</span></button>`}`;
+    ${own ? '' : `<button class="chip plain new" id="eq-save-as"><svg><use href="#i-plus"/></svg><span>${mine.length ? 'Сохранить текущий' : 'Сохранить как свой пресет'}</span></button>`}
+    <button class="chip plain new" id="eq-paste" title="Пресет, которым поделился друг"><svg><use href="#i-code"/></svg><span>Вставить код</span></button>`;
   $('#eq-save-as')?.addEventListener('click', eqSaveAs);
+  $('#eq-paste').onclick = openShareCode; // share.js
 }
 
 // Сравнение с точностью до полудецибела: так ползунки и хранятся
@@ -190,6 +192,7 @@ function eqMineMenu(id, anchor) {
     { label: 'Включить', icon: 'i-eq', onClick: () => eqUseMine(id) },
     ...(changed ? [{ label: 'Записать сюда текущие полосы', icon: 'i-refresh', onClick: () => eqUpdateMine(id) }] : []),
     { label: 'Переименовать', icon: 'i-pencil', onClick: () => eqRenameMine(id) },
+    { label: 'Поделиться', icon: 'i-share', onClick: () => shareEqPreset(p) }, // share.js
     { sep: true },
     { label: 'Удалить', icon: 'i-trash', danger: true, onClick: () => eqDeleteMine(id) },
   ], { anchor });

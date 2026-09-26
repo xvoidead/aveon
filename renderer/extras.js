@@ -702,14 +702,14 @@ function onTrackShown(track) {
   if (stats.cur?.id !== track.id) statsOnTrack(track);
   if (lyricsOpen() && ly.track?.id !== track.id) loadLyrics(track);
   if (cz.trackId !== track.id) censorLoad(track); // censor.js
-  const editable = track.source === 'local';
+  const editable = track.source === 'local' && !track.shared;
   $('#now-cover').classList.toggle('editable', editable);
   $('#now-title').classList.toggle('editable', editable);
   $('#now-cover').title = editable ? 'Изменить обложку и теги' : '';
 }
 
 for (const id of ['#now-cover', '#now-title']) { // имя исполнителя — ссылка на артиста (artists.js)
-  $(id).addEventListener('click', () => { if (state.track?.source === 'local') openEditor(state.track); });
+  $(id).addEventListener('click', () => { if (state.track?.source === 'local' && !state.track.shared) openEditor(state.track); });
 }
 
 function hideOverlays() { closeStats(); closeLyrics(); }
