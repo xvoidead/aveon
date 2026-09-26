@@ -395,6 +395,7 @@ function lookSection() {
   <section class="sec" data-sec="motion">
     <h3 class="sec-title">Анимации и прочее</h3>
     <div class="field"><label>Анимации</label><div class="ctl">${seg('motion', [['full', 'Все'], ['calm', 'Спокойные'], ['off', 'Без анимаций']], l.motion)}</div></div>
+    ${IS_MOBILE ? '' : `<div class="field"><label>Плашка звонка на сцене</label><div class="ctl"><label class="switch"><input type="checkbox" id="call-panel" ${state.cfg.ui?.callPanel !== false ? 'checked' : ''} aria-label="Плашка звонка на сцене"><span></span></label></div></div>`}
     ${IS_MOBILE ? '' : `<div class="field"><label>Прятать кнопки окна</label><div class="ctl"><label class="switch"><input type="checkbox" id="autohide-win" ${state.cfg.ui?.autoHideWin !== false ? 'checked' : ''} aria-label="Прятать кнопки окна"><span></span></label></div></div>`}
     <div class="row-actions">
       <button class="btn" id="look-copy"><svg><use href="#i-share"/></svg>Скопировать код оформления</button>
@@ -480,6 +481,11 @@ function bindLook(body) {
   $('#keep-titles', body).onchange = (e) => {
     document.body.classList.toggle('keep-titles', e.target.checked);
     saveCfg({ ui: { keepTitles: e.target.checked } });
+  };
+  const callPanel = $('#call-panel', body);
+  if (callPanel) callPanel.onchange = (e) => {
+    state.cfg.ui.callPanel = e.target.checked; // renderCall (app.js) спрячет плашку сам
+    saveCfg({ ui: { callPanel: e.target.checked } });
   };
   const autohide = $('#autohide-win', body);
   if (autohide) autohide.onchange = (e) => {

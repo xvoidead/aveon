@@ -855,6 +855,8 @@ function renderCall(talking) {
   // На телефоне плашка видна всегда: в ней кнопка «в бочку вручную», а шкал нет
   $('#discord').classList.toggle('off', !IS_MOBILE && !inCall && !broken && !manual);
   $('#discord').classList.toggle('no-meters', IS_MOBILE || !inCall);
+  // плашку можно убрать в настройках оформления; сломанный монитор звука всё равно показываем
+  $('#discord').hidden = !IS_MOBILE && state.cfg.ui?.callPanel === false && !broken;
   if (IS_MOBILE) $('#duck-manual').setAttribute('aria-pressed', String(!!m.manual));
 
   const el = $('#duck-chip');
