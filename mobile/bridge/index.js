@@ -272,6 +272,14 @@ const api = {
     avatar: call((userId, at) => account.avatarOf(userId, at)),
     now: (p) => { ready.then(() => friends.now(clone(p))); },
   },
+  wave: {
+    start: call((settings) => ym.waveStart(settings)),
+    more: call((queue) => ym.waveMore(queue)),
+    feedback: call((type, track, played) => ym.waveFeedback(type, track, played)),
+    related: call((track) => (track?.source === 'sc' ? sc.related(track) : [])),
+    speak: (text, opts) => Aveon.speak({ text, rate: opts?.rate || 1, pitch: opts?.pitch || 1 }),
+    stopSpeak: () => Aveon.stopSpeak().catch(() => {}),
+  },
   downloads: {
     add: call((tracks) => resolve.download(tracks)),
     remove: call(async (tracks) => { for (const t of tracks) await cache.unpin(t); return true; }),

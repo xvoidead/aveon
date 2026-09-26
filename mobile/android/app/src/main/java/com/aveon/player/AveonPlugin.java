@@ -556,6 +556,58 @@ public class AveonPlugin extends Plugin {
         });
     }
 
+    // ---------- голос диджея волны (renderer/wave.js): в WebView нет speechSynthesis ----------
+
+    private android.speech.tts.TextToSpeech tts;
+    private boolean ttsReady = false;
+    private final java.util.Map<String, PluginCall> speaking = new java.util.HashMap<>();
+
+    private void ensureTts(Runnable then) {
+        if (tts != null) { if (ttsReady) then.run(); else main.postDelayed(() -> ensureTts(then), 200); return; }
+        tts = new android.speech.tts.TextToSpeech(getContext(), (status) -> {
+            ttsReady = status == android.speech.tts.TextToSpeech.SUCCESS;
+            if (ttsReady) {
+                tts.setLanguage(new Locale("ru", "RU"));
+                tts.setOnUtteranceProgressListener(new android.speech.tts.UtteranceProgressListener() {
+                    @Override public void onStart(String id) {}
+                    @Override public void onDone(String id) { finish(id); }
+                    @Override public void onError(String id) { finish(id); }
+                    private void finish(String id) {
+                        PluginCall c;
+                        synchronized (speaking) { c = speaking.remove(id); }
+                        if (c != null) c.resolve();
+                    }
+                });
+            }
+            then.run();
+        });
+    }
+
+    @PluginMethod
+    public void speak(PluginCall call) {
+        String text = call.getString("text", "");
+        float rate = call.getFloat("rate", 1f);
+        float pitch = call.getFloat("pitch", 1f);
+        ensureTts(() -> {
+            if (!ttsReady || text.isEmpty()) { call.resolve(); return; }
+            String id = "w" + System.nanoTime();
+            synchronized (speaking) { speaking.put(id, call); }
+            tts.setSpeechRate(rate);
+            tts.setPitch(pitch);
+            tts.speak(text, android.speech.tts.TextToSpeech.QUEUE_FLUSH, null, id);
+        });
+    }
+
+    @PluginMethod
+    public void stopSpeak(PluginCall call) {
+        if (tts != null) tts.stop();
+        synchronized (speaking) {
+            for (PluginCall c : speaking.values()) c.resolve();
+            speaking.clear();
+        }
+        call.resolve();
+    }
+
     // ---------- мелочи ----------
 
     @PluginMethod
@@ -603,6 +655,7 @@ public class AveonPlugin extends Plugin {
     @Override
     protected void handleOnDestroy() {
         main.removeCallbacksAndMessages(null);
+        if (tts != null) { tts.shutdown(); tts = null; }
         if (instance == this) instance = null;
         super.handleOnDestroy();
     }

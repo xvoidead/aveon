@@ -115,6 +115,13 @@ contextBridge.exposeInMainWorld('tishe', {
     miniToggle: () => call('mini:toggle'),
     onChange: (cb) => on('desk:changed', cb),
   },
+  // Волна: бесконечный поток под вкус (renderer/wave.js)
+  wave: {
+    start: (settings) => call('wave:start', settings),
+    more: (queue) => call('wave:more', queue),
+    feedback: (type, track, played) => call('wave:feedback', type, track, played),
+    related: (track) => call('wave:related', track),
+  },
   // Скачанные для офлайна: треки лежат на диске вместе с обложкой и текстом
   downloads: {
     add: (tracks) => call('dl:add', tracks),

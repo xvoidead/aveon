@@ -8,8 +8,8 @@ if (IS_MOBILE) document.getElementById('now-artist').textContent = 'Выбери
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
-const NAMES = { local: 'Мои файлы', artists: 'Артисты', albums: 'Альбомы', ym: 'Яндекс Музыка', sc: 'SoundCloud', sp: 'Spotify' };
-const VIEWS = ['local', 'artists', 'albums', 'ym', 'sc', 'sp'];
+const NAMES = { wave: 'Волна', local: 'Мои файлы', artists: 'Артисты', albums: 'Альбомы', ym: 'Яндекс Музыка', sc: 'SoundCloud', sp: 'Spotify' };
+const VIEWS = ['wave', 'local', 'artists', 'albums', 'ym', 'sc', 'sp']; // wave — wave.js
 const SHORT = { local: 'файл', ym: 'Яндекс', sc: 'SoundCloud', sp: 'Spotify' };
 
 const state = {
@@ -573,6 +573,7 @@ function buildOrder(startIdx) {
 }
 
 function playFrom(list, index) {
+  if (!Wave.starting) waveStop(); // wave.js: включили что-то своё — волна выключается
   state.queue = list.slice();
   failStreak = 0;
   buildOrder(index);
@@ -585,6 +586,8 @@ function next(auto = false) {
   for (let step = 1; step <= n; step++) {
     let p = state.pos + step;
     if (p >= n) {
+      // волна бесконечная: треки кончились — подкидываем ещё и идём дальше (wave.js)
+      if (Wave.active) { waveExtend().then((added) => { if (added) next(auto); }); return; }
       if (auto && state.cfg.repeat === 'off') { audio.pause(); audio.currentTime = 0; return; }
       p %= n;
     }
@@ -822,7 +825,7 @@ function duckTick() {
 
   // manual — бочка включена вручную (Android: кнопка на сцене и в уведомлении)
   // вручную: кнопка на телефоне, остров или клавиша B на компьютере
-  const manual = !!m.manual || duck.forced;
+  const manual = !!m.manual || duck.forced || duck.dj; // dj — говорит диджей волны (wave.js)
   const talking = manual || (!!m.call && now - duck.lastVoice < d.hold);
   const active = manual || (d.enabled && !!m.call && (d.mode === 'call' || talking));
   const want = active ? 1 : 0;
@@ -851,7 +854,7 @@ function renderCall(talking) {
   const m = duck.meter;
   const broken = duck.ok === false;
   const inCall = !!m.call;
-  const manual = !!m.manual || duck.forced;
+  const manual = !!m.manual || duck.forced || duck.dj;
   // На телефоне плашка видна всегда: в ней кнопка «в бочку вручную», а шкал нет
   $('#discord').classList.toggle('off', !IS_MOBILE && !inCall && !broken && !manual);
   $('#discord').classList.toggle('no-meters', IS_MOBILE || !inCall);
@@ -1315,6 +1318,7 @@ async function openView(view, sub = null) {
   hideOverlays(); // статистика и текст песни закрываются при переходе в раздел
   state.view = view;
   state.sub = sub;
+  if (view !== 'wave') leaveWaveView(); // wave.js
   saveCfg({ view });
   $$('.source').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
   $('#view-title').textContent = NAMES[view];
@@ -1322,6 +1326,7 @@ async function openView(view, sub = null) {
   const input = $('#search');
   input.value = state.queries[view] || '';
   input.placeholder = {
+    wave: 'Поиск',
     local: 'Искать в своих файлах',
     artists: sub ? 'Искать у артиста' : 'Искать артиста',
     albums: 'Искать в альбоме',
@@ -1331,6 +1336,7 @@ async function openView(view, sub = null) {
   }[view];
   renderCollections();
 
+  if (view === 'wave') { renderWave(); return; } // wave.js
   if (view === 'local') { renderLocal(); return; }
   if (view === 'artists') { openArtists(sub); return; } // artists.js
 

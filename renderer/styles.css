@@ -1341,3 +1341,41 @@ html:is(.dock-bottom, .dock-top) .me-avatar { width: 34px; height: 34px; }
 
 /* панель друзей ставит friends.js (placeFriends) — под кнопкой, а не у края окна */
 .together.friends { right: auto; }
+
+/* ---------- волна (wave.js) ---------- */
+.library.wave-on .search, .library.wave-on .collections-wrap { display: none; }
+.wave-hero {
+  position: relative; margin: 4px -8px 16px; padding: 58px 26px 20px; border-radius: 22px; overflow: hidden;
+  background:
+    radial-gradient(80% 120% at 0% 0%, color-mix(in srgb, var(--amber) 22%, transparent), transparent 60%),
+    radial-gradient(70% 110% at 100% 100%, color-mix(in srgb, var(--voice) 18%, transparent), transparent 60%),
+    var(--oak-2);
+  border: 1px solid var(--rivet-2);
+}
+.wave-canvas { position: absolute; left: 0; right: 0; top: 0; height: 64px; width: 100%; pointer-events: none; opacity: .85; }
+.wave-main { position: relative; display: flex; align-items: center; gap: 18px; min-height: 104px; }
+.wave-go {
+  width: 76px; height: 76px; flex: none; border-radius: 50%; display: grid; place-items: center;
+  background: var(--amber); color: var(--oak); box-shadow: 0 14px 34px color-mix(in srgb, var(--amber) 40%, transparent);
+  transition: transform .15s ease;
+}
+.wave-go:hover { transform: scale(1.05); }
+.wave-go svg { width: 30px; height: 30px; }
+.wave-now { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.wave-now b { font: 700 26px/1.1 var(--display); letter-spacing: -0.02em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wave-now span { color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wave-rate { display: flex; gap: 6px; }
+.wave-rate .icon-btn { width: 42px; height: 42px; background: var(--rivet); }
+.wave-rate .icon-btn:hover { color: var(--amber); }
+.wave-opts { position: relative; display: flex; flex-direction: column; gap: 10px; margin-top: 18px; }
+.wave-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.wave-row > span { width: 96px; flex: none; color: var(--text-3); font-size: 13px; }
+.wave-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.wave-seg button { padding: 6px 14px; border-radius: 99px; background: var(--rivet); color: var(--text-2); font-size: 13px; font-weight: 500; transition: background .15s, color .15s; }
+.wave-seg button:hover { background: var(--rivet-2); color: var(--text); }
+.wave-seg button.on { background: var(--text); color: var(--oak); }
+.wave-voice { height: 32px; max-width: 280px; }
+html.mobile .wave-hero { margin: 4px 0 14px; padding: 18px 16px 16px; }
+html.mobile .wave-now b { font-size: 20px; }
+html.mobile .wave-go { width: 64px; height: 64px; }
+html.mobile .wave-row > span { width: 100%; }

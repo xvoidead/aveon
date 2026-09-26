@@ -70,6 +70,7 @@ const DEFAULTS = {
   tray: { enabled: true, closeToTray: false }, // значок в трее (src/tray.js)
   hotkeys: {}, // горячие клавиши на всю систему; по умолчанию — src/hotkeys.js
   livewall: { enabled: false, style: 'both', title: true, dim: 45 }, // живые обои (src/livewall.js)
+  wave: { mood: 'all', diversity: 'default', language: 'any', dj: false, djEvery: 2, djRate: 1, djVoice: '' }, // волна (renderer/wave.js)
   look: {}, // оформление: тема, цвета, шрифты… (значения по умолчанию — renderer/look.js)
   cache: { keep: true, limitMb: 2048 }, // треки сохраняются сами, пока их слушаешь (src/cache.js)
   mxm: { token: '' }, // токен Musixmatch: выдаётся редко, поэтому храним

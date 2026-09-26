@@ -366,6 +366,13 @@ function registerIpc() {
   ipcMain.on('eqpop:live', (e, eq) => send('eqpop:live', eq));
   ipcMain.on('eqpop:action', (e, action) => { eqpop.hide(); send('eqpop:action', action); });
 
+
+  // Волна: «Моя волна» Яндекса и похожие треки SoundCloud для своей волны (renderer/wave.js)
+  handle('wave:start', (settings) => ym.waveStart(settings));
+  handle('wave:more', (queue) => ym.waveMore(queue));
+  handle('wave:feedback', (type, track, played) => ym.waveFeedback(type, track, played));
+  handle('wave:related', (track) => (track?.source === 'sc' ? sc.related(track) : []));
+
   // Кэш треков и текстов: сколько занимает, очистка
   handle('cache:info', () => cache.info());
   handle('cache:clear', (kind) => { if (kind === 'downloads' || kind === 'all') resolve.cancelDownloads(); return cache.clear(kind); });

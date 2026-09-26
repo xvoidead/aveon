@@ -224,4 +224,81 @@ async function album(id) {
 
 function reset() { uidCache = null; }
 
-module.exports = { search, collections, collection, stream, reset, artistByName, album };
+
+// ---------- «Моя волна» (rotor) ----------
+// Сессия волны: настройки уходят «семенами» (настроение, характер, язык), дальше сервер сам
+// подбирает треки и учитывает, что ты слушал до конца, пропустил, лайкнул или не захотел слушать.
+// Если сессии недоступны — старый API станции user:onyourwave.
+const wave = { sid: null, batch: null, legacy: false, settings: {} };
+const WAVE_STATION = 'user:onyourwave';
+
+function waveSeeds(s = {}) {
+  const seeds = [WAVE_STATION];
+  if (s.mood && s.mood !== 'all') seeds.push(`settingMoodEnergy:${s.mood}`);
+  if (s.diversity && s.diversity !== 'default') seeds.push(`settingDiversity:${s.diversity}`);
+  if (s.language && s.language !== 'any') seeds.push(`settingLanguage:${s.language}`);
+  return seeds;
+}
+
+const jsonPost = (body) => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+const waveTrackId = (t) => String(t?.ref?.id || String(t?.id || '').replace(/^ym:/, ''));
+const waveItems = (seq) => (seq || []).map((x) => x.track).map(mapTrack).filter((t) => t && t.playable);
+
+async function waveStart(settings = {}) {
+  wave.settings = settings;
+  try {
+    const r = await api('/rotor/session/new', {}, jsonPost({ seeds: waveSeeds(settings), includeTracksInResponse: true, includeWaveModel: false, interactive: true }));
+    wave.sid = r.radioSessionId;
+    wave.batch = r.batchId;
+    wave.legacy = false;
+    return waveItems(r.sequence);
+  } catch (e) {
+    // старый API: настройки — отдельным запросом, треки — со станции
+    wave.legacy = true;
+    wave.sid = null;
+    try {
+      await api(`/rotor/station/${WAVE_STATION}/settings2`, {}, jsonPost({
+        moodEnergy: settings.mood || 'all', diversity: settings.diversity || 'default', language: settings.language || 'any', type: 'rotor',
+      }));
+    } catch {}
+    return waveMore([]);
+  }
+}
+
+// queue — id последних треков: сервер не повторяет их и продолжает с того места
+async function waveMore(queue = []) {
+  const ids = queue.map(waveTrackId).filter(Boolean).slice(-10);
+  if (!wave.legacy && wave.sid) {
+    const r = await api(`/rotor/session/${wave.sid}/tracks`, {}, jsonPost({ queue: ids }));
+    wave.batch = r.batchId || wave.batch;
+    return waveItems(r.sequence);
+  }
+  const r = await api(`/rotor/station/${WAVE_STATION}/tracks`, { settings2: 'true', ...(ids.length ? { queue: ids[ids.length - 1] } : {}) });
+  wave.batch = r.batchId || wave.batch;
+  return waveItems(r.sequence);
+}
+
+// type: radioStarted | trackStarted | trackFinished | skip | like | dislike
+async function waveFeedback(type, track, played = 0) {
+  const event = { type, timestamp: new Date().toISOString(), from: 'aveon' };
+  if (track) event.trackId = waveTrackId(track);
+  if (type === 'trackFinished' || type === 'skip') event.totalPlayedSeconds = Math.round(played);
+  try {
+    if (!wave.legacy && wave.sid) await api(`/rotor/session/${wave.sid}/feedback`, {}, jsonPost({ event, batchId: wave.batch }));
+    else await api(`/rotor/station/${WAVE_STATION}/feedback`, wave.batch ? { 'batch-id': wave.batch } : {}, jsonPost(event));
+  } catch {}
+  // «нравится» — в лайки аккаунта; «не нравится» — в дизлайки, чтобы волна его больше не ставила
+  if ((type === 'like' || type === 'dislike') && track) {
+    try {
+      const u = await uid();
+      await api(`/users/${u}/${type === 'like' ? 'likes' : 'dislikes'}/tracks/add-multiple`, {}, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ 'track-ids': waveTrackId(track) }).toString(),
+      });
+    } catch {}
+  }
+  return true;
+}
+
+module.exports = { search, collections, collection, stream, reset, artistByName, album, waveStart, waveMore, waveFeedback };

@@ -138,4 +138,13 @@ async function stream(track) {
     : `SoundCloud не отдал поток: ${lastErr?.message || 'пустой ответ'}`);
 }
 
-module.exports = { search, collections, collection, stream, discoverClientId };
+
+// Похожие треки — для своей волны (renderer/wave.js), когда затравка из SoundCloud
+async function related(track) {
+  const id = track?.ref?.id || String(track?.id || '').replace(/^sc:/, '');
+  if (!id) return [];
+  const res = await api(`/tracks/${id}/related`, { limit: 30 });
+  return (res.collection || []).map(mapTrack).filter((t) => t && t.playable !== false);
+}
+
+module.exports = { search, collections, collection, stream, discoverClientId, related };
