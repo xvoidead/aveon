@@ -151,7 +151,9 @@ api.together.onEvent((ev) => {
       applyRemote(ev.state, ev.age, { beat: ev.beat });
       if (fresh && !ev.beat && !ev.initial && ev.by) {
         toast(`${firstName(ev.by)} включает «${ev.state.track.title}»`);
-        islandNotify(`${firstName(ev.by)} включает «${ev.state.track.title}»`, 'together'); // island-feed.js
+        islandNotify(`${firstName(ev.by)} включает «${ev.state.track.title}»`, 'together', null, [ // island-feed.js
+          { label: 'Открыть руму', run: () => { api.island.action({ type: 'focus' }); openTogether(); } },
+        ]);
       }
       break;
     }

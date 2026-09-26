@@ -87,6 +87,7 @@ api.island.onState((s) => {
   renderLyr(ly);
   pill.classList.toggle('friend-live', !!s.friends?.count);
   renderFriends(s.friends);
+  renderEvents(s.events || []);
   renderLabel();
   $('#b-play use').setAttribute('href', s.playing ? '#i-pause' : '#i-play');
   $('#b-barrel').classList.toggle('on', !!s.manual);
@@ -318,3 +319,42 @@ pill.addEventListener('wheel', (e) => { e.preventDefault(); act('volume', { delt
   setInterval(send, 150);
   send();
 })();
+
+
+// ---- лента событий в раскрытом острове: последние три, с кнопками и крестиком ----
+const EV_ICON = { friend: '👋', together: '🎧', admin: '📣', info: '🔔' };
+function evAgo(at) {
+  const s = Math.max(0, Math.round((Date.now() - at) / 1000));
+  return s < 60 ? 'сейчас' : s < 3600 ? `${Math.round(s / 60)} мин` : `${Math.round(s / 3600)} ч`;
+}
+
+function renderEvents(list) {
+  let box = $('#events');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'events';
+    box.className = 'events';
+    $('#friends').after(box);
+    box.addEventListener('click', (e) => {
+      const b = e.target.closest('[data-ev]');
+      if (!b) return;
+      e.stopPropagation();
+      act('event', { id: b.dataset.ev, i: b.dataset.i === undefined ? null : +b.dataset.i });
+    });
+    setInterval(() => { for (const t of box.querySelectorAll('[data-at]')) t.textContent = evAgo(+t.dataset.at); }, 20000);
+  }
+  // пока есть события, строка «друг слушает» не нужна — событие о нём тоже будет в ленте
+  $('#friends').classList.toggle('under-events', list.length > 0);
+  pill.classList.toggle('has-events', list.length > 0);
+  pill.style.setProperty('--ev', String(list.length));
+  const html = list.map((e) => {
+    const bg = avatarCss(e.av);
+    const face = bg ? `<i class="pic" style='background-image:${bg}'></i>` : e.letter ? `<i>${esc(e.letter)}</i>` : `<i class="ico">${emo(EV_ICON[e.kind] || '🔔')}</i>`;
+    return `<div class="ev">${face}<span class="ev-t">${emo(e.text)}</span><small data-at="${e.at}">${evAgo(e.at)}</small>
+      ${e.acts.map((a) => `<button class="${a.primary ? 'primary' : ''}" data-ev="${esc(e.id)}" data-i="${a.i}">${esc(a.label)}</button>`).join('')}
+      <button class="ev-x" data-ev="${esc(e.id)}" title="Убрать">×</button></div>`;
+  }).join('');
+  // перерисовываем, только если поменялось: состояние приходит 15 раз в секунду, клик по
+  // пересозданной кнопке терялся бы
+  if (box.dataset.html !== html) { box.innerHTML = html; box.dataset.html = html; }
+}

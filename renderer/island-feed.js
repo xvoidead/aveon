@@ -9,10 +9,19 @@ const islandOpt = (k) => ({ ...ISLAND_OPTS, ...(state.cfg?.island || {}) })[k];
 
 // Уведомление в острове: заявка в друзья, друг включил трек, кто-то зашёл в комнату…
 const islandNotices = [];
-// person — друг, о котором уведомление: в острове вместо обложки его аватарка
-function islandNotify(text, kind = 'info', person = null) {
-  if (IS_MOBILE || !api.island || !islandOpt('notify')) return;
-  islandNotices.push({ id: `${Date.now()}-${Math.random()}`, text, kind, person: person ? { id: person.id, avatar: person.avatar, name: person.name } : null });
+// person — друг, о котором уведомление: в острове вместо обложки его аватарка.
+// actions — кнопки события [{ label, run, primary? }]. Всплывает уведомление как обычно (без кнопок),
+// а в раскрытом острове внизу — лента последних событий с этими кнопками (islandHistory)
+const islandHistory = []; // новые в начале; { id, text, kind, at, person, actions }
+const HISTORY_KEEP = 2 * 3600 * 1000; // событие старше двух часов из ленты уходит
+function islandNotify(text, kind = 'info', person = null, actions = []) {
+  if (IS_MOBILE || !api.island) return;
+  const p = person ? { id: person.id, avatar: person.avatar, name: person.name } : null;
+  const id = `${Date.now()}-${Math.random()}`;
+  islandHistory.unshift({ id, text, kind, at: Date.now(), person: p, actions });
+  if (islandHistory.length > 10) islandHistory.length = 10;
+  if (!islandOpt('notify')) return;
+  islandNotices.push({ id, text, kind, person: p });
   if (islandNotices.length > 5) islandNotices.shift();
   window.islandPushSoon?.(); // сразу, а не через 1,5 с, когда на паузе
 }
@@ -110,7 +119,10 @@ function islandNotify(text, kind = 'info', person = null) {
     for (const f of list) {
       const was = heard.get(f.id);
       if (was && !was.playing && t - was.said > 10 * 60 * 1000 && !inRoom.has(f.id)) {
-        islandNotify(`${firstName(f.name)} слушает «${f.now.track.title}»`, 'friend', f);
+        islandNotify(`${firstName(f.name)} слушает «${f.now.track.title}»`, 'friend', f, [
+          { label: '▶ Слушать', primary: true, run: () => { const x = friendById(f.id); if (x?.now) playFriend(x, false); } }, // friends.js
+          { label: 'Написать', run: () => chatFromIsland(f.id) },
+        ]);
         was.said = t;
       }
       heard.set(f.id, { playing: true, said: was ? was.said : t }); // уже слушал, когда плеер открыли — без уведомления
@@ -130,7 +142,14 @@ function islandNotify(text, kind = 'info', person = null) {
     const t = state.track;
     const n = islandNotices[0];
     if (n && !n.shownAt) n.shownAt = Date.now(); // с этого момента уведомление на экране
-    const base = { notice: n ? { id: n.id, text: n.text, kind: n.kind, av: n.person ? avatarKey(n.person) : '' } : null };
+    const now = Date.now();
+    while (islandHistory.length && now - islandHistory[islandHistory.length - 1].at > HISTORY_KEEP) islandHistory.pop();
+    const events = islandHistory.slice(0, 3).map((e) => ({
+      id: e.id, text: e.text, kind: e.kind, at: e.at,
+      av: e.person ? avatarKey(e.person) : '', letter: e.person ? (e.person.name || '?').trim()[0]?.toUpperCase() : '',
+      acts: e.actions.map((a, i) => ({ i, label: a.label, primary: !!a.primary })),
+    }));
+    const base = { events, notice: n ? { id: n.id, text: n.text, kind: n.kind, av: n.person ? avatarKey(n.person) : '' } : null };
     if (!t) return { ...base, hasTrack: false };
     let bars = [0, 0, 0, 0, 0];
     let full = null;
@@ -199,6 +218,15 @@ function islandNotify(text, kind = 'info', person = null) {
 
   api.island.onAction((a) => {
     if (locked()) return;
+    // лента событий раскрытого острова: кнопка события (выполнить и убрать) или крестик (просто убрать)
+    if (a.type === 'event') {
+      const k = islandHistory.findIndex((x) => x.id === a.id);
+      const ev = k >= 0 ? islandHistory[k] : null;
+      if (k >= 0) islandHistory.splice(k, 1);
+      push();
+      try { if (a.i != null) ev?.actions[a.i]?.run(); } catch (e) { console.warn('кнопка события:', e); }
+      return;
+    }
     if (a.type === 'thumb') {
       if (a.action === 'toggle') togglePlay();
       else if (a.action === 'next') next();
