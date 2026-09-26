@@ -763,6 +763,7 @@ function showNow(track, stream) {
   state.via = stream?.via || null;
   $('#now-title').textContent = track.title;
   $('#btn-now-album').disabled = false;
+  $('#btn-now-sc').disabled = track.source === 'sc'; // из SoundCloud и так — искать там нечего
   $('#now-artist').innerHTML = track.artist ? artistLinks(track.artist) : 'Исполнитель неизвестен'; // имя — ссылка на артиста
   $('#now-cover').innerHTML = track.cover ? `<img src="${esc(track.cover)}" alt="">` : '<span class="porthole-empty">♪</span>';
   const via = $('#now-via');
@@ -1326,6 +1327,9 @@ $('#tracklist').addEventListener('contextmenu', (e) => {
   openTrackMenu(+row.dataset.i, { x: e.clientX, y: e.clientY });
 });
 
+// что играет — найти в SoundCloud (searchIn, trackQuery — у меню трека)
+$('#btn-now-sc').onclick = () => { if (state.track) searchIn('sc', trackQuery(state.track)); };
+
 $('#btn-now-album').onclick = (e) => {
   if (!state.track) return;
   const btn = e.currentTarget;
@@ -1839,29 +1843,90 @@ function renderSettingsNav() {
   }
   const found = applySettingsView();
   const searching = !!normQ(settingsQuery);
+  if (!searching) setOpen.add(settingsTab); // открытый раздел — раскрыт
+  // Дерево: раздел — ветка, его секции — листья (раскрываются, если секций больше одной)
   $('#set-tabs', nav).innerHTML = SET_TABS.map(([id, label, icon]) => {
     const on = !searching && id === settingsTab;
     const badge = searching ? (found[id] ? String(found[id]) : '') : tabBadge(id);
-    return `<button class="set-tab${on ? ' on' : ''}${searching && !found[id] ? ' ss-dim' : ''}${searching && found[id] ? ' ss-found' : ''}" data-tab="${id}" aria-current="${on ? 'page' : 'false'}">
-      <svg><use href="#${icon}"/></svg><span>${label}</span><small>${esc(badge)}</small>
-    </button>`;
+    const kids = setKids(id, searching);
+    const open = kids.length > 1 && (searching ? !!found[id] : setOpen.has(id));
+    return `<div class="set-node${open ? ' open' : ''}${kids.length > 1 ? ' has-kids' : ''}">
+      <button class="set-tab${on ? ' on' : ''}${searching && !found[id] ? ' ss-dim' : ''}${searching && found[id] ? ' ss-found' : ''}" data-tab="${id}" aria-current="${on ? 'page' : 'false'}"${kids.length > 1 ? ` aria-expanded="${open}"` : ''}>
+        <svg><use href="#${icon}"/></svg><span>${label}</span><small>${esc(badge)}</small>${kids.length > 1 ? '<svg class="set-caret"><use href="#i-chevron-r"/></svg>' : '<i></i>'}
+      </button>
+      ${kids.length > 1 ? `<div class="set-kids"><div>${kids.map((k) => `<button class="set-leaf${!searching && k.id === setLeaf ? ' on' : ''}" data-tab="${id}" data-leaf="${esc(k.id)}" tabindex="${open ? 0 : -1}">${esc(k.title)}</button>`).join('')}</div></div>` : ''}
+    </div>`;
   }).join('');
   $('#set-title').textContent = searching ? `Поиск: ${settingsQuery.trim()}` : SET_TABS.find(([id]) => id === settingsTab)[1];
+}
+
+// ---- дерево разделов ----
+const setOpen = new Set(); // раскрытые ветки
+let setLeaf = ''; // секция, которую сейчас видно (подсвечена в дереве)
+
+function secTitle(sec) {
+  const t = sec.querySelector('.sec-title');
+  if (!t) return '';
+  return [...t.childNodes].filter((n) => !(n.nodeType === 1 && n.classList.contains('state'))).map((n) => n.textContent).join('').trim();
+}
+
+function setKids(tab, searching) {
+  return $$('#settings-body .sec')
+    // скрытые чужие разделы тоже считаются (у них свои ветки); не бывает только «для компьютера» на телефоне
+    .filter((sec) => SEC_TAB[sec.dataset.sec] === tab && (!searching || !sec.hidden) && !(IS_MOBILE && sec.classList.contains('desktop-only')))
+    .map((sec) => ({ id: sec.dataset.sec, title: secTitle(sec) }))
+    .filter((k) => k.title);
 }
 
 $('#set-nav').addEventListener('click', (e) => {
   const b = e.target.closest('[data-tab]');
   if (!b) return;
   const searching = !!normQ(settingsQuery);
-  if (!searching && b.dataset.tab === settingsTab) return;
-  settingsTab = b.dataset.tab;
+  const tab = b.dataset.tab;
+  const leaf = b.dataset.leaf;
   if (searching) { // из поиска — в раздел, поиск сбрасываем
     settingsQuery = '';
     $('#set-q').value = '';
   }
+  if (leaf) {
+    settingsTab = tab;
+    setOpen.add(tab);
+    setLeaf = leaf;
+    renderSettingsNav();
+    const sec = $(`#settings-body [data-sec="${leaf}"]`);
+    sec?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    sec?.classList.remove('sec-flash');
+    void sec?.offsetWidth;
+    sec?.classList.add('sec-flash');
+    return;
+  }
+  if (!searching && tab === settingsTab) { // тот же раздел — свернуть / развернуть ветку
+    if (setOpen.has(tab)) setOpen.delete(tab); else setOpen.add(tab);
+    renderSettingsNav();
+    return;
+  }
+  settingsTab = tab;
+  setOpen.add(tab);
+  setLeaf = '';
   renderSettingsNav();
   $('#settings-body').scrollTop = 0;
 });
+
+// что сейчас видно — подсвечиваем лист дерева
+let setScrollRaf = 0;
+$('#settings-body').addEventListener('scroll', () => {
+  if (setScrollRaf) return;
+  setScrollRaf = requestAnimationFrame(() => {
+    setScrollRaf = 0;
+    const body = $('#settings-body');
+    const top = body.getBoundingClientRect().top + 24;
+    const secs = $$('.sec', body).filter((x) => !x.hidden);
+    const cur = secs.find((x) => x.getBoundingClientRect().bottom > top) || secs[0];
+    if (!cur || cur.dataset.sec === setLeaf) return;
+    setLeaf = cur.dataset.sec;
+    for (const l of $$('#set-tabs .set-leaf')) l.classList.toggle('on', l.dataset.leaf === setLeaf);
+  });
+}, { passive: true });
 
 // Ctrl+F в открытых настройках — в поиск настроек, а не в поиск музыки
 document.addEventListener('keydown', (e) => {
