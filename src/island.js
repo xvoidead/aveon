@@ -150,7 +150,7 @@ setInterval(() => {
 function wanted() {
   const c = cfg();
   if (Date.now() < previewUntil) return true;
-  if (!c.enabled || !last?.hasTrack) return false;
+  if (!c.enabled || (!last?.hasTrack && Date.now() >= noticeUntil)) return false; // без трека — только ради уведомления
   if (c.hideInGames && games.current()) return false; // идёт игра — остров не мешает (src/games.js)
   if (!c.onlyAway || !main || main.isDestroyed()) return true;
   return main.isMinimized() || !main.isVisible() || !main.isFocused();
@@ -180,8 +180,11 @@ function init(mainWindow) {
   games.start(() => cfg().enabled && !!cfg().hideInGames, () => update());
 }
 
+let noticeId = null;
+let noticeUntil = 0; // до этого момента остров виден ради уведомления, даже без трека
 function state(s) {
   last = s;
+  if (s.notice && s.notice.id !== noticeId) { noticeId = s.notice.id; noticeUntil = Date.now() + 4200; setTimeout(update, 4300); }
   if (win && !win.isDestroyed() && ready) win.webContents.send('island:state', s);
   update();
 }

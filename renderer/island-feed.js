@@ -14,6 +14,7 @@ function islandNotify(text, kind = 'info', person = null) {
   if (IS_MOBILE || !api.island || !islandOpt('notify')) return;
   islandNotices.push({ id: `${Date.now()}-${Math.random()}`, text, kind, person: person ? { id: person.id, avatar: person.avatar, name: person.name } : null });
   if (islandNotices.length > 5) islandNotices.shift();
+  window.islandPushSoon?.(); // сразу, а не через 1,5 с, когда на паузе
 }
 
 (() => {
@@ -128,6 +129,7 @@ function islandNotify(text, kind = 'info', person = null) {
   function snapshot(wall) {
     const t = state.track;
     const n = islandNotices[0];
+    if (n && !n.shownAt) n.shownAt = Date.now(); // с этого момента уведомление на экране
     const base = { notice: n ? { id: n.id, text: n.text, kind: n.kind, av: n.person ? avatarKey(n.person) : '' } : null };
     if (!t) return { ...base, hasTrack: false };
     let bars = [0, 0, 0, 0, 0];
@@ -169,8 +171,13 @@ function islandNotify(text, kind = 'info', person = null) {
     api.island.push(snap);
   }
 
-  // уведомление показывается ~4 секунды, потом следующее
-  setInterval(() => { if (islandNotices.length) islandNotices.shift(); }, 4000);
+  window.islandPushSoon = () => push();
+  // уведомление показывается 4,2 с с момента, когда ушло в остров, потом следующее.
+  // Раньше очередь сдвигалась по часам раз в 4 с — пришедшее перед сдвигом пропадало, не показавшись
+  setInterval(() => {
+    const n = islandNotices[0];
+    if (n?.shownAt && Date.now() - n.shownAt >= 4200) { islandNotices.shift(); push(); }
+  }, 250);
 
   let tick = 0;
   setInterval(() => {

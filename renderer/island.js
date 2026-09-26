@@ -53,7 +53,7 @@ api.island.onState((s) => {
   for (const [k, v] of Object.entries(s.avatars || {})) avatars.set(k, v);
   if (s.notice && s.notice.id !== lastNotice) {
     lastNotice = s.notice.id;
-    notice(s.notice.text, s.notice.av);
+    notice(s.notice.text, s.notice.av, s.notice.kind);
   }
   document.body.classList.toggle('hidden', !s.hasTrack && !is('notice') && !previewing);
   if (!s.hasTrack) return;
@@ -187,8 +187,24 @@ function peek() {
 }
 
 // av — ключ аватарки друга: на время уведомления она вместо обложки
-function notice(text, av = '') {
-  if (is('open')) return;
+// откуда уведомление — в подписи
+const NOTICE_FROM = { friend: 'друзья', together: 'рума', admin: 'от админов', info: 'авеон' };
+let pendingNotice = null; // пришло, пока остров раскрыт под курсором, — покажем, когда свернётся
+
+// эмодзи картинками Apple, как в окне плеера (renderer/app.js → emojify)
+const EMOJI_CDN = 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.1.2/img/apple/64/';
+const EMOJI_RE = /\p{Regional_Indicator}{2}|[#*0-9]\uFE0F?\u20E3|\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier})?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier})?)*/gu;
+const emo = (s) => esc(s).replace(EMOJI_RE, (e) => (/^[\u00a9\u00ae\u2122]$/.test(e) ? e
+  : `<img class="emoji" src="${EMOJI_CDN}${[...e].map((c) => c.codePointAt(0).toString(16).padStart(4, '0')).join('-')}.png" alt="${e}">`));
+document.addEventListener('error', (e) => {
+  const img = e.target;
+  if (!img.classList?.contains('emoji')) return;
+  if (!img.dataset.retry && img.src.includes('-fe0f')) { img.dataset.retry = '1'; img.src = img.src.replace(/-fe0f/g, ''); return; }
+  img.replaceWith(document.createTextNode(img.alt));
+}, true);
+
+function notice(text, av = '', kind = 'info') {
+  if (is('open')) { pendingNotice = { text, av, kind, at: Date.now() }; return; }
   pill.classList.remove('peek');
   pill.classList.add('notice');
   const face = avatarCss(av);
@@ -196,8 +212,10 @@ function notice(text, av = '') {
   pill.classList.toggle('face', !!face);
   pill.style.width = '';
   document.body.classList.remove('hidden');
-  $('#p-title').textContent = text;
-  $('#p-sub').textContent = 'авеон';
+  const title = $('#p-title');
+  title.innerHTML = emo(text);
+  title.dataset.key = ''; // после уведомления renderLabel перепишет название заново
+  $('#p-sub').textContent = NOTICE_FROM[kind] || 'авеон';
   clearTimeout(noticeTimer);
   noticeTimer = setTimeout(() => {
     pill.classList.remove('notice', 'face');
@@ -256,6 +274,10 @@ function pointerOut() {
   leaveTimer = setTimeout(() => {
     pill.classList.remove('open');
     renderLabel();
+    // уведомление, пришедшее под курсором, — сейчас, если ещё свежее
+    const p = pendingNotice;
+    pendingNotice = null;
+    if (p && Date.now() - p.at < 8000) notice(p.text, p.av, p.kind);
   }, 220);
 }
 pill.addEventListener('mouseenter', pointerIn); // быстрее часов главного процесса, если событие пришло
