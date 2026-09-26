@@ -304,8 +304,7 @@ function seen(kind) {
 function showBanner(kind, a) {
   if (!a?.text || String(a.id) === seen(kind)) return;
   if ($(`#banner-${kind}`)?.dataset.id !== String(a.id)) { // новое — сказать и в острове (баннер не видно, пока плеер свёрнут)
-    islandNotify(kind === 'notice' ? `${a.by ? `${a.by}: ` : ''}${a.text}` : a.track?.title ? `Трек дня: «${a.track.title}» — ${a.text}` : a.text, 'admin',
-      null, a.track?.title ? [{ label: 'Включить', primary: true, run: () => playShared(a.track) }] : []);
+    islandNotify(kind === 'notice' ? `${a.by ? `${a.by}: ` : ''}${a.text}` : a.track?.title ? `Трек дня: «${a.track.title}» — ${a.text}` : a.text, 'admin');
   }
   $(`#banner-${kind}`)?.remove();
   const el = document.createElement('div');

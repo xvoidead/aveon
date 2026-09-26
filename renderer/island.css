@@ -167,17 +167,3 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 .pill.notice .label b { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.22; font-size: 12.5px; }
 .pill.notice .label small { font-size: 10.5px; }
 .label img.emoji { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: -0.24em; margin: 0 .03em; }
-
-/* кнопки в уведомлении: ответить, принять, войти… */
-.nacts { position: absolute; left: 62px; right: 14px; bottom: 10px; display: none; gap: 6px; }
-.pill.notice.has-acts { height: 98px; border-radius: 30px; }
-.pill.notice.has-acts .nacts { display: flex; animation: nacts-in .2s ease .08s both; }
-.nacts button {
-  height: 26px; padding: 0 12px; border-radius: 99px; background: rgb(255 255 255 / .1); color: #f4f1ec;
-  font: 600 12px "Onest", "Segoe UI", sans-serif; white-space: nowrap; transition: background .12s ease, transform .1s ease;
-}
-.nacts button:hover { background: rgb(255 255 255 / .18); }
-.nacts button:active { transform: scale(.95); }
-.nacts button.primary { background: var(--voice); color: #000; }
-.nacts button.primary:hover { filter: brightness(1.1); }
-@keyframes nacts-in { from { opacity: 0; transform: translateY(4px); } }

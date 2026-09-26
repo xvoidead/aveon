@@ -184,12 +184,7 @@ let noticeId = null;
 let noticeUntil = 0; // до этого момента остров виден ради уведомления, даже без трека
 function state(s) {
   last = s;
-  if (s.notice && s.notice.id !== noticeId) {
-    const ttl = s.notice.ttl || 4200; // с кнопками — дольше
-    noticeId = s.notice.id;
-    noticeUntil = Date.now() + ttl;
-    setTimeout(update, ttl + 100);
-  }
+  if (s.notice && s.notice.id !== noticeId) { noticeId = s.notice.id; noticeUntil = Date.now() + 4200; setTimeout(update, 4300); }
   if (win && !win.isDestroyed() && ready) win.webContents.send('island:state', s);
   update();
 }
