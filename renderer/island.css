@@ -17,7 +17,7 @@ svg { width: 18px; height: 18px; }
 body.hidden .pill { opacity: 0; transform: scale(.8) translateY(-10px); }
 body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 /* бочка: обводка цветом голосов, как индикатор звонка */
-.pill.barrel { width: 280px; box-shadow: 0 6px 22px rgb(0 0 0 / .35), 0 0 0 1.5px var(--voice), 0 0 18px -2px var(--voice); }
+.pill.barrel { box-shadow: 0 6px 22px rgb(0 0 0 / .35), 0 0 0 1.5px var(--voice), 0 0 18px -2px var(--voice); }
 .glow { position: absolute; inset: 0; pointer-events: none; opacity: calc(var(--m) * .35); background: radial-gradient(120% 140% at 50% 120%, var(--voice), transparent 60%); }
 
 .row { position: absolute; left: 6px; right: 12px; top: 5px; height: 26px; display: flex; align-items: center; gap: 10px; transition: top .42s var(--ease), height .42s var(--ease); }
@@ -103,10 +103,6 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 @keyframes ring { to { --ang: 360deg; } }
 
 /* ---- текст песни: в свёрнутом острове — текущая строка, длинная переносится ---- */
-.pill.lyric:not(.open):not(.peek):not(.notice) { width: 300px; }
-.pill.lyric2:not(.open):not(.peek):not(.notice) { height: 54px; border-radius: 27px; }
-.pill.lyric2:not(.open):not(.peek):not(.notice) .row { height: 44px; }
-.pill.lyric2:not(.open):not(.peek):not(.notice) .label b { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.3; }
 .pill.lyric.barrel:not(.open):not(.peek):not(.notice) .label b { color: var(--voice); }
 
 /* ---- раскрытый остров: три строки текста, текущая — крупно ---- */
@@ -152,3 +148,9 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 
 /* предпросмотр положения из настроек */
 .pill.previewing { box-shadow: 0 6px 22px rgb(0 0 0 / .35), 0 0 0 2px var(--amber), 0 0 24px -4px var(--amber); }
+
+/* ширину свёрнутой капсулы задаёт island.js → fitWidth (под длину строки), здесь только плавность */
+.pill:not(.open):not(.peek):not(.notice) .label b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: font-size .3s ease; }
+.pill.open, .pill.peek, .pill.notice { width: var(--w-open, 340px); }
+.pill.peek, .pill.notice { width: 310px; }
+.measure { position: absolute; left: -9999px; top: 0; white-space: nowrap; visibility: hidden; font-weight: 600; }

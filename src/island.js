@@ -5,7 +5,7 @@ const { BrowserWindow, screen } = require('electron');
 const path = require('path');
 const config = require('./config');
 
-const SIZE = { width: 540, height: 290 }; // с запасом под раскрытый остров с текстом и друзьями // с запасом под раскрытую капсулу и тень
+const SIZE = { width: 780, height: 290 }; // с запасом: свёрнутая капсула растёт под длину строки, раскрытая — с текстом и друзьями
 
 let win = null;
 let main = null;
