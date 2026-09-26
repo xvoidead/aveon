@@ -1481,8 +1481,40 @@ collBox.addEventListener('pointerdown', (e) => {
 
 let viewSeq = 0;
 
+// ---- переход между вкладками ----
+// Подчёркивание переезжает к новой вкладке, содержимое въезжает с той стороны, куда переключились
+function moveSourceInk(instant = false) {
+  const nav = $('#sources');
+  const b = $('.source.active', nav);
+  let ink = $('.source-ink', nav);
+  if (!ink) { ink = document.createElement('i'); ink.className = 'source-ink'; nav.append(ink); instant = true; }
+  if (!b) { ink.style.opacity = '0'; return; }
+  if (instant) ink.style.transition = 'none';
+  ink.style.opacity = '1';
+  ink.style.transform = `translateX(${b.offsetLeft}px)`;
+  ink.style.width = `${b.offsetWidth}px`;
+  if (instant) { void ink.offsetWidth; ink.style.transition = ''; }
+}
+window.addEventListener('resize', () => moveSourceInk(true));
+document.fonts?.ready.then(() => moveSourceInk(true)); // ширины вкладок — после загрузки шрифтов
+
+function animateViewSwitch(from, to) {
+  const order = $$('.source').map((b) => b.dataset.view);
+  const a = order.indexOf(from), b = order.indexOf(to);
+  if (a < 0 || b < 0 || a === b) return;
+  const cls = b > a ? 'tab-in-r' : 'tab-in-l';
+  for (const el of $('#content').children) {
+    if (el.matches('.lib-top, .search, .profile, .lyrics') || el.hidden) continue;
+    el.classList.remove('tab-in-r', 'tab-in-l');
+    void el.offsetWidth; // перезапуск анимации, если переключают быстро
+    el.classList.add(cls);
+    el.addEventListener('animationend', () => el.classList.remove(cls), { once: true });
+  }
+}
+
 async function openView(view, sub = null) {
   const seq = ++viewSeq;
+  const prevView = state.view;
   $('#content').classList.remove('hero-on'); // шапку артиста показывает только его страница (artists.js)
   hideOverlays(); // статистика и текст песни закрываются при переходе в раздел
   state.view = view;
@@ -1491,6 +1523,9 @@ async function openView(view, sub = null) {
   if (view !== 'home') leaveHome(); // home.js
   saveCfg({ view });
   $$('.source').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+  moveSourceInk(prevView === view);
+  // въезжаем в следующем кадре: к нему главная и волна (home.js, wave.js) уже покажут свои блоки
+  if (prevView !== view) requestAnimationFrame(() => animateViewSwitch(prevView, view));
   $('#view-title').textContent = NAMES[view];
   $('#view-sub').textContent = '';
   const input = $('#search');

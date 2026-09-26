@@ -1802,3 +1802,16 @@ html:is(.dock-bottom, .dock-top) .call-head { min-width: 0; }
   html:is(.dock-bottom, .dock-top) .call .call-state { display: none; }
   html:is(.dock-bottom, .dock-top) .call { padding: 0 5px; }
 }
+
+/* ---------- переход между вкладками ---------- */
+.sources { position: relative; }
+.source.active::after { display: none; } /* вместо подчёркивания у кнопки — общее, которое переезжает */
+.source-ink {
+  position: absolute; left: 0; bottom: 0; height: 2px; border-radius: 1px; background: var(--amber); pointer-events: none;
+  transition: transform .32s cubic-bezier(.3, .9, .3, 1), width .32s cubic-bezier(.3, .9, .3, 1), opacity .2s ease;
+}
+@keyframes tab-in-r { from { opacity: 0; transform: translateX(22px); } }
+@keyframes tab-in-l { from { opacity: 0; transform: translateX(-22px); } }
+.tab-in-r { animation: tab-in-r .3s cubic-bezier(.2, .8, .2, 1) both; }
+.tab-in-l { animation: tab-in-l .3s cubic-bezier(.2, .8, .2, 1) both; }
+@media (prefers-reduced-motion: reduce) { .source-ink { transition: none; } .tab-in-r, .tab-in-l { animation: none; } }
