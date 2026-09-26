@@ -64,15 +64,6 @@
 
   <!-- Бочка: сейчас играет. Обручи, обложка и спектр реагируют на силу эффекта (--m) -->
   <section class="stage" id="stage">
-    <!-- слева сверху: кто вошёл (профиль и статистика) и настройки -->
-    <div class="stage-top">
-      <button class="me" id="open-profile" aria-label="Профиль и статистика" aria-expanded="false">
-        <span class="me-avatar" id="me-avatar">?</span>
-        <span class="me-text"><b id="me-name"></b><small id="me-sub"></small></span>
-      </button>
-      <button class="icon-btn" id="open-settings" aria-label="Настройки" title="Настройки (Ctrl+,)"><svg><use href="#i-settings"/></svg></button>
-    </div>
-
     <div class="barrel" id="barrel">
       <canvas id="viz" class="viz"></canvas>
       <svg class="hoops" viewBox="0 0 320 320" aria-hidden="true">
@@ -117,30 +108,42 @@
       </div>
     </div>
 
-    <button class="up-next" id="up-next" hidden title="Включить следующий трек">
-      <span class="up-next-pic" id="up-next-pic"></span>
-      <span class="up-next-main"><small>дальше</small><b id="up-next-title"></b><span id="up-next-artist"></span></span>
-      <svg><use href="#i-next"/></svg>
-    </button>
+    <!-- низ сцены: что дальше, Discord (звонок), аккаунт -->
+    <div class="stage-foot">
+      <button class="up-next" id="up-next" hidden title="Включить следующий трек">
+        <span class="up-next-pic" id="up-next-pic"></span>
+        <span class="up-next-main"><small>дальше</small><b id="up-next-title"></b><span id="up-next-artist"></span></span>
+        <svg><use href="#i-next"/></svg>
+      </button>
 
-    <div class="call" id="discord">
-      <div class="call-head">
-        <span class="call-state" id="duck-chip">Discord запускается</span>
-        <label class="switch" title="Эффект в звонке">
-          <input type="checkbox" id="duck-enabled" aria-label="Эффект в звонке"><span></span>
-        </label>
+      <div class="call" id="discord">
+        <div class="call-head">
+          <span class="call-state" id="duck-chip">Discord запускается</span>
+          <label class="switch" title="Эффект в звонке">
+            <input type="checkbox" id="duck-enabled" aria-label="Эффект в звонке"><span></span>
+          </label>
+        </div>
+        <div class="meters">
+          <span class="meter-label">Собеседники</span>
+          <div class="meter" id="meter" title="Нажми, чтобы задать порог">
+            <div class="meter-fill" id="meter-fill"></div>
+            <div class="meter-threshold" id="meter-threshold"></div>
+          </div>
+          <span class="meter-label">Ты</span>
+          <div class="meter mic" id="mic-meter" title="Твой голос после шумоподавления">
+            <div class="meter-fill" id="mic-fill"></div>
+            <div class="meter-threshold" id="mic-threshold"></div>
+          </div>
+        </div>
       </div>
-      <div class="meters">
-        <span class="meter-label">Собеседники</span>
-        <div class="meter" id="meter" title="Нажми, чтобы задать порог">
-          <div class="meter-fill" id="meter-fill"></div>
-          <div class="meter-threshold" id="meter-threshold"></div>
-        </div>
-        <span class="meter-label">Ты</span>
-        <div class="meter mic" id="mic-meter" title="Твой голос после шумоподавления">
-          <div class="meter-fill" id="mic-fill"></div>
-          <div class="meter-threshold" id="mic-threshold"></div>
-        </div>
+
+      <!-- аккаунт: профиль и статистика, рядом настройки -->
+      <div class="stage-account">
+        <button class="me" id="open-profile" aria-label="Профиль и статистика" aria-expanded="false">
+          <span class="me-avatar" id="me-avatar">?</span>
+          <span class="me-text"><b id="me-name"></b><small id="me-sub"></small></span>
+        </button>
+        <button class="icon-btn" id="open-settings" aria-label="Настройки" title="Настройки (Ctrl+,)"><svg><use href="#i-settings"/></svg></button>
       </div>
     </div>
   </section>
