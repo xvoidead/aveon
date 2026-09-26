@@ -20,6 +20,7 @@ contextBridge.exposeInMainWorld('tishe', {
   },
   source: {
     search: (src, q) => call('src:search', src, q),
+    searchArtists: (src, q) => call('src:searchArtists', src, q),
     collections: (src) => call('src:collections', src),
     collection: (src, id) => call('src:collection', src, id),
   },

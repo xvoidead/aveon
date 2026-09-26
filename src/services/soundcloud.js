@@ -147,4 +147,14 @@ async function related(track) {
   return (res.collection || []).map(mapTrack).filter((t) => t && t.playable !== false);
 }
 
-module.exports = { search, collections, collection, stream, discoverClientId, related };
+// Артисты — это пользователи SoundCloud, у которых есть треки
+async function searchArtists(q) {
+  const res = await api('/search/users', { q, limit: 20 });
+  return (res.collection || []).filter((u) => (u.track_count || 0) > 0).slice(0, 12).map((u) => ({
+    id: `sc:${u.id}`, source: 'sc', name: u.username,
+    cover: (u.avatar_url || '').replace('-large.', '-t300x300.'),
+    followers: u.followers_count || 0, link: u.permalink_url || '',
+  }));
+}
+
+module.exports = { searchArtists, search, collections, collection, stream, discoverClientId, related };

@@ -193,6 +193,7 @@ const api = {
   },
   source: {
     search: call((src, q) => SOURCES[src].search(q)),
+    searchArtists: call((src, q) => SOURCES[src].searchArtists(q)),
     collections: call((src) => SOURCES[src].collections()),
     collection: call((src, id) => SOURCES[src].collection(id)),
   },

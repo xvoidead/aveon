@@ -242,6 +242,7 @@ function registerIpc() {
   });
 
   handle('src:search', (source, q) => SOURCES[source].search(q));
+  handle('src:searchArtists', (source, q) => SOURCES[source].searchArtists(q));
   handle('src:collections', (source) => SOURCES[source].collections());
   handle('src:collection', (source, id) => SOURCES[source].collection(id));
   handle('stream', (track) => resolveStream(track));

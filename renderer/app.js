@@ -8,8 +8,8 @@ if (IS_MOBILE) document.getElementById('now-artist').textContent = 'Выбери
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
-const NAMES = { wave: 'Волна', local: 'Мои файлы', artists: 'Артисты', albums: 'Альбомы', ym: 'Яндекс Музыка', sc: 'SoundCloud', sp: 'Spotify' };
-const VIEWS = ['wave', 'local', 'artists', 'albums', 'ym', 'sc', 'sp']; // wave — wave.js
+const NAMES = { home: 'Главная', wave: 'Волна', local: 'Мои файлы', artists: 'Артисты', albums: 'Альбомы', ym: 'Яндекс Музыка', sc: 'SoundCloud', sp: 'Spotify' };
+const VIEWS = ['home', 'wave', 'local', 'artists', 'albums', 'ym', 'sc', 'sp']; // wave — wave.js
 const SHORT = { local: 'файл', ym: 'Яндекс', sc: 'SoundCloud', sp: 'Spotify' };
 
 const state = {
@@ -1482,6 +1482,7 @@ async function openView(view, sub = null) {
   state.view = view;
   state.sub = sub;
   if (view !== 'wave') leaveWaveView(); // wave.js
+  if (view !== 'home') leaveHome(); // home.js
   saveCfg({ view });
   $$('.source').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
   $('#view-title').textContent = NAMES[view];
@@ -1489,6 +1490,7 @@ async function openView(view, sub = null) {
   const input = $('#search');
   input.value = state.queries[view] || '';
   input.placeholder = {
+    home: 'Поиск',
     wave: 'Поиск',
     local: 'Искать в своих файлах',
     artists: sub ? 'Искать у артиста' : 'Искать артиста',
@@ -1499,6 +1501,7 @@ async function openView(view, sub = null) {
   }[view];
   renderCollections();
 
+  if (view === 'home') { renderHome(); return; } // home.js
   if (view === 'wave') { renderWave(); return; } // wave.js
   if (view === 'local') { renderLocal(); return; }
   if (view === 'artists') { openArtists(sub); return; } // artists.js
@@ -1545,9 +1548,12 @@ async function openView(view, sub = null) {
 
   if (sub === 'search') {
     const r = state.results[view] || [];
+    const artists = state.artistResults?.[view] || [];
     $('#view-title').textContent = state.queries[view];
-    if (r.length) renderTracks(r, `${summary(r)} в ${NAMES[view]}`);
-    else showEmpty({ title: 'Ничего не нашлось', text: 'Попробуй написать название иначе или только исполнителя.' });
+    if (r.length || artists.length) {
+      renderTracks(r, `${artists.length ? `${artists.length} ${plural(artists.length, 'артист', 'артиста', 'артистов')}, ` : ''}${summary(r)} в ${NAMES[view]}`);
+      renderSearchArtists(artists); // artists.js: строка артистов над треками
+    } else showEmpty({ title: 'Ничего не нашлось', text: 'Попробуй написать название иначе или только исполнителя.' });
     return;
   }
 
@@ -1617,7 +1623,13 @@ $('#search-form').addEventListener('submit', async (e) => {
   $('#view-title').textContent = q;
   showEmpty({ loading: true, text: `Ищу в ${NAMES[view]}…` });
   try {
-    state.results[view] = await api.source.search(view, q);
+    // треки и артисты — одновременно; артисты не нашлись или сервис их не умеет — просто без них
+    const [tracks, artists] = await Promise.all([
+      api.source.search(view, q),
+      api.source.searchArtists(view, q).catch(() => []),
+    ]);
+    state.results[view] = tracks;
+    state.artistResults = { ...(state.artistResults || {}), [view]: artists };
     if (seq !== viewSeq) return;
     openView(view, 'search');
   } catch (err) {
@@ -2510,7 +2522,7 @@ async function init() {
   renderModes();
   applyVolume();
   await Promise.all([refreshAlbums(), loadStats()]);
-  const start = lookStartView(VIEWS.includes(state.cfg.view) ? state.cfg.view : 'local'); // look.js
+  const start = lookStartView(VIEWS.includes(state.cfg.view) ? state.cfg.view : 'home'); // look.js
   if (state.cfg.localFolders.length) scanLocal();
   api.sp.status().then((s) => {
     state.sp = s;

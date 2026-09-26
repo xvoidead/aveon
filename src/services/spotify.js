@@ -205,4 +205,13 @@ async function status() {
 }
 
 // clientId, saveTokens, profile, SCOPES — для входа через ссылку aveon:// на Android (mobile/bridge)
-module.exports = { connect, disconnect, status, search, collections, collection, REDIRECT, SCOPES, clientId, saveTokens, profile };
+async function searchArtists(q) {
+  const res = await api('/search', { q, type: 'artist', limit: 12 });
+  return (res.artists?.items || []).map((a) => ({
+    id: `sp:${a.id}`, source: 'sp', name: a.name,
+    cover: (a.images || []).slice(-2)[0]?.url || a.images?.[0]?.url || '',
+    followers: a.followers?.total || 0, link: a.external_urls?.spotify || '',
+  }));
+}
+
+module.exports = { searchArtists, connect, disconnect, status, search, collections, collection, REDIRECT, SCOPES, clientId, saveTokens, profile };

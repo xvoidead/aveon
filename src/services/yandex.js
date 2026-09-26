@@ -301,4 +301,14 @@ async function waveFeedback(type, track, played = 0) {
   return true;
 }
 
-module.exports = { search, collections, collection, stream, reset, artistByName, album, waveStart, waveMore, waveFeedback };
+// Артисты по запросу — для поиска (строка артистов над треками)
+async function searchArtists(q) {
+  const res = await api('/search', { text: q, type: 'artist', page: 0, nocorrect: 'false' });
+  return (res.artists?.results || []).slice(0, 12).map((a) => ({
+    id: `ym:${a.id}`, source: 'ym', name: a.name, ymId: String(a.id),
+    cover: a.cover?.uri ? cover(a.cover.uri, '200x200') : '',
+    followers: a.likesCount || 0,
+  }));
+}
+
+module.exports = { searchArtists, search, collections, collection, stream, reset, artistByName, album, waveStart, waveMore, waveFeedback };

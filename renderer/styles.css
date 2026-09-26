@@ -1655,3 +1655,96 @@ body.is-scratching { user-select: none; }
 @media (max-width: 820px) { .set-search { display: none; } }
 html.mobile .set-search { display: none; }
 html.mobile .set-tabs { flex-direction: row; }
+
+/* ---------- артисты в поиске (artists.js → renderSearchArtists) ---------- */
+.search-artists { margin: 4px 0 8px; }
+.search-artists h3 { margin: 8px 12px 10px; font: 600 15px var(--ui); color: var(--text-2); }
+.sa-row { display: flex; gap: 6px; overflow-x: auto; padding: 0 4px 6px; scrollbar-width: none; }
+.sa-row::-webkit-scrollbar { display: none; }
+.sa-card { flex: none; width: 128px; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 6px; border-radius: 14px; text-align: center; transition: background .15s ease; }
+.sa-card:hover { background: var(--oak-2); }
+.sa-pic { width: 96px; height: 96px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; background: var(--rivet); box-shadow: 0 8px 22px rgb(0 0 0 / .3); }
+.sa-pic img { width: 100%; height: 100%; object-fit: cover; }
+.sa-pic i { font: 700 30px var(--display); font-style: normal; color: var(--text-3); }
+.sa-card b { max-width: 100%; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sa-card small { font-size: 12px; color: var(--text-3); }
+
+/* ---------- главная (home.js) ---------- */
+.library.home-on .search, .library.home-on .collections-wrap, .library.home-on .lib-head { display: none; }
+.home { overflow-y: auto; margin: 0 -12px; padding: 6px 12px 28px; flex: 1; min-height: 0; }
+.h-hello h1 { margin: 6px 0 4px; font: 700 clamp(28px, 3.4vw, 40px)/1.1 var(--display); letter-spacing: -0.03em; }
+.h-hello p { margin: 0; color: var(--text-2); max-width: 64ch; }
+
+/* баннер волны: эфир на всю ширину, кнопка-иллюминатор слева */
+.h-wave {
+  position: relative; display: flex; align-items: center; gap: 18px; margin: 22px 0 8px; padding: 22px 24px;
+  min-height: 118px; border-radius: 20px; overflow: hidden; cursor: pointer;
+  background: color-mix(in srgb, var(--amber) 7%, var(--oak-2));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amber) 22%, var(--rivet-2));
+  transition: box-shadow .2s ease;
+}
+.h-wave:hover, .h-wave:focus-visible { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amber) 55%, transparent); outline: none; }
+#h-wave-air { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.h-wave-go {
+  position: relative; width: 60px; height: 60px; flex: none; border-radius: 50%; display: grid; place-items: center;
+  background: var(--amber); color: var(--oak); box-shadow: 0 0 0 5px var(--oak-2), 0 0 0 6px color-mix(in srgb, var(--amber) 45%, transparent);
+  transition: transform .15s ease;
+}
+.h-wave-go:hover { transform: scale(1.05); }
+.h-wave-go svg { width: 24px; height: 24px; }
+.h-wave-text { position: relative; display: flex; flex-direction: column; gap: 3px; min-width: 0; }
+.h-wave-text b { font: 700 24px var(--display); letter-spacing: -0.02em; }
+.h-wave-text span { color: var(--text-2); }
+
+.h-sec { margin-top: 26px; }
+.h-head { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; margin: 0 0 12px; }
+.h-head h2 { margin: 0; font: 600 18px var(--ui); letter-spacing: -0.01em; }
+.h-more { color: var(--text-3); font-size: 13px; }
+.h-more:hover { color: var(--amber); }
+
+/* часто слушаешь: плитки в сетку */
+.h-tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 8px; }
+.h-tile { display: flex; align-items: center; gap: 12px; padding: 6px; padding-right: 12px; border-radius: 12px; background: var(--oak-2); text-align: left; min-width: 0; transition: background .15s ease; }
+.h-tile:hover { background: var(--rivet); }
+.h-tile-pic { position: relative; width: 52px; height: 52px; flex: none; border-radius: 8px; overflow: hidden; background: var(--rivet); display: grid; place-items: center; }
+.h-tile-pic img { width: 100%; height: 100%; object-fit: cover; }
+.h-tile-pic i { font: 600 16px var(--display); font-style: normal; color: var(--text-3); }
+.h-tile-pic svg { position: absolute; width: 22px; height: 22px; color: var(--text); opacity: 0; transition: opacity .15s ease; filter: drop-shadow(0 1px 3px rgb(0 0 0 / .6)); }
+.h-tile:hover .h-tile-pic svg { opacity: 1; }
+.h-tile:hover .h-tile-pic img { filter: brightness(.6); }
+.h-tile-text { display: flex; flex-direction: column; min-width: 0; }
+.h-tile-text b, .h-tile-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.h-tile-text b { font-weight: 600; }
+.h-tile-text small { color: var(--text-3); font-size: 12.5px; }
+
+/* ряды: плейлисты, артисты, друзья — листаются вбок */
+.h-row { display: flex; gap: 10px; overflow-x: auto; padding-bottom: 6px; scrollbar-width: none; scroll-snap-type: x proximity; }
+.h-row::-webkit-scrollbar { display: none; }
+.h-card { flex: none; width: 156px; display: flex; flex-direction: column; gap: 4px; text-align: left; scroll-snap-align: start; }
+.h-card-pic { width: 156px; height: 156px; border-radius: 14px; overflow: hidden; background: var(--rivet); display: grid; place-items: center; margin-bottom: 4px; transition: transform .15s ease; }
+.h-card:hover .h-card-pic { transform: translateY(-2px); }
+.h-card-pic img { width: 100%; height: 100%; object-fit: cover; }
+.h-card-pic svg { width: 40px; height: 40px; color: var(--amber); }
+.h-card b, .h-card small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.h-card b { font-weight: 600; }
+.h-card small { color: var(--text-3); font-size: 12.5px; }
+.h-artist { flex: none; width: 124px; display: flex; flex-direction: column; align-items: center; gap: 8px; scroll-snap-align: start; }
+.h-artist-pic { width: 116px; height: 116px; border-radius: 50%; overflow: hidden; background: var(--rivet); display: grid; place-items: center; box-shadow: 0 8px 22px rgb(0 0 0 / .3); transition: transform .15s ease; }
+.h-artist:hover .h-artist-pic { transform: scale(1.03); }
+.h-artist-pic img { width: 100%; height: 100%; object-fit: cover; }
+.h-artist-pic i { font: 700 32px var(--display); font-style: normal; color: var(--text-3); }
+.h-artist b { max-width: 100%; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.h-friend { flex: none; width: 250px; display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 14px; background: var(--oak-2); text-align: left; }
+.h-friend:hover { background: var(--rivet); }
+.h-friend-pic { width: 48px; height: 48px; flex: none; border-radius: 10px; overflow: hidden; background: var(--rivet); box-shadow: 0 0 0 2px var(--voice); }
+.h-friend-pic img { width: 100%; height: 100%; object-fit: cover; }
+.h-friend-text { display: flex; flex-direction: column; min-width: 0; }
+.h-friend-text b, .h-friend-text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.h-friend-text small { color: var(--text-3); font-size: 12.5px; }
+.h-empty { margin: 26px 0 0; color: var(--text-3); max-width: 52ch; }
+
+html.mobile .home { margin: 0 -16px; padding: 6px 16px 24px; }
+html.mobile .h-wave { padding: 16px; min-height: 96px; }
+html.mobile .h-tiles { grid-template-columns: 1fr; }
+html.mobile .h-card, html.mobile .h-card-pic { width: 132px; }
+html.mobile .h-card-pic { height: 132px; }

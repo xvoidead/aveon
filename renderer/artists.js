@@ -11,6 +11,7 @@ const art = {
   names: new Map(),  // ключ → имя, для артистов, которых нет в библиотеке (открыли по ссылке)
   disco: new Map(),  // ключ → { status: loading | ok | none | error, data, error }
   albums: new Map(), // ym:id → альбом с треками
+  ymHints: new Map(), // ключ → id артиста в Яндекс Музыке (из поиска), чтобы не искать по имени
 };
 
 const artistKey = (name) => String(name || '').toLowerCase().replace(/ё/g, 'е').replace(/\s+/g, ' ').trim();
@@ -194,6 +195,7 @@ function artistAlbums(artist) {
 
 // id артиста в Яндексе из треков библиотеки — так не нужно искать по имени
 function ymArtistId(artist) {
+  if (art.ymHints.has(artist.key)) return art.ymHints.get(artist.key); // открыли из поиска Яндекса
   for (const t of artist.tracks) {
     const a = t.source === 'ym' && t.ref?.artists?.find((x) => artistKey(x.name) === artist.key);
     if (a) return a.id;
@@ -368,6 +370,31 @@ async function openDiscAlbum(artist, id) {
   if (!tracks.length) { showEmpty({ title: 'Ничего не нашлось', text: 'В этом альбоме нет таких треков.' }); renderArtistChips(artist, true); return; }
   renderTracks(tracks, `${head} · ${summary(tracks)}`);
   renderArtistChips(artist, true);
+}
+
+// ---- артисты в поиске сервиса: строка карточек над найденными треками ----
+const fmtFans = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1).replace('.', ',').replace(',0', '')} млн` : n >= 1e3 ? `${Math.round(n / 1e3)} тыс.` : String(n));
+
+function renderSearchArtists(list) {
+  document.querySelector('#tracklist .search-artists')?.remove();
+  if (!list?.length) return;
+  const row = document.createElement('section');
+  row.className = 'search-artists';
+  row.setAttribute('aria-label', 'Артисты');
+  row.innerHTML = `<h3>Артисты</h3><div class="sa-row">${list.map((a, i) => `
+    <button class="sa-card" data-sa="${i}" title="${esc(a.name)}">
+      <span class="sa-pic">${a.cover ? `<img src="${esc(a.cover)}" alt="" loading="lazy">` : `<i>${esc((a.name || '?').trim()[0]?.toUpperCase() || '?')}</i>`}</span>
+      <b>${esc(a.name)}</b>
+      ${a.followers ? `<small>${fmtFans(a.followers)} ${a.source === 'ym' ? plural(a.followers, 'слушатель', 'слушателя', 'слушателей') : plural(a.followers, 'подписчик', 'подписчика', 'подписчиков')}</small>` : ''}
+    </button>`).join('')}</div>${state.shown.length ? '<h3>Треки</h3>' : ''}`;
+  $('#tracklist').prepend(row);
+  row.querySelectorAll('.sa-card').forEach((b) => {
+    b.onclick = () => {
+      const a = list[+b.dataset.sa];
+      if (a.ymId) art.ymHints.set(artistKey(a.name), a.ymId);
+      openArtist(a.name);
+    };
+  });
 }
 
 function openArtist(name) {
