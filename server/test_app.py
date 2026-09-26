@@ -396,3 +396,142 @@ def test_admin(client):
         assert client.get("/api/announce", headers=h(t_user2)).json()["notice"]["text"] == "привет"
     finally:
         srv.ADMINS.discard(login)
+
+
+# ---------- совместные плейлисты ----------
+
+def tr(i, title=None):
+    return {"id": f"ym:{i}", "source": "ym", "title": title or f"трек {i}", "artist": "a"}
+
+
+def test_collab_flow(client):
+    t1, _ = register(client)
+    t2, _ = register(client)
+    t3, _ = register(client)
+    id1, id2 = uid(client, t1), uid(client, t2)
+
+    code = client.post("/api/collab", json={"title": "  на тусу ", "tracks": [tr(1), tr(2), tr(1)]}, headers=h(t1)).json()["code"]
+    assert len(code) == 8
+    assert client.get(f"/api/collab/{code}", headers=h(t2)).status_code == 403
+    assert client.post("/api/collab/AAAAAAAA/join", headers=h(t2)).json()["error"] == "Такого плейлиста нет. Проверь код"
+
+    j = client.post(f"/api/collab/{code.lower()}/join", headers=h(t2)).json()
+    assert j["title"] == "на тусу" and [m["id"] for m in j["members"]] == [id1, id2]
+    assert [t["id"] for t in j["tracks"]] == ["ym:1", "ym:2"] and j["tracks"][0]["by"]["id"] == id1
+    rev = j["rev"]
+
+    r = client.post(f"/api/collab/{code}/tracks", json={"tracks": [tr(2), tr(3)]}, headers=h(t2)).json()
+    assert r["rev"] > rev
+    g = client.get(f"/api/collab/{code}", headers=h(t1)).json()
+    assert [t["id"] for t in g["tracks"]] == ["ym:1", "ym:2", "ym:3"] and g["tracks"][2]["by"]["id"] == id2
+
+    # чужое удалить нельзя, своё — можно; владелец — любое
+    assert client.post(f"/api/collab/{code}/remove", json={"ids": ["ym:1"]}, headers=h(t2)).status_code == 403
+    client.post(f"/api/collab/{code}/remove", json={"ids": ["ym:3"]}, headers=h(t2))
+    client.post(f"/api/collab/{code}/tracks", json={"tracks": [tr(4), tr(5)]}, headers=h(t2))
+    client.post(f"/api/collab/{code}/remove", json={"ids": ["ym:4"]}, headers=h(t1))
+
+    client.post(f"/api/collab/{code}/move", json={"id": "ym:5", "before": "ym:1"}, headers=h(t2))
+    client.post(f"/api/collab/{code}/move", json={"id": "ym:1", "before": None}, headers=h(t2))
+    assert [t["id"] for t in client.get(f"/api/collab/{code}", headers=h(t1)).json()["tracks"]] == ["ym:5", "ym:2", "ym:1"]
+
+    assert client.patch(f"/api/collab/{code}", json={"title": "x"}, headers=h(t2)).status_code == 403
+    client.patch(f"/api/collab/{code}", json={"title": "вечеринка"}, headers=h(t1))
+    lst = client.get("/api/collab", headers=h(t2)).json()
+    assert lst[0]["title"] == "вечеринка" and lst[0]["count"] == 3 and lst[0]["members"] == 2
+
+    # ушёл владелец — плейлист второму; ушли все — плейлиста нет
+    client.post(f"/api/collab/{code}/leave", headers=h(t1))
+    assert client.get(f"/api/collab/{code}", headers=h(t2)).json()["owner"] == id2
+    client.post(f"/api/collab/{code}/leave", headers=h(t2))
+    assert client.post(f"/api/collab/{code}/join", headers=h(t3)).status_code == 404
+
+
+def test_collab_limits(client):
+    t1, _ = register(client)
+    big = tr(1) | {"pad": "x" * 9000}
+    assert client.post("/api/collab", json={"title": "a", "tracks": [big]}, headers=h(t1)).status_code == 413
+    assert client.post("/api/collab", json={"title": " ", "tracks": []}, headers=h(t1)).status_code == 400
+    assert client.post("/api/collab", json={"title": "a", "tracks": [{"id": "x"}]}, headers=h(t1)).status_code == 400
+
+
+# ---------- трек по ссылке (Discord) ----------
+
+def test_share_track_public_page(client):
+    token, _ = register(client)
+    track = {"id": "ym:1", "source": "ym", "title": "Трек <b>", "artist": "Арт & ко",
+             "cover": "https://avatars.yandex.net/x/400x400", "link": "https://music.yandex.ru/album/1/track/1"}
+    assert client.post("/api/share", json={"kind": "track", "data": {"track": {"id": "x"}}}, headers=h(token)).status_code == 400
+    code = client.post("/api/share", json={"kind": "track", "data": {"track": track, "room": "ABCDEF"}}, headers=h(token)).json()["code"]
+
+    pub = client.get(f"/api/share/{code}/public")
+    assert pub.status_code == 200 and pub.json()["data"]["track"]["title"] == "Трек <b>"
+    page = client.get(f"/t/{code}")
+    assert page.status_code == 200 and page.headers["content-type"].startswith("text/html")
+    body = page.text
+    assert 'property="og:title" content="Трек &lt;b&gt; — Арт &amp; ко"' in body
+    assert 'og:image" content="https://avatars.yandex.net/x/400x400"' in body
+    assert "вместе с" in body and f"aveon://track/{code}" in body and "Открыть в Яндекс Музыке" in body
+    assert "<b>" not in body.split("<body>")[1]
+
+    # альбом публично не отдаётся
+    album = client.post("/api/share", json={"kind": "album", "data": {"title": "a", "tracks": []}}, headers=h(token)).json()["code"]
+    assert client.get(f"/api/share/{album}/public").status_code == 404
+    assert client.get("/t/AAAAAAAA").status_code == 404
+
+
+# ---------- реакции в руме ----------
+
+def test_together_react(client):
+    import time as _time
+    t1, _ = register(client)
+    t2, _ = register(client)
+    a = ws_hello(client, t1)
+    b = ws_hello(client, t2)
+    try:
+        a.send_json({"t": "create"})
+        code = a.receive_json()["code"]
+        b.send_json({"t": "join", "code": code})
+        b.receive_json()
+        a.receive_json()  # members
+
+        a.send_json({"t": "react", "e": "🔥"})
+        ra, rb = a.receive_json(), b.receive_json()
+        assert ra["t"] == rb["t"] == "react" and rb["e"] == "🔥" and rb["from"] == ra["from"]
+
+        a.send_json({"t": "react", "e": "🍕"})  # не из списка — молча
+        a.send_json({"t": "react", "e": "😂"})  # сразу за 🔥 — чаще 300 мс, отбросится
+        _time.sleep(0.35)
+        a.send_json({"t": "react", "e": "🎉"})
+        assert b.receive_json()["e"] == "🎉"
+    finally:
+        a.__exit__(None, None, None)
+        b.__exit__(None, None, None)
+
+
+def test_message_edit_react_album(client):
+    t1, l1 = register(client)
+    t2, l2 = register(client)
+    id1, id2 = uid(client, t1), uid(client, t2)
+    client.post("/api/friends", json={"login": l2}, headers=h(t1))
+    client.post("/api/friends", json={"login": l1}, headers=h(t2))
+    m = client.post(f"/api/messages/{id2}", json={"text": "превет"}, headers=h(t1)).json()["message"]
+    assert m["edited"] == 0 and m["reactions"] == []
+
+    assert client.patch(f"/api/messages/{id1}/{m['id']}", json={"text": "x"}, headers=h(t2)).status_code == 403
+    e = client.patch(f"/api/messages/{id2}/{m['id']}", json={"text": "привет"}, headers=h(t1)).json()["message"]
+    assert e["text"] == "привет" and e["edited"] > 0
+
+    r = client.post(f"/api/messages/{id1}/{m['id']}/react", json={"e": "🔥"}, headers=h(t2)).json()["message"]
+    assert r["reactions"] == [{"e": "🔥", "users": [id2]}] and r["my"] == "🔥"
+    client.post(f"/api/messages/{id2}/{m['id']}/react", json={"e": "🔥"}, headers=h(t1))
+    got = client.get(f"/api/messages/{id1}", headers=h(t2)).json()["messages"][0]
+    assert got["reactions"] == [{"e": "🔥", "users": [id2, id1]}] and got["text"] == "привет"
+    r = client.post(f"/api/messages/{id1}/{m['id']}/react", json={"e": "🔥"}, headers=h(t2)).json()["message"]  # снять
+    assert r["reactions"] == [{"e": "🔥", "users": [id1]}]
+    assert client.post(f"/api/messages/{id1}/{m['id']}/react", json={"e": "🍕"}, headers=h(t2)).status_code == 400
+
+    code = client.post("/api/share", json={"kind": "album", "data": {"title": "в дорогу", "tracks": []}}, headers=h(t1)).json()["code"]
+    a = client.post(f"/api/messages/{id2}", json={"album": {"code": code, "title": "в дорогу", "count": 12}}, headers=h(t1))
+    assert a.status_code == 200 and a.json()["message"]["album"]["code"] == code
+    assert client.post(f"/api/messages/{id2}", json={"album": {"code": "nope", "title": "x"}}, headers=h(t1)).status_code == 400

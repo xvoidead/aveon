@@ -82,6 +82,7 @@ function status() {
     lastSync: a.lastSync,
     syncing: !!running,
     error: lastError,
+    keys: keysState, // синхронизация ключей сервисов: ok | nokey (войти заново) | badkey (пароль сменили на другом устройстве)
   };
 }
 
@@ -97,7 +98,9 @@ async function enter(route, server, fields) {
   ensureDevice();
   const r = await api('POST', route, { ...fields, device: os.hostname().slice(0, 64) }, { server, token: '' });
   config.setSecret('acc.token', r.token);
-  config.set({ account: { server, login: r.user.login, name: r.user.name, avatar: '', avatarAt: 0, admin: !!r.user.admin } });
+  config.setSecret('acc.key', deriveKey(fields.password, r.user.login).toString('base64'));
+  // keysSig пустой — при первой синхронизации ключи с сервера и здесь сливаются, а не затирают друг друга
+  config.set({ account: { server, login: r.user.login, name: r.user.name, avatar: '', avatarAt: 0, admin: !!r.user.admin, keysSig: '', keysAt: 0 } });
   lastStatsPushed = '';
   start();
   const changed = await sync().catch(() => null);
@@ -110,6 +113,7 @@ const login = (server, login, password) => enter('/api/auth/login', server, { lo
 async function logout() {
   if (config.getSecret('acc.token')) await api('POST', '/api/auth/logout').catch(() => {});
   config.setSecret('acc.token', '');
+  config.setSecret('acc.key', '');
   config.set({ account: { login: '', name: '' } });
   stop();
   return status();
@@ -127,6 +131,10 @@ async function rename(name) {
 
 async function changePassword(old, next) {
   await api('POST', '/api/me/password', { old, new: next });
+  // ключи сервисов на сервере перешифровываем новым паролем (остальные устройства всё равно войдут заново)
+  config.setSecret('acc.key', deriveKey(next, acc().login).toString('base64'));
+  config.set({ account: { keysAt: Date.now() } });
+  schedule();
 }
 
 async function logoutAll() {
@@ -136,6 +144,7 @@ async function logoutAll() {
 async function remove(password) {
   await api('POST', '/api/me/delete', { password });
   config.setSecret('acc.token', '');
+  config.setSecret('acc.key', '');
   config.set({ account: { login: '', name: '' } });
   stop();
   return status();
@@ -290,11 +299,12 @@ async function syncStats(docs, changed) {
 async function runSync() {
   const { docs } = await api('GET', '/api/sync');
   const doc = (kind, key) => docs.find((d) => d.kind === kind && d.key === key) || null;
-  const changed = { albums: false, settings: false, stats: false, avatar: false };
+  const changed = { albums: false, settings: false, stats: false, avatar: false, keys: false };
   await syncAlbums(doc('albums', 'main'), changed);
   await syncSettings(doc('settings', 'main'), changed);
   await syncStats(docs, changed);
   await syncAvatar(changed);
+  await syncKeys(doc('keys', 'main'), changed);
   config.set({ account: { lastSync: Date.now() } });
   return changed;
 }
@@ -346,6 +356,111 @@ function init(onEvent) {
   }
 }
 
+// ---- ключи сервисов: одинаковые на всех компьютерах ----
+// Токены Яндекс Музыки, SoundCloud и Spotify и client_id сервисов. На сервер уходят только зашифрованными
+// (AES-256-GCM) ключом из пароля от авеона — сервер и админы видят шифр. Ключ вычисляется при входе
+// и хранится здесь в защищённом хранилище Windows (acc.key). Кто вошёл до этой версии — ключа нет,
+// нужен один повторный вход.
+
+const KEY_SECRETS = ['ym.token', 'sc.token', 'sp.refresh'];
+let keysState = 'ok';
+
+function deriveKey(password, login) {
+  return crypto.scryptSync(String(password), `aveon-keys:${String(login).toLowerCase()}`, 32, { N: 16384, r: 8, p: 1 });
+}
+
+function encKey() {
+  const k = config.getSecret('acc.key');
+  return k ? Buffer.from(k, 'base64') : null;
+}
+
+function keysNow() {
+  const c = config.get();
+  return {
+    secrets: Object.fromEntries(KEY_SECRETS.map((k) => [k, config.getSecret(k) || ''])),
+    sc: { clientId: c.sc?.clientId || '', profile: c.sc?.profile || '' },
+    sp: { clientId: c.sp?.clientId || '' },
+  };
+}
+
+const keySig = (k) => crypto.createHash('sha256').update(JSON.stringify(k)).digest('hex');
+const hasAny = (k) => Object.values(k.secrets).some(Boolean) || !!(k.sc.clientId || k.sc.profile || k.sp.clientId);
+
+function seal(obj, key) {
+  const iv = crypto.randomBytes(12);
+  const c = crypto.createCipheriv('aes-256-gcm', key, iv);
+  const ct = Buffer.concat([c.update(JSON.stringify(obj), 'utf8'), c.final()]);
+  return { v: 1, iv: iv.toString('base64'), tag: c.getAuthTag().toString('base64'), ct: ct.toString('base64') };
+}
+
+function unseal(box, key) {
+  const d = crypto.createDecipheriv('aes-256-gcm', key, Buffer.from(box.iv, 'base64'));
+  d.setAuthTag(Buffer.from(box.tag, 'base64'));
+  return JSON.parse(Buffer.concat([d.update(Buffer.from(box.ct, 'base64')), d.final()]).toString('utf8'));
+}
+
+// Первый раз на этом компьютере: с сервера берём то, что там есть, своё — где там пусто
+function mergeFill(theirs, mine) {
+  const pick = (a, b) => a || b;
+  return {
+    secrets: Object.fromEntries(KEY_SECRETS.map((k) => [k, pick(theirs.secrets?.[k], mine.secrets[k])])),
+    sc: { clientId: pick(theirs.sc?.clientId, mine.sc.clientId), profile: pick(theirs.sc?.profile, mine.sc.profile) },
+    sp: { clientId: pick(theirs.sp?.clientId, mine.sp.clientId) },
+  };
+}
+
+function applyKeys(k) {
+  const was = config.getSecret('sp.refresh');
+  for (const name of KEY_SECRETS) config.setSecret(name, k.secrets?.[name] || '');
+  if ((k.secrets?.['sp.refresh'] || '') !== (was || '')) { // другой вход в Spotify — старый access-токен не годится
+    config.setSecret('sp.access', '');
+    config.set({ sp: { expires: 0 } });
+  }
+  config.set({ sc: { clientId: k.sc?.clientId || '', profile: k.sc?.profile || '' }, sp: { clientId: k.sp?.clientId || '' } });
+}
+
+async function syncKeys(remote, changed) {
+  const key = encKey();
+  if (!key) { keysState = 'nokey'; return; }
+  const first = !acc().keysSig;
+  const mine = keysNow();
+  const sig = keySig(mine);
+  if (!first && sig !== acc().keysSig) config.set({ account: { keysSig: sig, keysAt: Date.now() } }); // поменяли здесь
+  keysState = 'ok';
+  await put('keys', 'main', remote, (theirs) => {
+    let data = null;
+    if (theirs?.box) {
+      try { data = unseal(theirs.box, key); } catch { keysState = 'badkey'; return undefined; } // другой пароль
+    }
+    const now = keysNow();
+    if (first) {
+      if (!data) {
+        if (!hasAny(now)) { config.set({ account: { keysSig: keySig(now) } }); return undefined; }
+        const at = Date.now();
+        config.set({ account: { keysSig: keySig(now), keysAt: at } });
+        return { at, box: seal(now, key) };
+      }
+      const merged = mergeFill(data, now);
+      if (keySig(merged) !== keySig(now)) { applyKeys(merged); changed.keys = true; changed.settings = true; }
+      const same = keySig(merged) === keySig(data);
+      const at = same ? theirs.at : Date.now();
+      config.set({ account: { keysSig: keySig(keysNow()), keysAt: at } });
+      return same ? undefined : { at, box: seal(merged, key) };
+    }
+    const localAt = acc().keysAt || 0;
+    if (data && theirs.at >= localAt) {
+      if (theirs.at > localAt && keySig(data) !== keySig(now)) { applyKeys(data); changed.keys = true; changed.settings = true; }
+      config.set({ account: { keysSig: keySig(keysNow()), keysAt: theirs.at } });
+      return undefined;
+    }
+    if (!localAt) return undefined;
+    return { at: localAt, box: seal(now, key) };
+  });
+}
+
+// Поменяли ключ сервиса (настройки, вход в Spotify) — синхронизировать поскорее
+function keysChanged() { schedule(); }
+
 // ---- админка (server/aveon_api/admin.py) и объявление для всех ----
 
 const adminApi = {
@@ -365,5 +480,5 @@ async function announcement() {
 
 module.exports = {
   init, status, register, login, logout, logoutAll, me, rename, changePassword, remove, sync, settingsChanged,
-  sharePut, shareGet, avatarOf, setAvatar, api, adminApi, announcement,
+  sharePut, shareGet, avatarOf, setAvatar, api, adminApi, announcement, keysChanged,
 };

@@ -71,6 +71,32 @@ CREATE TABLE IF NOT EXISTS friends (
     PRIMARY KEY (user_id, friend_id)
 );
 
+-- совместные плейлисты (collab.py): живые, правки видны всем участникам
+CREATE TABLE IF NOT EXISTS collabs (
+    code       TEXT PRIMARY KEY,          -- как у share: 8 символов без 0/O/1/I
+    owner_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title      TEXT NOT NULL,
+    rev        INTEGER NOT NULL,          -- растёт при каждом изменении
+    created    INTEGER NOT NULL,
+    updated    INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS collab_members (
+    code       TEXT NOT NULL REFERENCES collabs(code) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    joined     INTEGER NOT NULL,
+    PRIMARY KEY (code, user_id)
+);
+CREATE INDEX IF NOT EXISTS collab_members_user ON collab_members(user_id);
+CREATE TABLE IF NOT EXISTS collab_tracks (
+    code       TEXT NOT NULL REFERENCES collabs(code) ON DELETE CASCADE,
+    track_id   TEXT NOT NULL,             -- id трека из плеера, например "ym:123"
+    data       TEXT NOT NULL,             -- JSON снимка трека (как в альбомах)
+    added_by   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    added_at   INTEGER NOT NULL,
+    pos        REAL NOT NULL,             -- порядок
+    PRIMARY KEY (code, track_id)
+);
+
 -- разные настройки сервера: объявление из админки и т. п.
 CREATE TABLE IF NOT EXISTS settings (
     key        TEXT PRIMARY KEY,
@@ -88,6 +114,15 @@ CREATE TABLE IF NOT EXISTS messages (
     read       INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS messages_pair ON messages(from_id, to_id, id);
+
+-- реакции на сообщения: у каждого одна на сообщение (повторное нажатие снимает)
+CREATE TABLE IF NOT EXISTS message_reactions (
+    msg_id     INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    e          TEXT NOT NULL,
+    at         INTEGER NOT NULL,
+    PRIMARY KEY (msg_id, user_id)
+);
 CREATE INDEX IF NOT EXISTS messages_unread ON messages(to_id, read);
 
 -- что сейчас играет у пользователя: видят только его друзья
@@ -130,5 +165,10 @@ def init() -> None:
             conn.execute("ALTER TABLE users ADD COLUMN avatar TEXT NOT NULL DEFAULT ''")
         if "avatar_at" not in cols:
             conn.execute("ALTER TABLE users ADD COLUMN avatar_at INTEGER NOT NULL DEFAULT 0")
+        mcols = {r["name"] for r in conn.execute("PRAGMA table_info(messages)")}
+        if "edited" not in mcols:  # когда сообщение изменили, 0 — не меняли
+            conn.execute("ALTER TABLE messages ADD COLUMN edited INTEGER NOT NULL DEFAULT 0")
+        if "album" not in mcols:  # альбом в сообщении: {code, title, count, cover} — код из share.py
+            conn.execute("ALTER TABLE messages ADD COLUMN album TEXT")
         if "banned" not in cols:  # админка: заблокированный не может войти
             conn.execute("ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0")

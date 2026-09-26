@@ -225,6 +225,7 @@ function registerIpc() {
     config.set(patch);
     if (patch.duck?.targets) duck.setTargets(config.get().duck.targets);
     account.settingsChanged(patch);
+    if (patch.sc || patch.sp) account.keysChanged(); // client_id сервисов — тоже ключи
     if (patch.discord) discord.settingsChanged();
     if (patch.friends) friends.settingsChanged();
     if (patch.cache) cache.settingsChanged();
@@ -239,6 +240,7 @@ function registerIpc() {
     config.setSecret(key, value);
     if (key === 'ym.token') ym.reset();
     matchCache.clear();
+    account.keysChanged(); // ключи сервисов синхронизируются между компьютерами
     return config.publicView();
   });
 
@@ -269,8 +271,8 @@ function registerIpc() {
   handle('share:get', (code) => account.shareGet(code));
 
   handle('sc:discover', () => sc.discoverClientId());
-  handle('sp:connect', () => sp.connect());
-  handle('sp:disconnect', () => sp.disconnect());
+  handle('sp:connect', async () => { const r = await sp.connect(); account.keysChanged(); return r; });
+  handle('sp:disconnect', () => { const r = sp.disconnect(); account.keysChanged(); return r; });
   handle('sp:status', () => sp.status());
   handle('sp:redirect', () => sp.REDIRECT);
 
@@ -368,6 +370,8 @@ function registerIpc() {
   handle('adm:notify', (id, text) => account.adminApi.notify(id, text));
   handle('acc:announcement', () => account.announcement());
   handle('fr:send', (id, body) => friends.send(id, body));
+  handle('fr:edit', (id, msg, text) => friends.edit(id, msg, text));
+  handle('fr:react', (id, msg, e) => friends.react(id, msg, e));
   handle('fr:unknock', (id) => friends.unknock(id));
   handle('fr:avatar', (userId, at) => account.avatarOf(userId, at));
   ipcMain.on('fr:now', (e, p) => friends.now(p));
@@ -532,6 +536,7 @@ app.whenReady().then(() => {
   account.init((ev) => {
     if (ev.changed?.albums) local.allowFiles(albums.localPaths());
     if (ev.changed?.settings) duck.setTargets(config.get().duck.targets);
+    if (ev.changed?.keys) { ym.reset(); matchCache.clear(); } // пришли ключи сервисов с другого компьютера
     send('account:event', ev);
   });
 });

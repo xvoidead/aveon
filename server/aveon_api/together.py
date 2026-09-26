@@ -11,6 +11,7 @@
     join   {code}                    войти в руму
     state  {state, beat?}            новое состояние; отправитель становится ведущим
     ping   {c}                       сверка часов: c — время клиента
+    react  {e}                       реакция: одна из REACTS, не чаще раза в 300 мс
     leave  {}
   сервер → клиент
     hello   {you, now}
@@ -18,6 +19,7 @@
     state   {state, driver, by, beat, now}
     members {members, driver, joined?, left?}
     pong    {c, s}
+    react   {e, by, from, now}       всем в руме, включая отправителя; состояние румы не меняется
     error   {error}
 """
 from __future__ import annotations
@@ -35,6 +37,8 @@ router = APIRouter()
 CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"  # без 0/O и 1/I, чтобы код легко продиктовать
 CODE_LEN = 6
 MAX_MEMBERS = 10
+REACTS = {"🔥", "😍", "😂", "🎉", "👏", "💀", "🥁", "🛢"}
+REACT_GAP = 0.3  # с между реакциями одного участника
 MAX_MESSAGE = 64 * 1024
 
 
@@ -49,6 +53,7 @@ class Member:
     name: str
     ws: WebSocket
     avatar_at: int = 0  # 0 — аватара нет; сам аватар плеер берёт из /api/avatar/{user}
+    last_react: float = 0.0  # когда отправил последнюю реакцию — не чаще раза в 300 мс
 
 
 @dataclass
@@ -178,6 +183,13 @@ async def together(ws: WebSocket):
                 room.driver = member.id
                 await broadcast(room, {"t": "state", "state": st, "driver": member.id, "by": member.name,
                                        "beat": bool(msg.get("beat")), "now": now_ms()}, skip=member.id)
+
+            elif kind == "react" and room:
+                e = msg.get("e")
+                t = time.monotonic()
+                if e in REACTS and t - member.last_react >= REACT_GAP:
+                    member.last_react = t
+                    await broadcast(room, {"t": "react", "e": e, "by": member.name, "from": member.id, "now": now_ms()})
 
             elif kind == "leave":
                 await leave(room, member)

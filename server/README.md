@@ -65,6 +65,11 @@ sudo systemctl enable --now aveon-api
 ```nginx
 server {
     server_name aveon.example.ru;
+    # /t/ — публичная страница трека: из неё Discord берёт превью ссылки
+    location /t/ {
+        proxy_pass http://127.0.0.1:8787;
+        proxy_set_header Host $host;
+    }
     location /api/ {
         proxy_pass http://127.0.0.1:8787;
         proxy_set_header Host $host;
@@ -114,12 +119,37 @@ server {
 | `POST` | `/api/messages/{id}` | `{text?, track?}` — сообщение другу; в списке друзей у каждого `unread` и `last` |
 | `PUT` | `/api/now` | `{track, playing, pos}`; `track: null` — ничего не играет |
 
+## совместные плейлисты
+
+Живой плейлист по коду из 8 символов: несколько человек добавляют треки, правки видны всем. До 20 участников
+и 2000 треков, снимок трека — до 8 КБ. Клиент опрашивает `GET /api/collab/{code}` раз в 15 с и перерисовывает
+список, когда меняется `rev`. Подробности — в начале `aveon_api/collab.py`.
+
+| метод | путь | что делает |
+|---|---|---|
+| `POST` | `/api/collab` | `{title, tracks}` → `{code}`; создатель сразу участник |
+| `GET` | `/api/collab` | плейлисты, где я участник: `[{code, title, count, members, updated, rev}]` |
+| `GET` | `/api/collab/{code}` | `{code, title, owner, rev, updated, members, tracks}` — только участникам |
+| `POST` | `/api/collab/{code}/join` | войти по коду, ответ как у `GET` |
+| `POST` | `/api/collab/{code}/tracks` | `{tracks}` → `{rev}`; в конец, дубликаты пропускаются |
+| `POST` | `/api/collab/{code}/remove` | `{ids}` → `{rev}`; убрать может добавивший или владелец |
+| `POST` | `/api/collab/{code}/move` | `{id, before}` → `{rev}`; `before: null` — в конец |
+| `PATCH` | `/api/collab/{code}` | `{title}` → `{rev}`; только владелец |
+| `POST` | `/api/collab/{code}/leave` | ушёл владелец — плейлист самому раннему участнику; никого нет — удаляется |
+
+## трек по ссылке (превью в Discord)
+
+`POST /api/share` с `kind: "track"` и `data: {track, room?}` (до 16 КБ) даёт код. Ссылка
+`https://{сервер}/t/{code}` открывает публичную страницу без входа: обложка, название, «Открыть в авеоне»
+(`aveon://track/{code}`) и в сервисе трека. В `<head>` — теги `og:*`, по ним Discord строит карточку.
+`GET /api/share/{code}/public` отдаёт трек без авторизации (только `kind == "track"`).
+
 ## слушать вместе
 
 WebSocket `/api/together`: румы с кодом из 6 символов, до 10 человек. Сервер пересылает состояние
 (трек, играет/пауза, позиция и серверное время) и отдаёт его тем, кто вошёл позже. Звук сервер не передаёт:
 каждый плеер играет трек сам. Румы живут в памяти и исчезают, когда из них вышли все.
-Протокол описан в начале `aveon_api/together.py`. Нужен пакет `websockets` (есть в requirements.txt).
+Протокол описан в начале `aveon_api/together.py`. Реакции: `react {e}` — одна из 🔥 😍 😂 🎉 👏 💀 🥁 🛢, не чаще раза в 300 мс; сервер рассылает всем в руме. Нужен пакет `websockets` (есть в requirements.txt).
 
 Пароли хранятся как scrypt-хеши, токены — как sha256, сессия живёт 90 дней с последнего запроса.
 

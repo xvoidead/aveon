@@ -281,6 +281,8 @@ const api = {
     messages: call((id, before) => friends.messages(id, before)),
     profile: call((id) => friends.profile(id)),
     send: call((id, body) => friends.send(id, body)),
+    edit: call((id, msg, text) => friends.edit(id, msg, text)),
+    react: call((id, msg, e) => friends.react(id, msg, e)),
     unknock: call((id) => friends.unknock(id)),
     avatar: call((userId, at) => account.avatarOf(userId, at)),
     now: (p) => { ready.then(() => friends.now(clone(p))); },

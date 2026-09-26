@@ -237,12 +237,12 @@ function renderTogether() {
   togetherEl.innerHTML = `
     <h2 class="together-title">Рума</h2>
     <button class="together-code" id="tg-copy" title="Скопировать код">
-      <span>${esc(r.code)}</span><svg><use href="#i-copy"/></svg>
+      <span>${emo(r.code)}</span><svg><use href="#i-copy"/></svg>
     </button>
     <p class="together-desc">${r.members.length > 1 ? 'Слушаете вместе. Любой может сменить трек, поставить паузу или перемотать.' : 'Отправь этот код другу — пусть введёт его у себя в «Слушать вместе».'}</p>
     <ul class="together-members">
       ${r.members.map((m) => `<li>${avatarHtml(m)}
-        <span class="together-name">${esc(m.name)}${m.id === r.you ? ' <em>ты</em>' : ''}</span>
+        <span class="together-name">${emo(m.name)}${m.id === r.you ? ' <em>ты</em>' : ''}</span>
         ${m.id === lead && r.members.length > 1 ? '<span class="together-lead">ведёт</span>' : ''}</li>`).join('')}
     </ul>
     ${r.connected ? '' : '<p class="together-note warn">Связь пропала, переподключаюсь…</p>'}
@@ -312,3 +312,21 @@ document.addEventListener('keydown', (e) => {
 // после перезапуска окна (dev) — вернуть состояние румы
 renderTogetherChip();
 api.together.status().then((r) => { Together.room = r; renderTogetherChip(); }).catch(() => {});
+
+// ---- плеер снизу или сверху: плашка румы — внутри плашки звонка, одной капсулой ----
+// Экономит место: слева рума (лица или значок), справа — звонок. Не в звонке — только рума.
+// Плашку звонка убрали в настройках (#discord скрыт) — рума остаётся на своём месте.
+const chipHome = { parent: togetherBtn.parentElement, next: togetherBtn.nextElementSibling };
+function placeTogetherChip() {
+  const call = $('#discord');
+  const html = document.documentElement.classList;
+  const dock = html.contains('dock-bottom') || html.contains('dock-top');
+  const inside = togetherBtn.parentElement === call;
+  if (dock && call && !call.hidden) {
+    if (!inside) call.prepend(togetherBtn);
+  } else if (inside) {
+    chipHome.parent.insertBefore(togetherBtn, chipHome.next);
+  }
+}
+new MutationObserver(placeTogetherChip).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+placeTogetherChip();

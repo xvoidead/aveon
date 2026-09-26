@@ -95,11 +95,11 @@ function friendStatus(f) {
   if (n.playing) {
     const dur = n.track.duration || 0;
     const pct = dur ? Math.min(100, (friendPos(n) / dur) * 100) : 0;
-    return `<small class="fr-status live"><svg><use href="#i-play"/></svg><span>${esc(trackLine(n.track))}</span></small>
+    return `<small class="fr-status live"><svg><use href="#i-play"/></svg><span>${emo(trackLine(n.track))}</span></small>
       ${dur ? `<span class="fr-bar"><i data-fr-bar="${f.id}" style="width:${pct.toFixed(1)}%"></i></span>` : ''}`;
   }
   if (n.live) return `<small class="fr-status"><span>на паузе · ${esc(trackLine(n.track))}</span></small>`;
-  return `<small class="fr-status"><span>${esc(trackLine(n.track))} · ${esc(friendAgo(n))}</span></small>`;
+  return `<small class="fr-status"><span>${emo(trackLine(n.track))} · ${esc(friendAgo(n))}</span></small>`;
 }
 
 function friendItem(f) {
@@ -107,7 +107,7 @@ function friendItem(f) {
   return `<li class="fr-item">
     <button class="fr-main" data-fr-open="${f.id}" title="Профиль ${esc(f.name)}">
       ${frAvatarHtml(f, !!n?.playing)}
-      <span class="fr-text"><b class="fr-name"><span>${esc(f.name)}</span>${f.in_room ? '<em class="fr-tag">в руме</em>' : ''}</b>${friendStatus(f)}</span>
+      <span class="fr-text"><b class="fr-name"><span>${emo(f.name)}</span>${f.in_room ? '<em class="fr-tag">в руме</em>' : ''}</b>${friendStatus(f)}</span>
     </button>
     <button class="icon-btn small fr-chat-btn" data-fr-chat="${f.id}" aria-label="Написать" title="Написать"><svg><use href="#i-chat"/></svg>${f.unread ? `<i class="fr-unread${f.unread > (Friends.unreadWas.get(f.id) || 0) ? ' pop' : ''}">${f.unread > 9 ? '9+' : f.unread}</i>` : ''}</button>
     ${roomButton(f)}
@@ -122,7 +122,7 @@ function requestItem(p, kind) {
        <button class="icon-btn small" data-fr-remove="${p.id}" aria-label="Отклонить" title="Отклонить"${busy}><svg><use href="#i-close"/></svg></button>`
     : `<button class="icon-btn small" data-fr-remove="${p.id}" aria-label="Отозвать заявку" title="Отозвать заявку"${busy}><svg><use href="#i-close"/></svg></button>`;
   return `<li class="fr-item fr-request">
-    <span class="fr-main static">${frAvatarHtml(p)}<span class="fr-text"><b>${esc(p.name)}</b><small class="fr-status">@${esc(p.login)}</small></span></span>
+    <span class="fr-main static">${frAvatarHtml(p)}<span class="fr-text"><b>${emo(p.name)}</b><small class="fr-status">@${esc(p.login)}</small></span></span>
     ${actions}
   </li>`;
 }
@@ -143,7 +143,7 @@ function roomButton(f) {
 
 function knockItem(p) {
   return `<li class="fr-item fr-request">
-    <span class="fr-main static">${frAvatarHtml(p)}<span class="fr-text"><b>${esc(p.name)}</b><small class="fr-status">просится к тебе</small></span></span>
+    <span class="fr-main static">${frAvatarHtml(p)}<span class="fr-text"><b>${emo(p.name)}</b><small class="fr-status">просится к тебе</small></span></span>
     <button class="btn primary fr-btn" data-fr-letin="${p.id}">Пустить</button>
     <button class="icon-btn small" data-fr-unknock="${p.id}" aria-label="Не пускать" title="Не пускать"><svg><use href="#i-close"/></svg></button>
   </li>`;
@@ -152,7 +152,7 @@ function knockItem(p) {
 function inviteItem(p) {
   const here = Together.room?.code === p.code;
   return `<li class="fr-item fr-request">
-    <span class="fr-main static">${frAvatarHtml(p)}<span class="fr-text"><b>${esc(p.name)}</b><small class="fr-status">рума ${esc(p.code)}</small></span></span>
+    <span class="fr-main static">${frAvatarHtml(p)}<span class="fr-text"><b>${emo(p.name)}</b><small class="fr-status">рума ${esc(p.code)}</small></span></span>
     ${here ? '<small class="fr-status">ты уже там</small>' : `<button class="btn primary fr-btn" data-fr-join="${p.id}">Войти</button>`}
     <button class="icon-btn small" data-fr-dismiss="${p.id}" aria-label="Не пойду" title="Не пойду"><svg><use href="#i-close"/></svg></button>
   </li>`;
@@ -180,7 +180,7 @@ function renderFriends() {
   let body;
   if (!d) {
     body = Friends.error
-      ? `<p class="together-note warn">${esc(Friends.error)}</p>`
+      ? `<p class="together-note warn">${emo(Friends.error)}</p>`
       : '<div class="spinner small"></div>';
   } else {
     const listening = d.friends.filter((f) => f.now?.playing).length;
@@ -198,7 +198,7 @@ function renderFriends() {
         : '<p class="together-desc fr-empty">Пока никого. Добавь друга по логину — здесь будет видно, кто что слушает, и любой трек можно включить у себя.</p>'}
       ${d.outgoing.length ? `<h3 class="fr-sub">Ждут ответа <span>${d.outgoing.length}</span></h3>
         <ul class="fr-list">${d.outgoing.map((p) => requestItem(p, 'out')).join('')}</ul>` : ''}
-      ${Friends.error ? `<p class="together-note warn">${esc(Friends.error)}</p>` : ''}`;
+      ${Friends.error ? `<p class="together-note warn">${emo(Friends.error)}</p>` : ''}`;
   }
   const sharing = state.cfg.friends?.share !== false;
   friendsEl.innerHTML = `
@@ -574,12 +574,20 @@ async function loadChat(older = false) {
       Chat.messages = [...messages, ...Chat.messages];
       Chat.more = messages.length >= 50;
     } else {
-      // новые дописываем, уже показанные не трогаем
+      // новые дописываем; у уже показанных подхватываем правки и реакции
+      const got = new Map(messages.map((m) => [m.id, m]));
+      let changed = false;
+      Chat.messages = Chat.messages.map((m) => {
+        const n = got.get(m.id);
+        if (!n || msgSig(n) === msgSig(m)) return m;
+        changed = true;
+        return n;
+      });
       const known = new Set(Chat.messages.map((m) => m.id));
       const fresh = messages.filter((m) => !known.has(m.id));
       const first = !Chat.messages.length;
       if (first) Chat.more = messages.length >= 50;
-      if (!fresh.length && !first) return;
+      if (!fresh.length && !first && !changed) return;
       Chat.messages = [...Chat.messages, ...fresh].sort((a, b) => a.id - b.id);
     }
     Chat.error = '';
@@ -599,16 +607,32 @@ function msgTime(sec) {
 }
 
 // Одно сообщение. enter — выезжает (новое); delay — задержка для лесенки при открытии чата
-function msgHtml(m, { enter = false, delay = 0 } = {}) {
-  const t = m.track;
-  const cover = t?.cover && /^https?:/i.test(t.cover) ? `<img src="${esc(t.cover)}" alt="">` : '<span>♪</span>';
-  const cls = `${m.mine ? ' mine' : ''}${enter ? ' enter' : ''}${m.pending ? ' pending' : ''}`;
-  return `<div class="fr-msg${cls}" data-mid="${esc(String(m.id))}"${delay ? ` style="--d:${delay}ms"` : ''} title="${esc(m.pending ? 'отправляется…' : msgTime(m.created))}">
-    ${t ? `<button class="fr-track" data-msg-play title="Включить у себя">
-      <span class="fr-track-cover">${cover}</span>
-      <span class="fr-track-text"><b>${esc(t.title)}</b><small>${esc(t.artist || '')}</small></span>
+const MSG_REACTIONS = ['❤️', '🔥', '😂', '😍', '👍', '👏', '😢', '💀'];
+// подпись содержимого: поменялось (изменили, отреагировали) — узел перерисовываем на месте
+const msgSig = (m) => JSON.stringify([m.text, m.edited, m.reactions, m.my, m.album, !!m.pending]);
+
+function msgInner(m) {
+  const t = m.track, a = m.album;
+  const coverOf = (url) => (url && /^https?:/i.test(url) ? `<img src="${esc(url)}" alt="">` : '<span>♪</span>');
+  return `${t ? `<button class="fr-track" data-msg-play title="Включить у себя">
+      <span class="fr-track-cover">${coverOf(t.cover)}</span>
+      <span class="fr-track-text"><b>${emo(t.title)}</b><small>${emo(t.artist || '')}</small></span>
       <svg><use href="#i-play"/></svg></button>` : ''}
-    ${m.text ? `<p>${esc(m.text)}</p>` : ''}
+    ${a ? `<button class="fr-track fr-album" data-msg-album title="Добавить альбом себе">
+      <span class="fr-track-cover">${coverOf(a.cover)}</span>
+      <span class="fr-track-text"><b>${emo(a.title)}</b><small>альбом · ${a.count} ${plural(a.count, 'трек', 'трека', 'треков')}</small></span>
+      <span class="fr-album-add">добавить</span></button>` : ''}
+    ${m.text ? `<p>${emo(m.text)}</p>` : ''}
+    ${m.edited || m.reactions?.length ? `<div class="msg-foot">
+      ${(m.reactions || []).map((r) => `<button class="msg-react${r.e === m.my ? ' mine' : ''}" data-react="${esc(r.e)}" title="${r.e === m.my ? 'Убрать реакцию' : 'Тоже'}">${emo(r.e)}${r.users.length > 1 ? `<b>${r.users.length}</b>` : ''}</button>`).join('')}
+      ${m.edited ? '<span class="msg-edited">изменено</span>' : ''}</div>` : ''}
+    ${m.pending ? '' : '<button class="msg-more" data-msg-more aria-label="Действия" title="Реакция, копировать, изменить"><svg><use href="#i-more"/></svg></button>'}`;
+}
+
+function msgHtml(m, { enter = false, delay = 0 } = {}) {
+  const cls = `${m.mine ? ' mine' : ''}${enter ? ' enter' : ''}${m.pending ? ' pending' : ''}`;
+  return `<div class="fr-msg${cls}" data-mid="${esc(String(m.id))}" data-sig="${esc(msgSig(m))}"${delay ? ` style="--d:${delay}ms"` : ''} title="${esc(m.pending ? 'отправляется…' : msgTime(m.created))}">
+    ${msgInner(m)}
   </div>`;
 }
 
@@ -645,6 +669,8 @@ function buildChat(f) {
       <span class="fr-text"></span>
     </div>
     <div class="fr-scroll fr-msgs"></div>
+    <div class="fr-editbar" id="fr-editbar" hidden><svg><use href="#i-pencil"/></svg><span>Изменение сообщения</span>
+      <button type="button" class="icon-btn small" id="fr-edit-cancel" aria-label="Не менять" title="Не менять (Esc)"><svg><use href="#i-close"/></svg></button></div>
     <form class="fr-compose" id="fr-compose" autocomplete="off">
       <button type="button" class="icon-btn small" id="fr-attach" aria-label="Отправить, что сейчас играет"><svg><use href="#i-share"/></svg></button>
       <input class="input" id="fr-text" maxlength="2000" placeholder="сообщение" aria-label="Сообщение">
@@ -654,9 +680,12 @@ function buildChat(f) {
   const input = $('#fr-text', friendsEl);
   $('#fr-back', friendsEl).onclick = closeChat;
   $('#fr-attach', friendsEl).onclick = () => { if (state.track) sendMessage(Chat.id, { track: shareable(state.track) }); };
+  $('#fr-edit-cancel', friendsEl).onclick = () => stopEdit(true);
+  input.addEventListener('keydown', (e) => { if (e.key === 'Escape' && Chat.editing) { e.stopPropagation(); stopEdit(true); } });
   $('#fr-compose', friendsEl).onsubmit = (e) => {
     e.preventDefault();
     const text = input.value.trim();
+    if (Chat.editing) { saveEdit(text); return; }
     if (!text) { input.focus(); return; }
     input.value = '';
     sendMessage(Chat.id, { text }).then((ok) => {
@@ -664,24 +693,35 @@ function buildChat(f) {
       input.focus();
     });
   };
+  const msgOf = (el) => { const node = el?.closest('[data-mid]'); return node && Chat.messages.find((x) => String(x.id) === node.dataset.mid); };
   list.onclick = (e) => {
     if (e.target.closest('#fr-older')) { loadChat(true); return; }
-    const node = e.target.closest('[data-msg-play]')?.closest('[data-mid]');
-    const m = node && Chat.messages.find((x) => String(x.id) === node.dataset.mid);
-    if (m?.track) { playShared(m.track); toast(`Включаю «${m.track.title}»`); }
+    const m = msgOf(e.target);
+    if (!m) return;
+    const r = e.target.closest('[data-react]');
+    if (r) { reactMsg(m, r.dataset.react); return; }
+    if (e.target.closest('[data-msg-more]')) { const b = e.target.closest('[data-msg-more]').getBoundingClientRect(); openMsgMenu(m, b.left, b.bottom + 6); return; }
+    if (e.target.closest('[data-msg-album]') && m.album) { importShare(`aveon:${m.album.code}`); return; } // share.js
+    if (e.target.closest('[data-msg-play]') && m.track) { playShared(m.track); toast(`Включаю «${m.track.title}»`); }
+  };
+  list.oncontextmenu = (e) => {
+    const m = msgOf(e.target);
+    if (!m || m.pending) return;
+    e.preventDefault();
+    openMsgMenu(m, e.clientX, e.clientY);
   };
   playViewAnim();
   updateChat(f, $('.fr-chat-head', friendsEl));
 }
 
 function chatStateHtml(f) {
-  if (Chat.error) return `<p class="together-note warn">${esc(Chat.error)}</p>`;
+  if (Chat.error) return `<p class="together-note warn">${emo(Chat.error)}</p>`;
   if (Chat.loading || Chat.firstLoad) return '<div class="spinner small"></div>';
   return `<p class="together-desc fr-empty">Напиши ${esc(firstName(f.name))} или отправь, что сейчас играет.</p>`;
 }
 
 function updateChat(f, head) {
-  $('.fr-text', head).innerHTML = `<b>${esc(f.name)}</b>${friendStatus(f)}`;
+  $('.fr-text', head).innerHTML = `<b>${emo(f.name)}</b>${friendStatus(f)}`;
   const now = state.track;
   const attach = $('#fr-attach', friendsEl);
   attach.disabled = !now;
@@ -728,6 +768,8 @@ function updateChat(f, head) {
       if (node.dataset.mid !== id) node.dataset.mid = id; // «отправляется…» стало настоящим
       node.classList.toggle('pending', !!m.pending);
       node.title = m.pending ? 'отправляется…' : msgTime(m.created);
+      const sig = msgSig(m);
+      if (node.dataset.sig !== sig) { node.innerHTML = msgInner(m); node.dataset.sig = sig; } // изменили или отреагировали
     } else {
       node = msgNode(m, { enter: !Chat.shown.has(m.id) });
       list.insertBefore(node, next || $('.together-note', list));
@@ -744,7 +786,7 @@ function updateChat(f, head) {
   }
   syncOlder(list);
   let note = $('.together-note', list);
-  if (Chat.error && !note) list.insertAdjacentHTML('beforeend', `<p class="together-note warn">${esc(Chat.error)}</p>`);
+  if (Chat.error && !note) list.insertAdjacentHTML('beforeend', `<p class="together-note warn">${emo(Chat.error)}</p>`);
   else if (note && !Chat.error) note.remove();
   else if (note) note.textContent = Chat.error;
 
@@ -875,7 +917,7 @@ function renderFriendProfile() {
     const state = n.playing ? 'слушает сейчас' : n.live ? 'на паузе' : `последний трек · ${friendAgo(n)}`;
     nowHtml = `<div class="fp-now${n.playing ? ' live' : ''}">
       ${fpCover(n.track, 'fp-now-cover')}
-      <div class="fp-now-text"><small>${esc(state)}</small><b>${esc(n.track.title)}</b><span>${esc(n.track.artist || '')}</span>
+      <div class="fp-now-text"><small>${emo(state)}</small><b>${emo(n.track.title)}</b><span>${emo(n.track.artist || '')}</span>
         ${n.playing && n.track.duration ? `<span class="fr-bar"><i data-fr-bar="${f.id}" style="width:${Math.min(100, (friendPos(n) / n.track.duration) * 100).toFixed(1)}%"></i></span>` : ''}
       </div>
       <div class="fp-now-actions">
@@ -889,21 +931,21 @@ function renderFriendProfile() {
 
   let statsHtml;
   if (!d) {
-    statsHtml = FP.error ? `<p class="together-note warn">${esc(FP.error)}</p>` : '<div class="spinner small"></div>';
+    statsHtml = FP.error ? `<p class="together-note warn">${emo(FP.error)}</p>` : '<div class="spinner small"></div>';
   } else {
     const s = d.stats;
     statsHtml = !s.total ? '<p class="together-desc">Статистики пока нет — или слушает без аккаунта на этом сервере.</p>' : `
       <div class="fp-nums">
-        <div><b>${esc(fpDuration(s.month))}</b><small>в этом месяце</small></div>
-        <div><b>${esc(fpDuration(s.total))}</b><small>всего</small></div>
+        <div><b>${emo(fpDuration(s.month))}</b><small>в этом месяце</small></div>
+        <div><b>${emo(fpDuration(s.total))}</b><small>всего</small></div>
         <div><b>${s.days}</b><small>${plural(s.days, 'день', 'дня', 'дней')} с музыкой</small></div>
       </div>
       ${s.artists.length ? `<h3 class="fr-sub">Любимые артисты</h3>
-        <div class="fp-artists">${s.artists.map((a) => `<span title="${esc(fpDuration(a.sec))}">${esc(a.name)}</span>`).join('')}</div>` : ''}
+        <div class="fp-artists">${s.artists.map((a) => `<span title="${esc(fpDuration(a.sec))}">${emo(a.name)}</span>`).join('')}</div>` : ''}
       ${s.tracks.length ? `<h3 class="fr-sub">Любимые треки</h3>
         <div class="fp-tracks">${s.tracks.map((x, i) => `<button class="fr-track" data-fp-play="${i}" title="Включить у себя">
           ${fpCover(x.track)}
-          <span class="fr-track-text"><b>${esc(x.track.title)}</b><small>${esc(x.track.artist || '')} · ${x.plays} ${plural(x.plays, 'раз', 'раза', 'раз')}</small></span>
+          <span class="fr-track-text"><b>${emo(x.track.title)}</b><small>${emo(x.track.artist || '')} · ${x.plays} ${plural(x.plays, 'раз', 'раза', 'раз')}</small></span>
           <svg><use href="#i-play"/></svg></button>`).join('')}</div>` : ''}`;
   }
 
@@ -916,13 +958,13 @@ function renderFriendProfile() {
       <div class="fp-hero">
         ${frAvatarHtml(f, !!n?.playing).replace('fr-avatar', 'fr-avatar fp-avatar')}
         <div class="fp-who">
-          <h2 class="fr-name"><span>${esc(f.name)}</span>${f.in_room ? '<em class="fr-tag">в руме</em>' : ''}</h2>
+          <h2 class="fr-name"><span>${emo(f.name)}</span>${f.in_room ? '<em class="fr-tag">в руме</em>' : ''}</h2>
           <small>@${esc(f.login)}${f.since ? ` · друзья с ${esc(fpDate(f.since))}` : ''}</small>
         </div>
       </div>
       <div class="fp-actions">
         <button class="btn primary" id="fp-chat"><svg><use href="#i-chat"/></svg>Написать${f.unread ? ` <i class="fr-unread static">${f.unread}</i>` : ''}</button>
-        <button class="btn" id="fp-room"${act === 'knock' && Friends.knocked.has(f.id) ? ' disabled' : ''}><svg><use href="#i-${act === 'knock' ? 'enter' : 'together'}"/></svg>${esc(roomLabel)}</button>
+        <button class="btn" id="fp-room"${act === 'knock' && Friends.knocked.has(f.id) ? ' disabled' : ''}><svg><use href="#i-${act === 'knock' ? 'enter' : 'together'}"/></svg>${emo(roomLabel)}</button>
         <button class="icon-btn small" id="fp-more" aria-label="Ещё" aria-haspopup="menu"><svg><use href="#i-more"/></svg></button>
       </div>
       ${nowHtml}
@@ -943,4 +985,93 @@ function renderFriendProfile() {
       if (x) { playShared(x.track); toast(`Включаю «${x.track.title}»`); }
     };
   });
+}
+
+
+// ---------- действия с сообщением: реакции, копировать, изменить ----------
+
+async function reactMsg(m, e) {
+  if (m.pending) return;
+  try {
+    const { message } = await api.friends.react(Chat.id, m.id, e);
+    Chat.messages = Chat.messages.map((x) => (x.id === message.id ? message : x));
+    renderFriends();
+  } catch (err) { toast(err.message, 'err'); }
+}
+
+function msgCopyText(m) {
+  if (m.text) return m.text;
+  if (m.track) return `${m.track.title}${m.track.artist ? ` — ${m.track.artist}` : ''}${m.track.link ? ` ${m.track.link}` : ''}`;
+  if (m.album) return `aveon:${m.album.code}`;
+  return '';
+}
+
+let msgMenu = null;
+function closeMsgMenu() {
+  msgMenu?.remove();
+  msgMenu = null;
+}
+
+function openMsgMenu(m, x, y) {
+  closeMsgMenu();
+  const el = document.createElement('div');
+  el.className = 'msg-menu';
+  el.setAttribute('role', 'menu');
+  el.innerHTML = `<div class="msg-menu-reacts">${MSG_REACTIONS.map((e) => `<button class="${e === m.my ? 'on' : ''}" data-e="${esc(e)}" title="${e === m.my ? 'Убрать' : ''}">${emo(e)}</button>`).join('')}</div>
+    <button class="menu-item" data-act="copy"><svg><use href="#i-copy"/></svg><span>Копировать</span></button>
+    ${m.mine && !m.album ? '<button class="menu-item" data-act="edit"><svg><use href="#i-pencil"/></svg><span>Изменить</span></button>' : ''}`;
+  document.body.append(el);
+  msgMenu = el;
+  const w = el.offsetWidth, h = el.offsetHeight;
+  el.style.left = `${Math.min(Math.max(8, x), innerWidth - w - 8)}px`;
+  el.style.top = `${y + h > innerHeight - 8 ? Math.max(8, y - h) : y}px`;
+  el.onclick = async (e) => {
+    const r = e.target.closest('[data-e]');
+    const act = e.target.closest('[data-act]')?.dataset.act;
+    if (!r && !act) return;
+    closeMsgMenu();
+    if (r) reactMsg(m, r.dataset.e);
+    else if (act === 'copy') { if (await copyText(msgCopyText(m))) toast('Скопировано'); }
+    else if (act === 'edit') startEdit(m);
+  };
+}
+document.addEventListener('pointerdown', (e) => { if (msgMenu && !msgMenu.contains(e.target)) closeMsgMenu(); }, true);
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && msgMenu) { e.stopPropagation(); closeMsgMenu(); } }, true);
+
+// Изменение — как в Telegram: текст в поле ввода, над ним полоса «Изменение сообщения»
+function startEdit(m) {
+  Chat.editing = m.id;
+  const input = $('#fr-text', friendsEl);
+  $('#fr-editbar', friendsEl).hidden = false;
+  $('.fr-send', friendsEl).textContent = 'Сохранить';
+  Chat.draft = input.value;
+  input.value = m.text || '';
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+  $(`.fr-msg[data-mid="${m.id}"]`, friendsEl)?.classList.add('editing');
+}
+
+function stopEdit(restore) {
+  const id = Chat.editing;
+  Chat.editing = null;
+  const input = $('#fr-text', friendsEl);
+  if (!input) return;
+  $('#fr-editbar', friendsEl).hidden = true;
+  $('.fr-send', friendsEl).textContent = 'Отправить';
+  input.value = restore ? Chat.draft || '' : '';
+  Chat.draft = '';
+  $(`.fr-msg[data-mid="${id}"]`, friendsEl)?.classList.remove('editing');
+}
+
+async function saveEdit(text) {
+  const m = Chat.messages.find((x) => x.id === Chat.editing);
+  if (!m) { stopEdit(true); return; }
+  if (text === (m.text || '')) { stopEdit(true); return; }
+  if (!text && !m.track) { toast('Пустое сообщение не сохранить', 'err'); return; }
+  try {
+    const { message } = await api.friends.edit(Chat.id, m.id, text);
+    Chat.messages = Chat.messages.map((x) => (x.id === message.id ? message : x));
+    stopEdit(true);
+    renderFriends();
+  } catch (e) { toast(e.message, 'err'); }
 }

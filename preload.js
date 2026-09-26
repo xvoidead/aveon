@@ -92,6 +92,8 @@ contextBridge.exposeInMainWorld('tishe', {
     messages: (id, before) => call('fr:messages', id, before),
     profile: (id) => call('fr:profile', id),
     send: (id, body) => call('fr:send', id, body),
+    edit: (id, msg, text) => call('fr:edit', id, msg, text),
+    react: (id, msg, e) => call('fr:react', id, msg, e),
     unknock: (id) => call('fr:unknock', id),
     avatar: (userId, at) => call('fr:avatar', userId, at),
     now: (p) => ipcRenderer.send('fr:now', p),

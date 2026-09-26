@@ -41,6 +41,26 @@ function esc(s) {
   return String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+// ---------- эмодзи как на iPhone ----------
+// Windows рисует свои эмодзи — меняем их на картинки Apple из emoji-datasource-apple (так делает emoji-mart).
+// emo(текст) — как esc, только эмодзи картинками. Не загрузилась — пробуем без FE0F, потом оставляем символ
+const EMOJI_CDN = 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.1.2/img/apple/64/';
+const EMOJI_RE = /\p{Regional_Indicator}{2}|[#*0-9]\uFE0F?\u20E3|\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier})?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier})?)*/gu;
+function emojify(html) {
+  return String(html).replace(EMOJI_RE, (e) => {
+    if (/^[\u00a9\u00ae\u2122]$/.test(e)) return e; // ©, ®, ™ без FE0F — это текст, не эмодзи
+    const file = [...e].map((c) => c.codePointAt(0).toString(16).padStart(4, '0')).join('-'); // имена файлов — по 4 знака: 0031-fe0f-20e3
+    return `<img class="emoji" src="${EMOJI_CDN}${file}.png" alt="${e}" draggable="false">`;
+  });
+}
+const emo = (s) => emojify(esc(s));
+document.addEventListener('error', (e) => {
+  const img = e.target;
+  if (!img.classList?.contains('emoji')) return;
+  if (!img.dataset.retry && img.src.includes('-fe0f')) { img.dataset.retry = '1'; img.src = img.src.replace(/-fe0f/g, ''); return; }
+  img.replaceWith(document.createTextNode(img.alt));
+}, true);
+
 function fmt(sec) {
   if (!isFinite(sec) || sec <= 0) return '0:00';
   sec = Math.floor(sec);
@@ -1053,6 +1073,7 @@ function renderCall(talking) {
   el.className = `call-state ${cls}`;
   el.title = broken ? duck.error : '';
   $('#discord').title = broken ? duck.error : text; // в узком окне надпись спрятана — видна при наведении
+  if (typeof placeTogetherChip === 'function') placeTogetherChip(); // together.js: плашку звонка могли скрыть или показать
 
   if (!inCall || IS_MOBILE) return; // шкалы скрыты — считать их незачем
 
@@ -1399,7 +1420,7 @@ function renderActions() {
   dlActions(add); // downloads.js: «Скачать всё» / «Удалить все скачанные»
   if (state.view === 'albums' && state.album) {
     const iconBtn = (icon, fn, label) => { const b = add('', icon, fn); b.setAttribute('aria-label', label); b.title = label; };
-    iconBtn('i-share', () => shareAlbum(state.album), 'Поделиться альбомом'); // share.js
+    iconBtn('i-share', (e) => albumShareMenu(state.album, e.currentTarget), 'Поделиться альбомом'); // share.js
     iconBtn('i-pencil', renameAlbum, 'Переименовать альбом');
     iconBtn('i-trash', deleteAlbum, 'Удалить альбом');
   } else if (state.view === 'local' && state.cfg.localFolders.length) {

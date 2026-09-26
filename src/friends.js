@@ -36,6 +36,8 @@ const invite = (id, code) => call('POST', `/api/friends/${encodeURIComponent(id)
 const dismiss = (id) => call('DELETE', `/api/friends/${encodeURIComponent(id)}/invite`);
 const messages = (id, before) => call('GET', `/api/messages/${encodeURIComponent(id)}${before ? `?before=${encodeURIComponent(before)}` : ''}`);
 const send = (id, body) => call('POST', `/api/messages/${encodeURIComponent(id)}`, body);
+const edit = (id, msg, text) => call('PATCH', `/api/messages/${encodeURIComponent(id)}/${encodeURIComponent(msg)}`, { text });
+const react = (id, msg, e) => call('POST', `/api/messages/${encodeURIComponent(id)}/${encodeURIComponent(msg)}/react`, { e });
 const profile = (id) => call('GET', `/api/friends/${encodeURIComponent(id)}/profile`);
 const knock = (id) => call('POST', `/api/friends/${encodeURIComponent(id)}/knock`);
 const unknock = (id) => call('DELETE', `/api/friends/${encodeURIComponent(id)}/knock`);
@@ -83,4 +85,4 @@ async function offline() {
   sentKey = '';
 }
 
-module.exports = { init, list, add, accept, remove, invite, dismiss, knock, unknock, messages, send, profile, now, settingsChanged, reset, offline };
+module.exports = { init, list, add, accept, remove, invite, dismiss, knock, unknock, messages, send, edit, react, profile, now, settingsChanged, reset, offline };

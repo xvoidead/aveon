@@ -3,7 +3,7 @@ const { app, safeStorage } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
-const SECRET_KEYS = ['sc.token', 'ym.token', 'sp.refresh', 'sp.access', 'acc.token'];
+const SECRET_KEYS = ['sc.token', 'ym.token', 'sp.refresh', 'sp.access', 'acc.token', 'acc.key']; // acc.key — ключ шифрования ключей сервисов (src/account.js)
 
 const DEFAULTS = {
   volume: 0.8,
