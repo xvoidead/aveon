@@ -1562,3 +1562,35 @@ html.mobile .wave-phrase { font-size: 19px; line-height: 1.7; }
 .announce .announce-track > svg { width: 14px; height: 14px; flex: none; color: var(--amber); }
 .announce.notice { border-color: var(--voice); }
 .announce.notice > svg { color: var(--voice); }
+
+/* ---------- анимации чата и переходов в «Друзьях» ---------- */
+@keyframes msg-in { from { opacity: 0; transform: translateX(-14px) scale(.94); } }
+@keyframes msg-in-mine { from { opacity: 0; transform: translateX(14px) scale(.94); } }
+@keyframes msg-sent { from { opacity: .5; } }
+@keyframes view-in { from { opacity: 0; transform: translateX(18px); } }
+@keyframes view-back { from { opacity: 0; transform: translateX(-18px); } }
+@keyframes badge-pop { 0% { transform: scale(.3); } 60% { transform: scale(1.25); } 100% { transform: scale(1); } }
+
+.fr-msg { transform-origin: left bottom; transition: opacity .25s ease; }
+.fr-msg.mine { transform-origin: right bottom; }
+.fr-msg.enter { animation: msg-in .34s cubic-bezier(.2, .8, .2, 1) both; animation-delay: var(--d, 0ms); }
+.fr-msg.mine.enter { animation-name: msg-in-mine; }
+.fr-msg.pending { opacity: .5; }
+.fr-msg.sent { animation: msg-sent .4s ease; }
+.fr-msg .fr-track { transition: transform .15s ease, background .15s ease; }
+.fr-msg .fr-track:hover { transform: translateY(-1px); }
+.fr-msg .fr-track:active { transform: scale(.98); }
+
+.together.friends.view-in > * { animation: view-in .28s cubic-bezier(.2, .8, .2, 1) both; }
+.together.friends.view-back > * { animation: view-back .28s cubic-bezier(.2, .8, .2, 1) both; }
+.together.friends.view-in > :nth-child(2), .together.friends.view-back > :nth-child(2) { animation-delay: .03s; }
+.together.friends.view-in > :nth-child(n+3), .together.friends.view-back > :nth-child(n+3) { animation-delay: .06s; }
+
+.fr-unread.pop { animation: badge-pop .45s cubic-bezier(.3, 1.4, .5, 1); }
+.fr-send { transition: transform .12s ease; }
+.fr-send:active { transform: scale(.95); }
+
+@media (prefers-reduced-motion: reduce) {
+  .fr-msg.enter, .fr-msg.sent, .fr-unread.pop,
+  .together.friends.view-in > *, .together.friends.view-back > * { animation: none; }
+}

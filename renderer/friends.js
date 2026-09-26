@@ -19,6 +19,8 @@ const Friends = {
   knocked: new Map(), // к кому мы попросились → когда: его приглашение принимаем сами
   seenMsg: new Map(), // от кого → id последнего непрочитанного, о котором уже сказали
   msgPrimed: false,   // первый опрос: о старых непрочитанных не тостим, их видно по счётчику
+  unreadWas: new Map(), // сколько непрочитанного было при прошлой отрисовке: вырос — счётчик подпрыгивает
+  viewAnim: null,     // 'in' — открыли чат или профиль, 'back' — вернулись к списку (анимация перехода)
   busy: new Set(),   // id, по которым сейчас идёт запрос
 };
 
@@ -107,7 +109,7 @@ function friendItem(f) {
       ${frAvatarHtml(f, !!n?.playing)}
       <span class="fr-text"><b class="fr-name"><span>${esc(f.name)}</span>${f.in_room ? '<em class="fr-tag">в руме</em>' : ''}</b>${friendStatus(f)}</span>
     </button>
-    <button class="icon-btn small fr-chat-btn" data-fr-chat="${f.id}" aria-label="Написать" title="Написать"><svg><use href="#i-chat"/></svg>${f.unread ? `<i class="fr-unread">${f.unread > 9 ? '9+' : f.unread}</i>` : ''}</button>
+    <button class="icon-btn small fr-chat-btn" data-fr-chat="${f.id}" aria-label="Написать" title="Написать"><svg><use href="#i-chat"/></svg>${f.unread ? `<i class="fr-unread${f.unread > (Friends.unreadWas.get(f.id) || 0) ? ' pop' : ''}">${f.unread > 9 ? '9+' : f.unread}</i>` : ''}</button>
     ${roomButton(f)}
     <button class="icon-btn small" data-fr-more="${f.id}" aria-label="Ещё" aria-haspopup="menu"><svg><use href="#i-more"/></svg></button>
   </li>`;
@@ -167,6 +169,15 @@ function renderFriendsBadge() {
 function renderFriends() {
   renderFriendsBadge();
   if (friendsEl.hidden) return;
+  if (Friends.viewAnim) {
+    const cls = Friends.viewAnim === 'back' ? 'view-back' : 'view-in';
+    Friends.viewAnim = null;
+    friendsEl.classList.remove('view-in', 'view-back');
+    requestAnimationFrame(() => {
+      friendsEl.classList.add(cls);
+      setTimeout(() => friendsEl.classList.remove(cls), 400);
+    });
+  }
   requestAnimationFrame(placeFriends);
   if (Chat.id) { renderChat(); return; }
   if (FP.id) { renderFriendProfile(); return; }
@@ -209,6 +220,7 @@ function renderFriends() {
     <div class="fr-scroll">${body}</div>
     <div class="field fr-share"><label for="fr-share">Показывать друзьям, что я слушаю</label>
       <div class="ctl"><label class="switch"><input type="checkbox" id="fr-share" ${sharing ? 'checked' : ''}><span></span></label></div></div>`;
+  for (const f of d?.friends || []) Friends.unreadWas.set(f.id, f.unread || 0);
   const input = $('#fr-login', friendsEl);
   input.value = typed;
   if (focused) input.focus();
@@ -534,12 +546,15 @@ api.together.onEvent(() => renderFriends());
 // В сообщении может быть трек: его можно включить у себя одной кнопкой.
 
 const CHAT_POLL = 4000;
-const Chat = { id: null, messages: [], loading: false, sending: false, error: '', more: true };
+const Chat = { id: null, messages: [], loading: false, sending: false, error: '', more: true, shown: new Set(), stagger: false };
 
 function openChat(id) {
   if (!friendById(id)) return;
   if (friendsEl.hidden) openFriends();
   Chat.id = id;
+  Chat.shown = new Set();
+  Chat.stagger = true; // первые сообщения появляются лесенкой
+  Friends.viewAnim = 'in';
   Chat.messages = [];
   Chat.error = '';
   Chat.more = true;
@@ -549,6 +564,7 @@ function openChat(id) {
 
 function closeChat() {
   Chat.id = null;
+  Friends.viewAnim = 'back';
   renderFriends();
   loadFriends(); // счётчик непрочитанного обнулился
 }
@@ -588,10 +604,15 @@ function msgTime(sec) {
   return d.toLocaleString('ru', today ? { hour: '2-digit', minute: '2-digit' } : { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
 }
 
-function msgHtml(m) {
+// fromEnd — какое сообщение с конца: при открытии чата последние появляются лесенкой снизу вверх
+function msgHtml(m, fromEnd) {
   const t = m.track;
   const cover = t?.cover && /^https?:/i.test(t.cover) ? `<img src="${esc(t.cover)}" alt="">` : '<span>♪</span>';
-  return `<div class="fr-msg${m.mine ? ' mine' : ''}" title="${esc(msgTime(m.created))}">
+  const enter = !Chat.shown.has(m.id);
+  const delay = enter && Chat.stagger ? Math.max(0, 11 - Math.min(fromEnd, 11)) * 28 : 0;
+  const cls = `${m.mine ? ' mine' : ''}${enter ? ' enter' : ''}${m.pending ? ' pending' : ''}${m.justSent ? ' sent' : ''}`;
+  m.justSent = false;
+  return `<div class="fr-msg${cls}"${delay ? ` style="--d:${delay}ms"` : ''} title="${esc(m.pending ? 'отправляется…' : msgTime(m.created))}">
     ${t ? `<button class="fr-track" data-msg-play="${m.id}" title="Включить у себя">
       <span class="fr-track-cover">${cover}</span>
       <span class="fr-track-text"><b>${esc(t.title)}</b><small>${esc(t.artist || '')}</small></span>
@@ -614,7 +635,7 @@ function renderChat() {
       : Chat.loading ? '<div class="spinner small"></div>'
       : `<p class="together-desc fr-empty">Напиши ${esc(firstName(f.name))} или отправь, что сейчас играет.</p>`;
   } else {
-    body = `${Chat.more ? '<button class="fr-older" id="fr-older">раньше</button>' : ''}${Chat.messages.map(msgHtml).join('')}
+    body = `${Chat.more ? '<button class="fr-older" id="fr-older">раньше</button>' : ''}${Chat.messages.map((m, i, all) => msgHtml(m, all.length - 1 - i)).join('')}
       ${Chat.error ? `<p class="together-note warn">${esc(Chat.error)}</p>` : ''}`;
   }
   const now = state.track;
@@ -630,6 +651,8 @@ function renderChat() {
       <input class="input" id="fr-text" maxlength="2000" placeholder="сообщение" aria-label="Сообщение">
       <button class="btn primary fr-send" type="submit"${Chat.sending ? ' disabled' : ''}>Отправить</button>
     </form>`;
+  for (const m of Chat.messages) Chat.shown.add(m.id); // показанные больше не анимируем
+  if (Chat.messages.length) Chat.stagger = false;
   const list = $('.fr-msgs', friendsEl);
   list.scrollTop = atBottom ? list.scrollHeight : list.scrollHeight - fromBottom;
   const input = $('#fr-text', friendsEl);
@@ -661,12 +684,24 @@ function renderChat() {
 async function sendMessage(id, body) {
   if (Chat.sending) return false;
   Chat.sending = true;
+  // своё сообщение видно сразу, полупрозрачным; ответ сервера заменяет его настоящим
+  const temp = Chat.id === id
+    ? { id: `tmp${Date.now()}`, mine: true, text: body.text || '', track: body.track || null, created: Date.now() / 1000, pending: true }
+    : null;
+  if (temp) Chat.messages = [...Chat.messages, temp];
   if (Chat.id === id) renderFriends();
   try {
     const { message } = await api.friends.send(id, body);
-    if (Chat.id === id) Chat.messages = [...Chat.messages, message];
+    if (Chat.id === id) {
+      Chat.shown.add(message.id);
+      message.justSent = true;
+      const already = Chat.messages.some((m) => m.id === message.id); // опрос чата успел принести его раньше
+      if (already) Chat.messages = Chat.messages.filter((m) => m !== temp);
+      else Chat.messages = temp ? Chat.messages.map((m) => (m === temp ? message : m)) : [...Chat.messages, message];
+    }
     return true;
   } catch (e) {
+    if (temp) Chat.messages = Chat.messages.filter((m) => m !== temp);
     toast(e.message, 'err');
     return false;
   } finally {
@@ -703,6 +738,7 @@ const FP = { id: null, data: null, error: '', loading: false };
 function openFriendProfile(id) {
   if (!friendById(id)) return;
   FP.id = id;
+  Friends.viewAnim = 'in';
   FP.data = null;
   FP.error = '';
   renderFriends();
@@ -711,6 +747,7 @@ function openFriendProfile(id) {
 
 function closeFriendProfile() {
   FP.id = null;
+  Friends.viewAnim = 'back';
   renderFriends();
 }
 
