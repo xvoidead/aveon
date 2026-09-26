@@ -14,18 +14,71 @@ let ready = false;
 
 const cfg = () => ({ enabled: true, pos: 'top', onlyAway: true, overFullscreen: false, ...(config.get().island || {}) });
 
+function display() {
+  return main && !main.isDestroyed() ? screen.getDisplayMatching(main.getBounds()) : screen.getPrimaryDisplay();
+}
+
+// Капсула внутри прозрачного окна (renderer/island.css: свёрнутая 280×36, поля 8 px, снизу 10)
+const PILL = { w: 280, h: 36 };
+function pillIn(pos) {
+  const x = pos === 'left' ? 8 : pos === 'right' ? SIZE.width - PILL.w - 8 : (SIZE.width - PILL.w) / 2;
+  const y = pos === 'bottom' ? SIZE.height - PILL.h - 10 : 8;
+  return { x, y };
+}
+
+// Где окно острова без сдвига — относительно экрана
+function baseWindow(pos, d) {
+  const wa = d.workArea, b = d.bounds;
+  let x = wa.x - b.x + (wa.width - SIZE.width) / 2;
+  let y = 0;
+  if (pos === 'left') x = wa.x - b.x + 12;
+  if (pos === 'right') x = wa.x - b.x + wa.width - SIZE.width - 12;
+  if (pos === 'bottom') y = wa.y - b.y + wa.height - SIZE.height;
+  return { x, y };
+}
+
+// Место острова: край экрана (pos) плюс свой сдвиг x/y. Ограничиваем по капсуле, а не по окну —
+// так её можно поставить вплотную к любому краю
 function place() {
   if (!win || win.isDestroyed()) return;
   const c = cfg();
-  const d = main && !main.isDestroyed() ? screen.getDisplayMatching(main.getBounds()) : screen.getPrimaryDisplay();
-  const wa = d.workArea;
+  const d = display();
   const b = d.bounds;
-  let x = Math.round(wa.x + (wa.width - SIZE.width) / 2);
-  let y = b.y;
-  if (c.pos === 'left') x = wa.x + 12;
-  if (c.pos === 'right') x = wa.x + wa.width - SIZE.width - 12;
-  if (c.pos === 'bottom') y = wa.y + wa.height - SIZE.height;
-  win.setBounds({ x, y, ...SIZE });
+  const base = baseWindow(c.pos, d);
+  const inner = pillIn(c.pos);
+  let px = base.x + inner.x + (c.x || 0);
+  let py = base.y + inner.y + (c.y || 0);
+  px = Math.max(0, Math.min(px, b.width - PILL.w));
+  py = Math.max(0, Math.min(py, b.height - PILL.h));
+  win.setBounds({ x: Math.round(b.x + px - inner.x), y: Math.round(b.y + py - inner.y), ...SIZE });
+}
+
+// Для мини-экрана в настройках: размер экрана и где стоит капсула без сдвига при каждом pos
+function screenInfo() {
+  const d = display();
+  const bases = {};
+  for (const pos of ['top', 'left', 'right', 'bottom']) {
+    const w = baseWindow(pos, d), inner = pillIn(pos);
+    bases[pos] = { x: Math.round(w.x + inner.x), y: Math.round(w.y + inner.y) };
+  }
+  return { width: d.bounds.width, height: d.bounds.height, pill: PILL, bases };
+}
+
+// Пока в настройках двигают остров, он виден, даже если плеер в фокусе или ничего не играет
+let previewUntil = 0;
+let previewTimer = null;
+function preview() {
+  previewUntil = Date.now() + 2500;
+  clearTimeout(previewTimer);
+  previewTimer = setTimeout(() => {
+    previewUntil = 0;
+    if (win && !win.isDestroyed() && ready) win.webContents.send('island:preview', false);
+    update();
+  }, 2600);
+  ensure();
+  place();
+  if (ready) win.webContents.send('island:preview', true);
+  update();
 }
 
 function ensure() {
@@ -77,6 +130,7 @@ function level() {
 // Когда показывать: включён, есть трек и (если так настроено) окно плеера не перед глазами
 function wanted() {
   const c = cfg();
+  if (Date.now() < previewUntil) return true;
   if (!c.enabled || !last?.hasTrack) return false;
   if (!c.onlyAway || !main || main.isDestroyed()) return true;
   return main.isMinimized() || !main.isVisible() || !main.isFocused();
@@ -126,4 +180,4 @@ function destroy() {
   if (win && !win.isDestroyed()) win.destroy();
 }
 
-module.exports = { init, state, hover, settingsChanged, destroy };
+module.exports = { init, state, hover, settingsChanged, destroy, preview, screenInfo };

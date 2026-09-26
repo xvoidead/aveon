@@ -65,7 +65,7 @@ const DEFAULTS = {
     custom: [], // свои пресеты: { id: 'u:…', name, gains, preamp }
   },
   // Остров поверх всех окон: pos — top | left | right | bottom; onlyAway — только когда плеер не в фокусе
-  island: { enabled: true, pos: 'top', onlyAway: true, overFullscreen: false, lyrics: true, friends: true, notify: true, pulse: true, rainbow: false, motion: 'music', bars: true, spin: true },
+  island: { enabled: true, pos: 'top', onlyAway: true, overFullscreen: false, lyrics: true, friends: true, notify: true, pulse: true, rainbow: false, motion: 'music', bars: true, spin: true, x: 0, y: 0 },
   mini: { open: false, onMinimize: false, top: true, opacity: 100, lyrics: true, x: null, y: null }, // мини-плеер (src/mini.js)
   tray: { enabled: true, closeToTray: false }, // значок в трее (src/tray.js)
   hotkeys: {}, // горячие клавиши на всю систему; по умолчанию — src/hotkeys.js
