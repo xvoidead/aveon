@@ -15,9 +15,14 @@ let ready = false;
 
 const cfg = () => ({ enabled: true, pos: 'top', onlyAway: true, overFullscreen: false, ...(config.get().island || {}) });
 
+// На каком экране остров. Плеер перед глазами — на его экране (там и настройки мини-экрана);
+// плеер свёрнут или позади — там, где курсор: с двумя мониторами игра обычно не на экране плеера
 function display() {
-  return main && !main.isDestroyed() ? screen.getDisplayMatching(main.getBounds()) : screen.getPrimaryDisplay();
+  const front = main && !main.isDestroyed() && main.isVisible() && !main.isMinimized() && main.isFocused();
+  if (front) return screen.getDisplayMatching(main.getBounds());
+  return screen.getDisplayNearestPoint(screen.getCursorScreenPoint());
 }
+let placedOn = null; // id экрана, на котором остров сейчас
 
 // Капсула внутри прозрачного окна (renderer/island.css: свёрнутая 280×36, поля 8 px, снизу 10)
 const PILL = { w: 280, h: 36 };
@@ -44,6 +49,7 @@ function place() {
   if (!win || win.isDestroyed()) return;
   const c = cfg();
   const d = display();
+  placedOn = d.id;
   const b = d.bounds;
   const base = baseWindow(c.pos, d);
   const inner = pillIn(c.pos);
@@ -134,7 +140,9 @@ function level() {
 // обратно, пока он виден. Фокус не забирает. Над эксклюзивным полноэкранным режимом (не «без рамки»)
 // окно не нарисовать никак — там помогает только режим «оконный без рамки» в самой игре
 setInterval(() => {
-  if (!win || win.isDestroyed() || !win.isVisible() || !cfg().overFullscreen) return;
+  if (!win || win.isDestroyed() || !win.isVisible()) return;
+  if (display().id !== placedOn) place(); // курсор ушёл на другой монитор — остров за ним
+  if (!cfg().overFullscreen) return;
   win.setAlwaysOnTop(true, 'screen-saver');
   win.moveTop();
 }, 1500);
