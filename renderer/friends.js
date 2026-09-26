@@ -105,7 +105,7 @@ function friendItem(f) {
   return `<li class="fr-item">
     <button class="fr-main" data-fr-open="${f.id}" title="Профиль ${esc(f.name)}">
       ${frAvatarHtml(f, !!n?.playing)}
-      <span class="fr-text"><b>${esc(f.name)}${f.in_room ? ' <em class="fr-tag">в руме</em>' : ''}</b>${friendStatus(f)}</span>
+      <span class="fr-text"><b class="fr-name"><span>${esc(f.name)}</span>${f.in_room ? '<em class="fr-tag">в руме</em>' : ''}</b>${friendStatus(f)}</span>
     </button>
     <button class="icon-btn small fr-chat-btn" data-fr-chat="${f.id}" aria-label="Написать" title="Написать"><svg><use href="#i-chat"/></svg>${f.unread ? `<i class="fr-unread">${f.unread > 9 ? '9+' : f.unread}</i>` : ''}</button>
     ${roomButton(f)}
@@ -803,7 +803,7 @@ function renderFriendProfile() {
       <div class="fp-hero">
         ${frAvatarHtml(f, !!n?.playing).replace('fr-avatar', 'fr-avatar fp-avatar')}
         <div class="fp-who">
-          <h2>${esc(f.name)}${f.in_room ? ' <em class="fr-tag">в руме</em>' : ''}</h2>
+          <h2 class="fr-name"><span>${esc(f.name)}</span>${f.in_room ? '<em class="fr-tag">в руме</em>' : ''}</h2>
           <small>@${esc(f.login)}${f.since ? ` · друзья с ${esc(fpDate(f.since))}` : ''}</small>
         </div>
       </div>

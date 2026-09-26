@@ -171,6 +171,46 @@ namespace Tishe
         }
     }
 
+    // Активное окно: чей это процесс. Плеер по имени узнаёт игру (src/games.js) и прячет остров.
+    // Имя спрашиваем только когда сменился процесс — остальное время это два дешёвых вызова
+    static class Foreground
+    {
+        [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+        [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint pid);
+
+        static uint lastPid;
+        static string lastName = "";
+
+        public static string Name()
+        {
+            try
+            {
+                uint pid;
+                GetWindowThreadProcessId(GetForegroundWindow(), out pid);
+                if (pid == 0) return "";
+                if (pid != lastPid)
+                {
+                    lastPid = pid;
+                    try { using (var p = Process.GetProcessById((int)pid)) lastName = p.ProcessName; } catch { lastName = ""; }
+                }
+                return lastName;
+            }
+            catch { return ""; }
+        }
+
+        // для JSON: кавычки и обратные косые экранируем, управляющие символы выкидываем
+        public static string Json(string s)
+        {
+            var sb = new StringBuilder();
+            foreach (char c in s)
+            {
+                if (c == '"' || c == '\\') sb.Append('\\');
+                if (c >= ' ') sb.Append(c);
+            }
+            return sb.ToString();
+        }
+    }
+
     static class Program
     {
         const int eRender = 0, eCapture = 1, DEVICE_STATE_ACTIVE = 1, CLSCTX_ALL = 23, AudioSessionStateActive = 1;
@@ -307,7 +347,8 @@ namespace Tishe
                                   ",\"mix\":" + mixPeak.ToString("0.0000", inv) +
                                   ",\"call\":" + (inCall ? 1 : 0) +
                                   ",\"dc\":" + (discord ? 1 : 0) +
-                                  ",\"ext\":" + ext + "}\n");
+                                  ",\"ext\":" + ext +
+                                  ",\"fg\":\"" + Foreground.Json(Foreground.Name()) + "\"}\n");
                 Console.Out.Flush();
                 Thread.Sleep(33);
             }
