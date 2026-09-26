@@ -34,6 +34,8 @@ const accept = (id) => call('POST', `/api/friends/${encodeURIComponent(id)}/acce
 const remove = (id) => call('DELETE', `/api/friends/${encodeURIComponent(id)}`);
 const invite = (id, code) => call('POST', `/api/friends/${encodeURIComponent(id)}/invite`, { code });
 const dismiss = (id) => call('DELETE', `/api/friends/${encodeURIComponent(id)}/invite`);
+const messages = (id, before) => call('GET', `/api/messages/${encodeURIComponent(id)}${before ? `?before=${encodeURIComponent(before)}` : ''}`);
+const send = (id, body) => call('POST', `/api/messages/${encodeURIComponent(id)}`, body);
 const knock = (id) => call('POST', `/api/friends/${encodeURIComponent(id)}/knock`);
 const unknock = (id) => call('DELETE', `/api/friends/${encodeURIComponent(id)}/knock`);
 
@@ -80,4 +82,4 @@ async function offline() {
   sentKey = '';
 }
 
-module.exports = { init, list, add, accept, remove, invite, dismiss, knock, unknock, now, settingsChanged, reset, offline };
+module.exports = { init, list, add, accept, remove, invite, dismiss, knock, unknock, messages, send, now, settingsChanged, reset, offline };

@@ -31,6 +31,14 @@ api.island.onConfig((c) => {
   for (const p of ['top', 'left', 'right', 'bottom']) document.body.classList.toggle(`pos-${p}`, (c.pos || 'top') === p);
 });
 
+// аватарки друзей: плеер присылает каждую один раз (s.avatars), дальше — только ключ
+const avatars = new Map();
+const avatarCss = (key) => {
+  const url = key && avatars.get(key);
+  return url ? `url("${url.replace(/"/g, '%22')}")` : '';
+};
+const coverCss = () => (st?.cover ? `url("${String(st.cover).replace(/"/g, '%22')}")` : '');
+
 // Предпросмотр из настроек: капсула видна, даже если ничего не играет
 let previewing = false;
 api.island.onPreview((on) => {
@@ -42,9 +50,10 @@ api.island.onPreview((on) => {
 
 api.island.onState((s) => {
   st = s;
+  for (const [k, v] of Object.entries(s.avatars || {})) avatars.set(k, v);
   if (s.notice && s.notice.id !== lastNotice) {
     lastNotice = s.notice.id;
-    notice(s.notice.text);
+    notice(s.notice.text, s.notice.av);
   }
   document.body.classList.toggle('hidden', !s.hasTrack && !is('notice') && !previewing);
   if (!s.hasTrack) return;
@@ -57,7 +66,7 @@ api.island.onState((s) => {
   if (s.id !== lastId) {
     const first = lastId === null;
     lastId = s.id;
-    $('#disc').style.backgroundImage = s.cover ? `url("${String(s.cover).replace(/"/g, '%22')}")` : '';
+    if (!is('notice')) $('#disc').style.backgroundImage = coverCss(); // в уведомлении там аватарка — вернём после
     if (!first) peek();
   }
   const o = s.opts || {};
@@ -162,7 +171,10 @@ function renderFriends(f) {
   const parts = [];
   if (f.count) parts.push(f.count === 1 ? `${esc(f.live[0].name)} слушает «${esc(f.live[0].title)}»` : `${f.count} ${plural(f.count, 'друг слушает', 'друга слушают', 'друзей слушают')} музыку`);
   if (f.room) parts.push(`вместе: ${f.room}`);
-  box.innerHTML = `${f.live.map((x) => `<i title="${esc(x.name)} — ${esc(x.title)}">${esc(x.letter)}</i>`).join('')}<span>${parts.join(' · ')}</span>`;
+  box.innerHTML = `${f.live.map((x) => {
+    const bg = avatarCss(x.av);
+    return `<i title="${esc(x.name)} — ${esc(x.title)}"${bg ? ` class="pic" style='background-image:${bg}'` : ''}>${bg ? '' : esc(x.letter)}</i>`;
+  }).join('')}<span>${parts.join(' · ')}</span>`;
 }
 
 // Новый трек — капсула на пару секунд показывает, что заиграло
@@ -174,17 +186,22 @@ function peek() {
   peekTimer = setTimeout(() => { pill.classList.remove('peek'); renderLabel(); }, 3500);
 }
 
-function notice(text) {
+// av — ключ аватарки друга: на время уведомления она вместо обложки
+function notice(text, av = '') {
   if (is('open')) return;
   pill.classList.remove('peek');
   pill.classList.add('notice');
+  const face = avatarCss(av);
+  $('#disc').style.backgroundImage = face || coverCss();
+  pill.classList.toggle('face', !!face);
   pill.style.width = '';
   document.body.classList.remove('hidden');
   $('#p-title').textContent = text;
   $('#p-sub').textContent = 'авеон';
   clearTimeout(noticeTimer);
   noticeTimer = setTimeout(() => {
-    pill.classList.remove('notice');
+    pill.classList.remove('notice', 'face');
+    $('#disc').style.backgroundImage = coverCss();
     if (!st?.hasTrack) document.body.classList.add('hidden');
     renderLabel();
   }, 3800);

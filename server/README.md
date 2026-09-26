@@ -110,6 +110,8 @@ server {
 | `DELETE` | `/api/friends/{id}` | удалить из друзей, отклонить или отозвать заявку |
 | `POST` / `DELETE` | `/api/friends/{id}/invite` | `{code}` — позвать друга в руму / убрать приглашение от него |
 | `POST` / `DELETE` | `/api/friends/{id}/knock` | попроситься в руму к другу / убрать его просьбу |
+| `GET` | `/api/messages/{id}?before=` | переписка с другом, по 50; входящие отмечаются прочитанными |
+| `POST` | `/api/messages/{id}` | `{text?, track?}` — сообщение другу; в списке друзей у каждого `unread` и `last` |
 | `PUT` | `/api/now` | `{track, playing, pos}`; `track: null` — ничего не играет |
 
 ## слушать вместе

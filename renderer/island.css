@@ -145,6 +145,10 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 .pill.m-static { transform: none !important; }
 .pill.m-static .ring { animation-play-state: paused; }
 .pill.m-static .glow { opacity: 0; }
+/* аватарки друзей: в строке «слушает» и в уведомлении вместо обложки */
+.friends i.pic { background: center / cover no-repeat; color: transparent; }
+.pill.notice.face .disc { background-size: cover; background-position: center; }
+
 
 /* предпросмотр положения из настроек */
 .pill.previewing { box-shadow: 0 6px 22px rgb(0 0 0 / .35), 0 0 0 2px var(--amber), 0 0 24px -4px var(--amber); }

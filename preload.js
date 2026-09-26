@@ -88,6 +88,8 @@ contextBridge.exposeInMainWorld('tishe', {
     invite: (id, code) => call('fr:invite', id, code),
     dismiss: (id) => call('fr:dismiss', id),
     knock: (id) => call('fr:knock', id),
+    messages: (id, before) => call('fr:messages', id, before),
+    send: (id, body) => call('fr:send', id, body),
     unknock: (id) => call('fr:unknock', id),
     avatar: (userId, at) => call('fr:avatar', userId, at),
     now: (p) => ipcRenderer.send('fr:now', p),

@@ -141,9 +141,13 @@ def friends_list(me: Me):
             live = t - r["at"] < LIVE_FOR * 1000
             now = {"track": json.loads(r["track"]), "playing": bool(r["playing"]) and live,
                    "pos": r["pos"], "at": r["at"], "live": live}
-        return person(r) | {"since": r["since"], "now": now, "in_room": r["id"] in busy}
+        return person(r) | {"since": r["since"], "now": now, "in_room": r["id"] in busy,
+                            "unread": unread.get(r["id"], {}).get("unread", 0), "last": unread.get(r["id"], {}).get("last")}
 
     busy = in_rooms()
+    from .messages import unread_by_friend  # messages.py импортирует этот модуль
+    with db.tx() as conn:
+        unread = unread_by_friend(conn, me.user_id)
     items = [view(r) for r in friends]
     # сверху — кто слушает прямо сейчас, потом кто в сети, потом по времени последнего трека
     items.sort(key=lambda f: (

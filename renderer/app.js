@@ -975,6 +975,7 @@ function openTrackMenu(i, pos) {
     items.unshift(...artists.slice(0, 3).map((name) => ({ label: artists.length > 1 ? name : 'Перейти к артисту', icon: 'i-user', onClick: () => openArtist(name) })), { sep: true });
   }
   if (t.source === 'local' && !t.shared) items.unshift({ label: 'Изменить теги и обложку', icon: 'i-pencil', onClick: () => openEditor(t) }, { sep: true });
+  if (state.account.loggedIn) items.push({ sep: true }, { label: 'Отправить другу', icon: 'i-chat', onClick: () => sendTrackMenu(t, pos) }); // friends.js
   if (state.view === 'albums' && state.album) {
     items.push({ sep: true }, { label: 'Убрать из альбома', icon: 'i-trash', danger: true, onClick: () => removeFromAlbum([t]) });
   }
