@@ -71,6 +71,32 @@ CREATE TABLE IF NOT EXISTS friends (
     PRIMARY KEY (user_id, friend_id)
 );
 
+-- совместные плейлисты (collab.py): живые, правки видны всем участникам
+CREATE TABLE IF NOT EXISTS collabs (
+    code       TEXT PRIMARY KEY,          -- как у share: 8 символов без 0/O/1/I
+    owner_id   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title      TEXT NOT NULL,
+    rev        INTEGER NOT NULL,          -- растёт при каждом изменении
+    created    INTEGER NOT NULL,
+    updated    INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS collab_members (
+    code       TEXT NOT NULL REFERENCES collabs(code) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    joined     INTEGER NOT NULL,
+    PRIMARY KEY (code, user_id)
+);
+CREATE INDEX IF NOT EXISTS collab_members_user ON collab_members(user_id);
+CREATE TABLE IF NOT EXISTS collab_tracks (
+    code       TEXT NOT NULL REFERENCES collabs(code) ON DELETE CASCADE,
+    track_id   TEXT NOT NULL,             -- id трека из плеера, например "ym:123"
+    data       TEXT NOT NULL,             -- JSON снимка трека (как в альбомах)
+    added_by   INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    added_at   INTEGER NOT NULL,
+    pos        REAL NOT NULL,             -- порядок
+    PRIMARY KEY (code, track_id)
+);
+
 -- разные настройки сервера: объявление из админки и т. п.
 CREATE TABLE IF NOT EXISTS settings (
     key        TEXT PRIMARY KEY,

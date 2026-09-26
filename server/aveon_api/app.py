@@ -129,12 +129,14 @@ from .share import router as share_router  # noqa: E402
 from .friends import router as friends_router  # noqa: E402
 from .messages import router as messages_router  # noqa: E402
 from .admin import router as admin_router  # noqa: E402
+from .collab import router as collab_router  # noqa: E402
 
 app.include_router(together_router)
 app.include_router(share_router)
 app.include_router(friends_router)
 app.include_router(messages_router)
 app.include_router(admin_router)
+app.include_router(collab_router)
 
 
 def user_view(row) -> dict:
