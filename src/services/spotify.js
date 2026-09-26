@@ -191,4 +191,5 @@ async function status() {
   try { return { connected: true, ...(await profile()) }; } catch (e) { return { connected: false, error: e.message }; }
 }
 
-module.exports = { connect, disconnect, status, search, collections, collection, REDIRECT };
+// clientId, saveTokens, profile, SCOPES — для входа через ссылку aveon:// на Android (mobile/bridge)
+module.exports = { connect, disconnect, status, search, collections, collection, REDIRECT, SCOPES, clientId, saveTokens, profile };

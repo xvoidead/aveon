@@ -5,6 +5,7 @@
 **музыкальный плеер, который уходит «в бочку», когда в discord говорят**
 
 ![windows](https://img.shields.io/badge/windows-10%20%7C%2011-2a201b?style=flat-square)
+![android](https://img.shields.io/badge/android-7%2B-2a201b?style=flat-square)
 ![electron](https://img.shields.io/badge/electron-44-2a201b?style=flat-square&logo=electron)
 ![license](https://img.shields.io/badge/license-MIT-2a201b?style=flat-square)
 
@@ -67,6 +68,47 @@ npm start
 
 Нужны Windows 10/11 и Node.js 20+. Если после `npm install` Electron не запускается, выполни
 `node node_modules/electron/install.js`.
+
+### установщик для windows
+
+```bash
+npm run dist
+```
+
+В `dist/` появится `aveon-setup-<версия>.exe`: мастер установки с выбором папки, ярлыками на рабочем
+столе и в «Пуске» и удалением через «Приложения». Настройки в `%APPDATA%\авеон` при удалении остаются.
+
+## android
+
+Тот же интерфейс в телефонной раскладке: библиотека на весь экран, снизу мини-плеер, бочка —
+отдельный экран, который выезжает снизу. Все источники, альбомы, тексты, цензура, эквалайзер,
+аккаунт и «слушать вместе» работают так же.
+
+Что по-другому:
+
+- **бочка в звонке** — Android не даёт приложениям слышать чужой звонок, поэтому музыка уходит
+  в бочку на весь звонок Discord (плеер видит, что телефон в режиме связи). Ещё бочку можно
+  включить вручную: кнопка «в бочку» на экране плеера и в уведомлении;
+- **уведомление и экран блокировки** — обложка, назад / пауза / дальше, перемотка и «в бочку»;
+- **свои файлы** — папки выбираются системным диалогом, музыка берётся из медиатеки телефона;
+- **фон в цвет обложки** на телефоне по умолчанию выключен (только акцент), включается в
+  настройках → «звук и вид»; на компьютере наоборот;
+- **spotify** — в Redirect URIs приложения добавь ещё `aveon://spotify`;
+- статуса в discord на телефоне нет: rich presence есть только у discord на компьютере.
+
+Сборка (нужны JDK 21 и Android SDK, путь к SDK — в `mobile/android/local.properties`):
+
+```bash
+npm run mobile:build              # renderer + мост → mobile/www → android-проект
+cd mobile/android
+./gradlew assembleDebug           # app/build/outputs/apk/debug/app-debug.apk
+```
+
+Как устроено: `renderer/` работает в WebView (Capacitor) без изменений, а код главного процесса
+из `src/` собирается esbuild'ом в `mobile/bridge` и работает там же — вместо Node-модулей шимы,
+сеть идёт через нативный HTTP без CORS. Нативная часть — `mobile/android/app/src/main/java/com/aveon/player`:
+уведомление (`MediaService`), звонок, медиатека и файлы данных, зашифрованные ключом Android
+Keystore (`AveonPlugin`), свои файлы и CORS для потоков (`AveonWebViewClient`).
 
 ## как это работает
 

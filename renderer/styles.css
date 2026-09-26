@@ -1007,3 +1007,9 @@ kbd {
 }
 .together-face:first-child { margin-left: 0; }
 
+
+/* Android-сборка (html.mobile, раскладка — renderer/mobile.css) */
+.mobile-only { display: none !important; }
+html.mobile .desktop-only { display: none !important; }
+.duck-manual { padding: 5px 12px; font-size: 12px; margin-left: auto; }
+.duck-manual[aria-pressed="true"] { background: var(--voice); color: var(--oak); border-color: transparent; }

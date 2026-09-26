@@ -1,0 +1,23 @@
+{
+  "appId": "com.aveon.player",
+  "appName": "авеон",
+  "webDir": "mobile/www",
+  "android": {
+    "path": "mobile/android",
+    "allowMixedContent": true,
+    "backgroundColor": "#1b1411"
+  },
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "CapacitorHttp": {
+      "enabled": false
+    },
+    "SystemBars": {
+      "style": "DARK",
+      "insetsHandling": "css",
+      "initialViewportFitValueHint": "cover"
+    }
+  }
+}
