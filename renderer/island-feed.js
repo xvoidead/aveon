@@ -9,10 +9,16 @@ const islandOpt = (k) => ({ ...ISLAND_OPTS, ...(state.cfg?.island || {}) })[k];
 
 // Уведомление в острове: заявка в друзья, друг включил трек, кто-то зашёл в комнату…
 const islandNotices = [];
-// person — друг, о котором уведомление: в острове вместо обложки его аватарка
-function islandNotify(text, kind = 'info', person = null) {
+// person — друг, о котором уведомление: в острове вместо обложки его аватарка.
+// actions — кнопки в уведомлении: [{ label, run, primary? }]; run выполняется здесь, в окне плеера.
+// С кнопками уведомление живёт дольше (8 с), а пока на нём курсор — не уходит
+const noticeRuns = new Map(); // id уведомления → его кнопки
+function islandNotify(text, kind = 'info', person = null, actions = []) {
   if (IS_MOBILE || !api.island || !islandOpt('notify')) return;
-  islandNotices.push({ id: `${Date.now()}-${Math.random()}`, text, kind, person: person ? { id: person.id, avatar: person.avatar, name: person.name } : null });
+  const id = `${Date.now()}-${Math.random()}`;
+  if (actions.length) noticeRuns.set(id, actions);
+  if (noticeRuns.size > 20) noticeRuns.delete(noticeRuns.keys().next().value);
+  islandNotices.push({ id, text, kind, ttl: actions.length ? 8000 : 4200, person: person ? { id: person.id, avatar: person.avatar, name: person.name } : null });
   if (islandNotices.length > 5) islandNotices.shift();
   window.islandPushSoon?.(); // сразу, а не через 1,5 с, когда на паузе
 }
@@ -110,7 +116,10 @@ function islandNotify(text, kind = 'info', person = null) {
     for (const f of list) {
       const was = heard.get(f.id);
       if (was && !was.playing && t - was.said > 10 * 60 * 1000 && !inRoom.has(f.id)) {
-        islandNotify(`${firstName(f.name)} слушает «${f.now.track.title}»`, 'friend', f);
+        islandNotify(`${firstName(f.name)} слушает «${f.now.track.title}»`, 'friend', f, [
+          { label: 'Слушать с ним', primary: true, run: () => { const x = friendById(f.id); if (x?.now) playFriend(x, false); } }, // friends.js
+          { label: 'Написать', run: () => chatFromIsland(f.id) },
+        ]);
         was.said = t;
       }
       heard.set(f.id, { playing: true, said: was ? was.said : t }); // уже слушал, когда плеер открыли — без уведомления
@@ -130,7 +139,8 @@ function islandNotify(text, kind = 'info', person = null) {
     const t = state.track;
     const n = islandNotices[0];
     if (n && !n.shownAt) n.shownAt = Date.now(); // с этого момента уведомление на экране
-    const base = { notice: n ? { id: n.id, text: n.text, kind: n.kind, av: n.person ? avatarKey(n.person) : '' } : null };
+    const acts = n ? (noticeRuns.get(n.id) || []).map((a, i) => ({ i, label: a.label, primary: !!a.primary })) : [];
+    const base = { notice: n ? { id: n.id, text: n.text, kind: n.kind, ttl: n.ttl, acts, av: n.person ? avatarKey(n.person) : '' } : null };
     if (!t) return { ...base, hasTrack: false };
     let bars = [0, 0, 0, 0, 0];
     let full = null;
@@ -176,7 +186,7 @@ function islandNotify(text, kind = 'info', person = null) {
   // Раньше очередь сдвигалась по часам раз в 4 с — пришедшее перед сдвигом пропадало, не показавшись
   setInterval(() => {
     const n = islandNotices[0];
-    if (n?.shownAt && Date.now() - n.shownAt >= 4200) { islandNotices.shift(); push(); }
+    if (n?.shownAt && Date.now() - n.shownAt >= (n.ttl || 4200)) { islandNotices.shift(); push(); }
   }, 250);
 
   let tick = 0;
@@ -199,6 +209,16 @@ function islandNotify(text, kind = 'info', person = null) {
 
   api.island.onAction((a) => {
     if (locked()) return;
+    // кнопка в уведомлении острова: выполнить и убрать уведомление
+    if (a.type === 'notice') {
+      const run = noticeRuns.get(a.id)?.[a.i]?.run;
+      noticeRuns.delete(a.id);
+      const k = islandNotices.findIndex((x) => x.id === a.id);
+      if (k >= 0) islandNotices.splice(k, 1);
+      push();
+      try { run?.(); } catch (e) { console.warn('кнопка уведомления:', e); }
+      return;
+    }
     if (a.type === 'thumb') {
       if (a.action === 'toggle') togglePlay();
       else if (a.action === 'next') next();

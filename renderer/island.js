@@ -53,7 +53,7 @@ api.island.onState((s) => {
   for (const [k, v] of Object.entries(s.avatars || {})) avatars.set(k, v);
   if (s.notice && s.notice.id !== lastNotice) {
     lastNotice = s.notice.id;
-    notice(s.notice.text, s.notice.av, s.notice.kind);
+    notice(s.notice.text, s.notice.av, s.notice.kind, s.notice.acts, s.notice.id, s.notice.ttl);
   }
   document.body.classList.toggle('hidden', !s.hasTrack && !is('notice') && !previewing);
   if (!s.hasTrack) return;
@@ -203,8 +203,18 @@ document.addEventListener('error', (e) => {
   img.replaceWith(document.createTextNode(img.alt));
 }, true);
 
-function notice(text, av = '', kind = 'info') {
-  if (is('open')) { pendingNotice = { text, av, kind, at: Date.now() }; return; }
+let noticeActs = []; // кнопки текущего уведомления
+let noticeId = '';
+let noticeTtl = 3800;
+function notice(text, av = '', kind = 'info', acts = [], id = '', ttl = 4200) {
+  if (is('open')) { pendingNotice = { text, av, kind, acts, id, ttl, at: Date.now() }; return; }
+  noticeActs = acts || [];
+  noticeId = id;
+  noticeTtl = Math.max(1500, (ttl || 4200) - 400);
+  let row = $('#nacts');
+  if (!row) { row = document.createElement('div'); row.id = 'nacts'; row.className = 'nacts'; pill.append(row); }
+  row.innerHTML = noticeActs.map((a) => `<button class="${a.primary ? 'primary' : ''}" data-i="${a.i}">${esc(a.label)}</button>`).join('');
+  pill.classList.toggle('has-acts', noticeActs.length > 0);
   pill.classList.remove('peek');
   pill.classList.add('notice');
   const face = avatarCss(av);
@@ -217,13 +227,25 @@ function notice(text, av = '', kind = 'info') {
   title.dataset.key = ''; // после уведомления renderLabel перепишет название заново
   $('#p-sub').textContent = NOTICE_FROM[kind] || 'авеон';
   clearTimeout(noticeTimer);
-  noticeTimer = setTimeout(() => {
-    pill.classList.remove('notice', 'face');
-    $('#disc').style.backgroundImage = coverCss();
-    if (!st?.hasTrack) document.body.classList.add('hidden');
-    renderLabel();
-  }, 3800);
+  noticeTimer = setTimeout(endNotice, noticeTtl);
 }
+
+function endNotice() {
+  clearTimeout(noticeTimer);
+  pill.classList.remove('notice', 'face', 'has-acts');
+  $('#disc').style.backgroundImage = coverCss();
+  if (!st?.hasTrack) document.body.classList.add('hidden');
+  renderLabel();
+}
+
+// кнопка в уведомлении: действие выполняет окно плеера (island-feed.js), уведомление уходит сразу
+pill.addEventListener('click', (e) => {
+  const b = e.target.closest('#nacts button');
+  if (!b || !is('notice')) return;
+  e.stopPropagation();
+  act('notice', { id: noticeId, i: +b.dataset.i });
+  endNotice();
+});
 
 // Позиция между сообщениями — сами, по часам
 // Заливка по буквам (richsync): сколько букв текущей строки уже спето — по времени слов
@@ -263,6 +285,8 @@ requestAnimationFrame(tick);
 function pointerIn() {
   clearTimeout(leaveTimer);
   if (is('open')) return;
+  // уведомление с кнопками под курсором — не раскрываем капсулу и не даём ему уйти, пока жмут
+  if (is('notice') && is('has-acts')) { clearTimeout(noticeTimer); return; }
   pill.classList.remove('peek', 'notice');
   pill.classList.add('open');
   renderLabel();
@@ -271,13 +295,14 @@ function pointerIn() {
 }
 function pointerOut() {
   clearTimeout(leaveTimer);
+  if (is('notice') && is('has-acts')) { clearTimeout(noticeTimer); noticeTimer = setTimeout(endNotice, 2500); return; }
   leaveTimer = setTimeout(() => {
     pill.classList.remove('open');
     renderLabel();
     // уведомление, пришедшее под курсором, — сейчас, если ещё свежее
     const p = pendingNotice;
     pendingNotice = null;
-    if (p && Date.now() - p.at < 8000) notice(p.text, p.av, p.kind);
+    if (p && Date.now() - p.at < 8000) notice(p.text, p.av, p.kind, p.acts, p.id, p.ttl);
   }, 220);
 }
 pill.addEventListener('mouseenter', pointerIn); // быстрее часов главного процесса, если событие пришло
