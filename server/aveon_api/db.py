@@ -114,6 +114,15 @@ CREATE TABLE IF NOT EXISTS messages (
     read       INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS messages_pair ON messages(from_id, to_id, id);
+
+-- реакции на сообщения: у каждого одна на сообщение (повторное нажатие снимает)
+CREATE TABLE IF NOT EXISTS message_reactions (
+    msg_id     INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    e          TEXT NOT NULL,
+    at         INTEGER NOT NULL,
+    PRIMARY KEY (msg_id, user_id)
+);
 CREATE INDEX IF NOT EXISTS messages_unread ON messages(to_id, read);
 
 -- что сейчас играет у пользователя: видят только его друзья
@@ -156,5 +165,10 @@ def init() -> None:
             conn.execute("ALTER TABLE users ADD COLUMN avatar TEXT NOT NULL DEFAULT ''")
         if "avatar_at" not in cols:
             conn.execute("ALTER TABLE users ADD COLUMN avatar_at INTEGER NOT NULL DEFAULT 0")
+        mcols = {r["name"] for r in conn.execute("PRAGMA table_info(messages)")}
+        if "edited" not in mcols:  # когда сообщение изменили, 0 — не меняли
+            conn.execute("ALTER TABLE messages ADD COLUMN edited INTEGER NOT NULL DEFAULT 0")
+        if "album" not in mcols:  # альбом в сообщении: {code, title, count, cover} — код из share.py
+            conn.execute("ALTER TABLE messages ADD COLUMN album TEXT")
         if "banned" not in cols:  # админка: заблокированный не может войти
             conn.execute("ALTER TABLE users ADD COLUMN banned INTEGER NOT NULL DEFAULT 0")

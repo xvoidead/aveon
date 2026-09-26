@@ -507,3 +507,31 @@ def test_together_react(client):
     finally:
         a.__exit__(None, None, None)
         b.__exit__(None, None, None)
+
+
+def test_message_edit_react_album(client):
+    t1, l1 = register(client)
+    t2, l2 = register(client)
+    id1, id2 = uid(client, t1), uid(client, t2)
+    client.post("/api/friends", json={"login": l2}, headers=h(t1))
+    client.post("/api/friends", json={"login": l1}, headers=h(t2))
+    m = client.post(f"/api/messages/{id2}", json={"text": "превет"}, headers=h(t1)).json()["message"]
+    assert m["edited"] == 0 and m["reactions"] == []
+
+    assert client.patch(f"/api/messages/{id1}/{m['id']}", json={"text": "x"}, headers=h(t2)).status_code == 403
+    e = client.patch(f"/api/messages/{id2}/{m['id']}", json={"text": "привет"}, headers=h(t1)).json()["message"]
+    assert e["text"] == "привет" and e["edited"] > 0
+
+    r = client.post(f"/api/messages/{id1}/{m['id']}/react", json={"e": "🔥"}, headers=h(t2)).json()["message"]
+    assert r["reactions"] == [{"e": "🔥", "users": [id2]}]
+    client.post(f"/api/messages/{id2}/{m['id']}/react", json={"e": "🔥"}, headers=h(t1))
+    got = client.get(f"/api/messages/{id1}", headers=h(t2)).json()["messages"][0]
+    assert got["reactions"] == [{"e": "🔥", "users": [id2, id1]}] and got["text"] == "привет"
+    r = client.post(f"/api/messages/{id1}/{m['id']}/react", json={"e": "🔥"}, headers=h(t2)).json()["message"]  # снять
+    assert r["reactions"] == [{"e": "🔥", "users": [id1]}]
+    assert client.post(f"/api/messages/{id1}/{m['id']}/react", json={"e": "🍕"}, headers=h(t2)).status_code == 400
+
+    code = client.post("/api/share", json={"kind": "album", "data": {"title": "в дорогу", "tracks": []}}, headers=h(t1)).json()["code"]
+    a = client.post(f"/api/messages/{id2}", json={"album": {"code": code, "title": "в дорогу", "count": 12}}, headers=h(t1))
+    assert a.status_code == 200 and a.json()["message"]["album"]["code"] == code
+    assert client.post(f"/api/messages/{id2}", json={"album": {"code": "nope", "title": "x"}}, headers=h(t1)).status_code == 400
