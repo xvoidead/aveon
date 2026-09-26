@@ -38,6 +38,13 @@ function censorTick(dt) {
   const tau = want > cz.c ? 12 : 60;
   cz.c += (want - cz.c) * (1 - Math.exp(-dt / tau));
   if (Math.abs(cz.c - want) < 0.01) cz.c = want;
+  // задом наперёд, скретч, заикание, плёнка — их делает скретч-обработчик: включаем на время слова
+  const effect = state.cfg?.censor?.effect;
+  const on = !!want && CZ_WORKLET.has(effect);
+  if (on !== !!cz.fxOn && typeof vinyl !== 'undefined' && vinyl.node) {
+    cz.fxOn = on;
+    vinyl.node.port.postMessage({ type: 'fx', mode: on ? effect : null, dur: 1 });
+  }
 }
 
 function censorStatusText() {
@@ -62,7 +69,7 @@ function censorStatus() {
 
 function censorSettingsHtml() {
   const c = state.cfg.censor;
-  const seg = (key, items) => `<div class="seg" data-cz-seg="${key}">${items.map(([v, label]) => `<button data-v="${v}" class="${c[key] === v ? 'on' : ''}">${label}</button>`).join('')}</div>`;
+  const seg = (key, items) => `<div class="seg wrap" data-cz-seg="${key}">${items.map(([v, label]) => `<button data-v="${v}" class="${c[key] === v ? 'on' : ''}">${label}</button>`).join('')}</div>`;
   const sw = (key, label) => `<div class="field"><label>${label}</label><div class="ctl"><label class="switch"><input type="checkbox" data-cz-bool="${key}" ${c[key] ? 'checked' : ''} aria-label="${label}"><span></span></label></div></div>`;
   return `
     <section class="sec" data-sec="censor">
@@ -73,7 +80,7 @@ function censorSettingsHtml() {
         ${sw('profanity', 'Мат')}
         ${sw('drugs', 'Наркотики')}
         <div class="field"><label>Что прятать</label><div class="ctl">${seg('scope', [['word', 'Только слово'], ['line', 'Всю строку']])}</div></div>
-        <div class="field"><label>Как коверкать</label><div class="ctl">${seg('effect', [['barrel', 'Бочка'], ['warble', 'Плывёт'], ['robot', 'Робот'], ['bleep', 'Пик'], ['mute', 'Тишина']])}</div></div>
+        <div class="field"><label>Как коверкать</label><div class="ctl">${seg('effect', [['barrel', 'Бочка'], ['warble', 'Плывёт'], ['robot', 'Робот'], ['bleep', 'Пик'], ['mute', 'Тишина'], ['reverse', 'Задом наперёд'], ['scratch', 'Скретч'], ['stutter', 'Заикание'], ['tape', 'Плёнка'], ['noise', 'Помехи']])}</div></div>
         <div class="field"><label for="cz-custom">Свои слова</label><div class="ctl">
           <input class="input" id="cz-custom" value="${esc(c.custom.join(', '))}" placeholder="через запятую, ловится и начало слова" spellcheck="false">
         </div></div>

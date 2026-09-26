@@ -230,9 +230,29 @@ function ensureGraph() {
   ctx = new AudioContext({ latencyHint: 'playback' });
   // у каждого плеера свой регулятор (для перехода между треками), дальше общий микшер → эквалайзер
   fx.mix = ctx.createGain();
+  // Канал эха для перехода «эхо»: плеер шлёт в него звук, повторы затихают сами
+  fx.echoIn = ctx.createGain();
+  fx.echo = ctx.createDelay(1);
+  fx.echo.delayTime.value = 0.34;
+  fx.echoFb = ctx.createGain();
+  fx.echoFb.gain.value = 0.52;
+  fx.echoIn.connect(fx.echo).connect(fx.echoFb).connect(fx.echo);
+  fx.echo.connect(fx.mix);
+  // у каждого плеера — свои фильтры для диджейских переходов (микс, фильтр) и отправка в эхо
+  fx.deckFx = new Map();
   fx.deck = new Map(decks.map((el) => {
     const g = ctx.createGain();
-    ctx.createMediaElementSource(el).connect(g).connect(fx.mix);
+    const hp = ctx.createBiquadFilter();
+    hp.type = 'highpass';
+    hp.frequency.value = 10;
+    const lp = ctx.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 22000;
+    const send = ctx.createGain();
+    send.gain.value = 0;
+    ctx.createMediaElementSource(el).connect(hp).connect(lp).connect(g).connect(fx.mix);
+    g.connect(send).connect(fx.echoIn);
+    fx.deckFx.set(el, { hp, lp, send });
     return [el, g];
   }));
   // tap — вход эффектов; между ним и микшером встаёт скретч обложкой (scratch.js), когда загрузится
@@ -282,6 +302,21 @@ function ensureGraph() {
   fx.cRingWet.gain.value = 0;
   fx.cBleep = ctx.createGain();
   fx.cBleep.gain.value = 0;
+  // «Помехи»: шум как у радио между станциями, полосой, чтобы не резал уши
+  const noise = ctx.createBuffer(1, ctx.sampleRate * 2, ctx.sampleRate);
+  const nd = noise.getChannelData(0);
+  for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
+  const ns = ctx.createBufferSource();
+  ns.buffer = noise;
+  ns.loop = true;
+  const nbp = ctx.createBiquadFilter();
+  nbp.type = 'bandpass';
+  nbp.frequency.value = 2400;
+  nbp.Q.value = 0.6;
+  fx.cNoise = ctx.createGain();
+  fx.cNoise.gain.value = 0;
+  ns.connect(nbp).connect(fx.cNoise);
+  ns.start();
   const tone = ctx.createOscillator();
   tone.frequency.value = 1000;
   tone.connect(fx.cBleep);
@@ -291,6 +326,7 @@ function ensureGraph() {
   src.connect(fx.cWarble).connect(fx.cWarbleWet).connect(fx.lp);
   src.connect(fx.cRing).connect(fx.cRingWet).connect(fx.lp);
   fx.cBleep.connect(fx.vol);
+  fx.cNoise.connect(fx.vol);
   fx.lp.connect(fx.boom).connect(fx.master);
   fx.boom.connect(fx.comb);
   fx.comb.connect(fx.combFb).connect(fx.comb);
@@ -298,10 +334,14 @@ function ensureGraph() {
   fx.master.connect(fx.vol).connect(fx.analyser).connect(ctx.destination);
   applyVolume();
   applyEffect(duck.m);
+  if (typeof ensureScratchNode === 'function') ensureScratchNode(); // scratch.js: и для переходов, и для цензуры
 }
 
 // m: 0 — чистый звук, 1 — полностью «в бочке» (или приглушено, если выбран режим громкости).
 // Поверх — самоцензура: c от 0 до 1 (censor.js) тоже уводит в бочку и искажает звук.
+// Способы цензуры, которые делает скретч-обработчик (scratch-worklet.js)
+const CZ_WORKLET = new Set(['reverse', 'scratch', 'stutter', 'tape']);
+
 function applyEffect(m) {
   if (!ctx) return;
   const d = state.cfg.duck;
@@ -310,7 +350,9 @@ function applyEffect(m) {
   const effect = state.cfg.censor?.effect || 'barrel';
   const k = c > 0.001 ? 0.008 : 0.02; // слово короткое — цензура должна включаться быстро
   const quiet = d.effect === 'volume' ? m : 0;
-  const b = Math.max(d.effect === 'volume' ? 0 : m, c);
+  // скретч, задом наперёд, заикание, плёнку и помехи слышно лучше без бочки поверх
+  const cb = CZ_WORKLET.has(effect) || effect === 'noise' ? 0 : c;
+  const b = Math.max(d.effect === 'volume' ? 0 : m, cb);
   // Частоту среза ведём по логарифму — на слух это ровное «закрывание»
   const freq = 20000 * Math.pow(d.barrelCutoff / 20000, b);
   const boom = d.barrelBoom;
@@ -319,7 +361,8 @@ function applyEffect(m) {
   fx.boom.gain.setTargetAtTime(b * boom * 9, t, k);
   fx.combWet.gain.setTargetAtTime(b * boom * 0.38, t, k);
   fx.master.gain.setTargetAtTime((1 - b * (1 - d.barrelLevel)) * (1 - quiet * (1 - d.level)), t, k);
-  fx.cDry.gain.setTargetAtTime(effect === 'barrel' ? 1 : 1 - c, t, k);
+  fx.cDry.gain.setTargetAtTime(effect === 'barrel' || CZ_WORKLET.has(effect) ? 1 : 1 - c, t, k);
+  fx.cNoise.gain.setTargetAtTime(effect === 'noise' ? c * 0.22 : 0, t, k);
   fx.cWarbleWet.gain.setTargetAtTime(effect === 'warble' ? c : 0, t, k);
   fx.cRingWet.gain.setTargetAtTime(effect === 'robot' ? c * 1.4 : 0, t, k); // модуляция вдвое снижает мощность
   fx.cBleep.gain.setTargetAtTime(effect === 'bleep' ? c * 0.18 : 0, t, k);
@@ -394,9 +437,101 @@ function handOff() {
 }
 
 // Новый трек зазвучал — хвост затихает, новый нарастает. Не зазвучал — хвост просто быстро гаснет.
+// Как переходить (настройки → Звук): плавно, микс, фильтр, эхо, перемотка, тормоз, резко, случайно
+const TRANSITIONS = ['fade', 'mix', 'filter', 'echo', 'backspin', 'brake', 'cut'];
+function transitionStyle() {
+  const t = state.cfg.transition || 'fade';
+  if (t !== 'random') return t;
+  const pool = ['mix', 'filter', 'echo', 'backspin', 'brake'];
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+function deckFx(el) { return fx.deckFx?.get(el); }
+
+function resetDeckFx(el) {
+  const f = deckFx(el);
+  if (!f) return;
+  const t = ctx.currentTime;
+  for (const [p, v] of [[f.hp.frequency, 10], [f.lp.frequency, 22000], [f.send.gain, 0]]) {
+    p.cancelScheduledValues(t);
+    p.setValueAtTime(v, t);
+  }
+}
+
+// Диджейский переход. Возвращает, сколько он длится, или 0 — тогда обычный плавный
+function djTransition(style, dur, playing) {
+  const t = ctx.currentTime;
+  const oldEl = tail.el, newEl = audio;
+  const fo = deckFx(oldEl), fn = deckFx(newEl);
+  const gOld = fx.deck.get(oldEl).gain, gNew = fx.deck.get(newEl).gain;
+  if (!fo || !fn || !playing) return 0;
+  gOld.cancelScheduledValues(t);
+  gNew.cancelScheduledValues(t);
+  if (style === 'cut') {
+    gOld.setTargetAtTime(0, t, 0.01);
+    gNew.setValueAtTime(1, t);
+    return 0.08;
+  }
+  if (style === 'mix') {
+    // бас уходящего убираем, бас нового включаем ровно посередине — как свап эквалайзером на пульте
+    fo.hp.frequency.setValueAtTime(10, t);
+    fo.hp.frequency.exponentialRampToValueAtTime(320, t + dur * 0.5);
+    fn.hp.frequency.setValueAtTime(700, t);
+    fn.hp.frequency.setValueAtTime(700, t + dur * 0.48);
+    fn.hp.frequency.exponentialRampToValueAtTime(10, t + dur * 0.56);
+    gOld.setValueCurveAtTime(FADE_OUT.map((v) => v * gOld.value), t, dur);
+    gNew.setValueCurveAtTime(FADE_IN, t, Math.max(0.2, dur * 0.6));
+    return dur;
+  }
+  if (style === 'filter') {
+    // уходящий «закрывается» фильтром вниз, новый «открывается» снизу вверх
+    fo.lp.frequency.setValueAtTime(22000, t);
+    fo.lp.frequency.exponentialRampToValueAtTime(160, t + dur);
+    fn.hp.frequency.setValueAtTime(2800, t);
+    fn.hp.frequency.exponentialRampToValueAtTime(10, t + dur * 0.9);
+    gOld.setValueCurveAtTime(FADE_OUT.map((v) => v * gOld.value), t, dur);
+    gNew.setValueCurveAtTime(FADE_IN, t, Math.max(0.2, dur * 0.7));
+    return dur;
+  }
+  if (style === 'echo') {
+    // уходящий улетает в эхо: сам стихает быстро, повторы гаснут сами, новый входит сразу
+    fo.send.gain.setValueAtTime(0.9, t);
+    fo.send.gain.setTargetAtTime(0, t + 0.35, 0.05);
+    gOld.setValueCurveAtTime(FADE_OUT.map((v) => v * gOld.value), t, 0.35);
+    gNew.setValueCurveAtTime(FADE_IN, t, Math.max(0.3, Math.min(dur, 2)));
+    return Math.max(dur, 2.5);
+  }
+  if (style === 'backspin' || style === 'brake') {
+    // пластинку рывком крутят назад (или тормозят рукой) — звук идёт из памяти скретча,
+    // потом новый трек с самого начала
+    const node = typeof vinyl !== 'undefined' ? vinyl.node : null;
+    if (!node) return 0;
+    const len = style === 'backspin' ? 1.1 : 1.4;
+    node.port.postMessage({ type: 'fx', mode: style, dur: len });
+    gOld.setValueAtTime(0, t + 0.05);
+    gNew.setValueAtTime(0, t);
+    setTimeout(() => {
+      node.port.postMessage({ type: 'fx', mode: null });
+      if (audio === newEl) {
+        newEl.currentTime = 0;
+        const g = fx.deck.get(newEl).gain;
+        g.cancelScheduledValues(ctx.currentTime);
+        g.setValueAtTime(1, ctx.currentTime);
+      }
+    }, len * 1000);
+    return len + 0.1;
+  }
+  return 0;
+}
+
 function startFade() {
   if (!tail || tail.timer) return;
   const playing = !audio.paused;
+  const style = transitionStyle();
+  if (style !== 'fade') {
+    const took = djTransition(style, tail.dur, playing);
+    if (took) { tail.timer = setTimeout(killTail, took * 1000 + 80); return; }
+  }
   const dur = playing ? tail.dur : 0.3;
   const t = ctx.currentTime;
   const gOld = fx.deck.get(tail.el).gain;
@@ -418,7 +553,16 @@ function killTail() {
   dropHls(el);
   el.removeAttribute('src');
   el.load();
-  deckGain(el, 1);
+  // Сначала фильтры, пока плеер беззвучен: резкий сброс фильтра даёт короткий удар — он не должен
+  // прозвучать. Громкость вернём, когда фильтр успокоится
+  resetDeckFx(el);
+  const g = fx.deck?.get(el)?.gain;
+  if (g) {
+    const t = ctx.currentTime;
+    g.cancelScheduledValues(t);
+    g.setValueAtTime(0, t);
+    g.setValueAtTime(1, t + 0.25);
+  }
 }
 
 for (const el of decks) el.addEventListener('ended', () => { if (tail?.el === el) killTail(); });
@@ -1679,6 +1823,10 @@ async function renderSettings() {
       <div class="field"><label for="crossfade">Плавный переход</label><div class="ctl">
         <input id="crossfade" type="range" min="0" max="12" step="1" value="${+c.crossfade || 0}">
         <span class="val" id="crossfade-val">${fadeLabel(c.crossfade)}</span></div></div>
+      <div class="field"><label>Как переходить</label><div class="ctl"><div class="seg wrap" id="transition">
+        ${[['fade', 'Плавно'], ['mix', 'Микс'], ['filter', 'Фильтр'], ['echo', 'Эхо'], ['backspin', 'Перемотка'], ['brake', 'Тормоз'], ['cut', 'Резко'], ['random', 'Случайно']].map(([v, t]) => `<button data-v="${v}" class="${(c.transition || 'fade') === v ? 'on' : ''}">${t}</button>`).join('')}
+      </div></div></div>
+      <p class="sec-desc">Микс — бас уходящего трека сменяется басом нового, как на пульте. Фильтр — старый «закрывается», новый «открывается». Эхо — уходящий улетает в повторы. Перемотка и тормоз — пластинку рывком крутят назад или останавливают рукой, и новый трек стартует с начала.</p>
       <div class="field"><label>Эквалайзер</label><div class="ctl">
         <span class="set-note">${c.eq.enabled ? esc(eqPresetName()) : 'выключен'}</span>
         <button class="btn" id="set-open-eq"><svg><use href="#i-eq"/></svg>Открыть</button></div></div>
@@ -1796,6 +1944,13 @@ ${censorSettingsHtml()}
     $('#crossfade-val', body).textContent = fadeLabel(+e.target.value);
   };
   $('#crossfade', body).onchange = (e) => saveCfg({ crossfade: +e.target.value });
+  $$('#transition button', body).forEach((b) => {
+    b.onclick = async () => {
+      $$('#transition button', body).forEach((x) => x.classList.toggle('on', x === b));
+      await saveCfg({ transition: b.dataset.v });
+      if (!(+state.cfg.crossfade)) toast('Переходы работают, когда «Плавный переход» больше нуля');
+    };
+  });
   bindLook(body); // look.js
 
   $$('input[data-duck]', body).forEach((inp) => {

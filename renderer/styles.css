@@ -1608,3 +1608,6 @@ body.is-scratching { user-select: none; }
   .fr-msg.enter, .fr-msg.sent, .fr-unread.pop,
   .together.friends.view-in > *, .together.friends.view-back > * { animation: none; }
 }
+
+/* длинные наборы вариантов (переходы, цензура) переносятся на новую строку */
+.seg.wrap { flex-wrap: wrap; }

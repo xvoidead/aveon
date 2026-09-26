@@ -14,6 +14,7 @@ const DEFAULTS = {
   friends: { share: true }, // друзья авеона видят, что я слушаю
   seenVersion: '', // какую версию уже показали в «Что нового»: выросла — показываем при запуске
   crossfade: 6, // с — плавный переход между треками, 0 — выключен
+  transition: 'fade', // fade | mix | filter | echo | backspin | brake | cut | random — renderer/app.js
   ui: {
     keepTitles: false, // true — названия треков без строчного стиля
     autoHideWin: true, // кнопки окна появляются, только когда к ним подводишь курсор
@@ -56,7 +57,7 @@ const DEFAULTS = {
     profanity: true, // мат
     drugs: true, // упоминания наркотиков
     scope: 'word', // word — только слово; line — вся строка
-    effect: 'warble', // barrel — только бочка; warble — плывёт; robot — робот; bleep — пик; mute — тишина
+    effect: 'warble', // barrel, warble, robot, bleep, mute; reverse, scratch, stutter, tape — скретч-обработчик; noise — помехи
     custom: [], // свои слова: всё, что начинается с них
   },
   eq: {
