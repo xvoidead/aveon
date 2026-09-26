@@ -9,9 +9,10 @@ const islandOpt = (k) => ({ ...ISLAND_OPTS, ...(state.cfg?.island || {}) })[k];
 
 // Уведомление в острове: заявка в друзья, друг включил трек, кто-то зашёл в комнату…
 const islandNotices = [];
-function islandNotify(text, kind = 'info') {
+// person — друг, о котором уведомление: в острове вместо обложки его аватарка
+function islandNotify(text, kind = 'info', person = null) {
   if (IS_MOBILE || !api.island || !islandOpt('notify')) return;
-  islandNotices.push({ id: `${Date.now()}-${Math.random()}`, text, kind });
+  islandNotices.push({ id: `${Date.now()}-${Math.random()}`, text, kind, person: person ? { id: person.id, avatar: person.avatar, name: person.name } : null });
   if (islandNotices.length > 5) islandNotices.shift();
 }
 
@@ -84,17 +85,31 @@ function islandNotify(text, kind = 'info') {
 
   // ---- друзья: кто слушает прямо сейчас, и кто из них только что включил новый трек ----
   const heard = new Map(); // id друга → id его трека
+
+  // Состояние уходит в остров до 30 раз в секунду — картинки туда не гоняем. Остров получает
+  // аватарку один раз (avatars: {ключ: data:…}), дальше — только ключ. Раз в полминуты шлём заново:
+  // вдруг остров перезапускался и всё забыл
+  const sentAvatars = new Set();
+  let newAvatars = {};
+  setInterval(() => sentAvatars.clear(), 30000);
+  function avatarKey(p) {
+    const url = typeof friendAvatarUrl === 'function' ? friendAvatarUrl(p) : ''; // friends.js
+    if (!url) return '';
+    const key = `${p.id}:${p.avatar}`;
+    if (!sentAvatars.has(key)) { sentAvatars.add(key); newAvatars[key] = url; }
+    return key;
+  }
   function friendsNow() {
     if (!islandOpt('friends')) return null;
     const list = (Friends.data?.friends || []).filter((f) => f.now?.playing);
     for (const f of list) {
       const key = f.now.track.id || `${f.now.track.title}|${f.now.track.artist}`;
-      if (heard.has(f.id) && heard.get(f.id) !== key) islandNotify(`${firstName(f.name)} слушает «${f.now.track.title}»`, 'friend');
+      if (heard.has(f.id) && heard.get(f.id) !== key) islandNotify(`${firstName(f.name)} слушает «${f.now.track.title}»`, 'friend', f);
       heard.set(f.id, key);
     }
     const room = Together.room;
     return {
-      live: list.slice(0, 4).map((f) => ({ name: f.name, letter: (f.name || '?').trim()[0]?.toUpperCase() || '?', title: f.now.track.title || '' })),
+      live: list.slice(0, 4).map((f) => ({ name: f.name, letter: (f.name || '?').trim()[0]?.toUpperCase() || '?', title: f.now.track.title || '', av: avatarKey(f) })),
       count: list.length,
       room: room && room.members.length > 1 ? room.members.length : 0,
     };
@@ -102,7 +117,8 @@ function islandNotify(text, kind = 'info') {
 
   function snapshot(wall) {
     const t = state.track;
-    const base = { notice: islandNotices[0] || null };
+    const n = islandNotices[0];
+    const base = { notice: n ? { id: n.id, text: n.text, kind: n.kind, av: n.person ? avatarKey(n.person) : '' } : null };
     if (!t) return { ...base, hasTrack: false };
     let bars = [0, 0, 0, 0, 0];
     let full = null;
@@ -138,7 +154,9 @@ function islandNotify(text, kind = 'info') {
   function push() {
     lastSent = performance.now();
     const wall = !!state.cfg?.livewall?.enabled;
-    api.island.push(snapshot(wall));
+    const snap = snapshot(wall);
+    if (Object.keys(newAvatars).length) { snap.avatars = newAvatars; newAvatars = {}; }
+    api.island.push(snap);
   }
 
   // уведомление показывается ~4 секунды, потом следующее
@@ -157,7 +175,7 @@ function islandNotify(text, kind = 'info') {
 
   // «Слушать вместе»: кто-то зашёл или вышел
   api.together.onEvent((ev) => {
-    if (ev.type === 'members' && ev.joined?.length) islandNotify(`${ev.joined.map((m) => firstName(m.name || 'друг')).join(', ')} — в комнате`, 'together');
+    if (ev.type === 'members' && ev.joined?.length) islandNotify(`${ev.joined.map((m) => firstName(m.name || 'друг')).join(', ')} — в руме`, 'together');
   });
 
   api.island.onAction((a) => {

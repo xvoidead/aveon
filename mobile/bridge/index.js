@@ -266,6 +266,8 @@ const api = {
     invite: call((id, code) => friends.invite(id, code)),
     dismiss: call((id) => friends.dismiss(id)),
     knock: call((id) => friends.knock(id)),
+    messages: call((id, before) => friends.messages(id, before)),
+    send: call((id, body) => friends.send(id, body)),
     unknock: call((id) => friends.unknock(id)),
     avatar: call((userId, at) => account.avatarOf(userId, at)),
     now: (p) => { ready.then(() => friends.now(clone(p))); },

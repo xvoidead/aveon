@@ -318,3 +318,28 @@ def test_room_invite_and_knock(client):
         ROOMS.pop("ABCDEF", None)
         fr.INVITES.clear()
         fr.KNOCKS.clear()
+
+
+def test_messages(client):
+    t1, l1 = register(client)
+    t2, l2 = register(client)
+    t3, _ = register(client)
+    id1, id2 = uid(client, t1), uid(client, t2)
+    assert client.post(f"/api/messages/{id2}", json={"text": "привет"}, headers=h(t1)).status_code == 403
+    client.post("/api/friends", json={"login": l2}, headers=h(t1))
+    client.post("/api/friends", json={"login": l1}, headers=h(t2))
+
+    assert client.post(f"/api/messages/{id2}", json={"text": "  "}, headers=h(t1)).status_code == 400
+    r = client.post(f"/api/messages/{id2}", json={"text": "послушай"}, headers=h(t1))
+    assert r.status_code == 200 and r.json()["message"]["mine"]
+    track = {"id": "ym:1", "source": "ym", "title": "Трек", "artist": "Артист"}
+    client.post(f"/api/messages/{id2}", json={"track": track}, headers=h(t1))
+
+    f = client.get("/api/friends", headers=h(t2)).json()["friends"][0]
+    assert f["unread"] == 2 and f["last"]["track_title"] == "Трек"
+
+    msgs = client.get(f"/api/messages/{id1}", headers=h(t2)).json()["messages"]
+    assert [m["text"] for m in msgs] == ["послушай", ""] and msgs[1]["track"] == track and not msgs[0]["mine"]
+    assert client.get("/api/friends", headers=h(t2)).json()["friends"][0]["unread"] == 0
+    assert client.get(f"/api/messages/{id1}?before={msgs[1]['id']}", headers=h(t2)).json()["messages"][0]["text"] == "послушай"
+    assert client.get(f"/api/messages/{id1}", headers=h(t3)).status_code == 403

@@ -71,6 +71,19 @@ CREATE TABLE IF NOT EXISTS friends (
     PRIMARY KEY (user_id, friend_id)
 );
 
+-- сообщения между друзьями: текст и/или трек (JSON)
+CREATE TABLE IF NOT EXISTS messages (
+    id         INTEGER PRIMARY KEY,
+    from_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    to_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    text       TEXT NOT NULL DEFAULT '',
+    track      TEXT,
+    created    INTEGER NOT NULL,
+    read       INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS messages_pair ON messages(from_id, to_id, id);
+CREATE INDEX IF NOT EXISTS messages_unread ON messages(to_id, read);
+
 -- что сейчас играет у пользователя: видят только его друзья
 CREATE TABLE IF NOT EXISTS nowplaying (
     user_id    INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
