@@ -117,7 +117,7 @@ const tgAvatars = new Map(); // `${user}:${avatar}` → data:… или '' (не
 
 function memberAvatar(m) {
   const r = Together.room;
-  if (r && m.id === r.you) return state.cfg.ui?.avatar || '';
+  if (r && m.id === r.you) return state.account.avatar || '';
   return tgAvatars.get(`${m.user}:${m.avatar}`) || '';
 }
 

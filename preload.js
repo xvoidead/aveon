@@ -60,6 +60,7 @@ contextBridge.exposeInMainWorld('tishe', {
     logoutAll: () => call('acc:logoutAll'),
     me: () => call('acc:me'),
     rename: (name) => call('acc:rename', name),
+    avatar: (dataUrl) => call('acc:avatar', dataUrl),
     password: (old, next) => call('acc:password', old, next),
     remove: (password) => call('acc:delete', password),
     sync: () => call('acc:sync'),

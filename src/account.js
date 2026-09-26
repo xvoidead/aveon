@@ -77,6 +77,7 @@ function status() {
     loggedIn: !!config.getSecret('acc.token'),
     login: a.login,
     name: a.name,
+    avatar: a.avatar || '',
     lastSync: a.lastSync,
     syncing: !!running,
     error: lastError,
@@ -95,7 +96,7 @@ async function enter(route, server, fields) {
   ensureDevice();
   const r = await api('POST', route, { ...fields, device: os.hostname().slice(0, 64) }, { server, token: '' });
   config.setSecret('acc.token', r.token);
-  config.set({ account: { server, login: r.user.login, name: r.user.name, avatarSig: '' } });
+  config.set({ account: { server, login: r.user.login, name: r.user.name, avatar: '', avatarAt: 0 } });
   lastStatsPushed = '';
   start();
   const changed = await sync().catch(() => null);
@@ -157,22 +158,31 @@ async function shareGet(code) {
 }
 
 // ---- аватар ----
-// Свой аватар хранится в настройках вида (синхронизируется между своими компьютерами), а на сервер
-// отправляется отдельно — чтобы его видели друзья в «Слушать вместе». Отправляем, только если изменился.
+// Аватар хранится на сервере: смена сразу уходит туда, другие компьютеры и друзья в «Слушать вместе»
+// берут его оттуда. Здесь лежит только копия (account.avatar), чтобы он был виден и без сети.
 
-const avatarSig = (s) => crypto.createHash('sha1').update(s || '').digest('hex').slice(0, 16);
+async function setAvatar(avatar) {
+  const r = await api('PUT', '/api/me/avatar', { avatar: avatar || '' });
+  config.set({ account: { avatar: avatar || '', avatarAt: r.user.avatar_at } });
+  return status();
+}
 
-async function pushAvatar() {
-  const avatar = config.get().ui?.avatar || '';
-  const sig = avatarSig(avatar);
-  if (acc().avatarSig === sig) return;
-  try {
-    await api('PUT', '/api/me/avatar', { avatar });
-  } catch (e) {
-    if (e.status === 404 || e.status === 405) return; // сервер ещё без аватаров — не мешаем синхронизации
-    throw e;
+// При синхронизации: аватар поменяли с другого компьютера — обновляем копию.
+// Старые версии хранили аватар в настройках вида — такой один раз переносим на сервер
+async function syncAvatar(changed) {
+  let me;
+  try { me = (await api('GET', '/api/me')).user; } catch { return; }
+  if (me.avatar_at === undefined) return; // сервер ещё без аватаров
+  const old = config.get().ui?.avatar;
+  if (old) {
+    config.set({ ui: { avatar: undefined } });
+    if (!me.avatar_at) { await setAvatar(old).catch(() => {}); changed.avatar = true; return; }
   }
-  config.set({ account: { avatarSig: sig } });
+  if (me.avatar_at === acc().avatarAt) return;
+  const avatar = me.avatar_at ? await avatarOf(me.id, me.avatar_at) : '';
+  if (me.avatar_at && !avatar) return; // не скачался — попробуем в следующий раз
+  config.set({ account: { avatar, avatarAt: me.avatar_at } });
+  changed.avatar = true;
 }
 
 // Аватар участника комнаты: at — когда он его менял, по нему же и кэш
@@ -277,11 +287,11 @@ async function syncStats(docs, changed) {
 async function runSync() {
   const { docs } = await api('GET', '/api/sync');
   const doc = (kind, key) => docs.find((d) => d.kind === kind && d.key === key) || null;
-  const changed = { albums: false, settings: false, stats: false };
+  const changed = { albums: false, settings: false, stats: false, avatar: false };
   await syncAlbums(doc('albums', 'main'), changed);
   await syncSettings(doc('settings', 'main'), changed);
   await syncStats(docs, changed);
-  await pushAvatar(); // после настроек: аватар мог прийти с другого компьютера
+  await syncAvatar(changed);
   config.set({ account: { lastSync: Date.now() } });
   return changed;
 }
@@ -335,5 +345,5 @@ function init(onEvent) {
 
 module.exports = {
   init, status, register, login, logout, logoutAll, me, rename, changePassword, remove, sync, settingsChanged,
-  sharePut, shareGet, avatarOf,
+  sharePut, shareGet, avatarOf, setAvatar,
 };

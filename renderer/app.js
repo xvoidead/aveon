@@ -1884,7 +1884,6 @@ function applySynced(changed) {
       state.cfg = cfg;
       document.body.classList.toggle('keep-titles', !!cfg.ui?.keepTitles);
       applyWinAutohide();
-      renderMe(); // profile.js: аватар и имя
       syncDuckSwitch();
       eqApply(); // eq.js: эквалайзер и свои пресеты тоже приходят с других компьютеров
       renderEq(); // открытое окно эквалайзера перечитает настройки

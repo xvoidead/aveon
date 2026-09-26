@@ -366,6 +366,7 @@ function registerIpc() {
   handle('acc:logoutAll', () => account.logoutAll());
   handle('acc:me', () => account.me());
   handle('acc:rename', (name) => account.rename(name));
+  handle('acc:avatar', (dataUrl) => account.setAvatar(dataUrl));
   handle('acc:password', (old, next) => account.changePassword(old, next));
   handle('acc:delete', (password) => account.remove(password));
   handle('acc:sync', () => account.sync());

@@ -12,7 +12,7 @@ const pf = { devices: null, devicesError: '', loadingDevices: false };
 const profileOpen = () => !profileEl.hidden;
 const displayName = () => state.account.name || state.account.login || 'гость';
 const initial = (s) => (String(s || '?').trim()[0] || '?').toUpperCase();
-const avatarUrl = () => state.cfg.ui?.avatar || '';
+const avatarUrl = () => state.account.avatar || ''; // копия с сервера (src/account.js)
 
 // Аватар: своя картинка или первая буква имени на градиенте
 function paintAvatar(el, name) {
@@ -44,8 +44,9 @@ function cropAvatar(file) {
   });
 }
 
+// Сразу на сервер: оттуда аватар берут другие компьютеры и друзья в «Слушать вместе»
 async function setAvatar(dataUrl) {
-  await saveCfg({ ui: { avatar: dataUrl } });
+  state.account = await api.account.avatar(dataUrl);
   renderMe();
   if (profileOpen()) renderProfileParts(['hero']);
 }
@@ -68,7 +69,7 @@ function pickAvatar() {
 function avatarMenu(anchor) {
   showMenu([
     { label: avatarUrl() ? 'Загрузить другое фото' : 'Загрузить фото', icon: 'i-user', onClick: pickAvatar },
-    ...(avatarUrl() ? [{ sep: true }, { label: 'Убрать фото', icon: 'i-trash', danger: true, onClick: () => setAvatar('').then(() => toast('Аватар убран')) }] : []),
+    ...(avatarUrl() ? [{ sep: true }, { label: 'Убрать фото', icon: 'i-trash', danger: true, onClick: () => setAvatar('').then(() => toast('Аватар убран'), (e) => toast(e.message, 'err')) }] : []),
   ], { anchor });
 }
 
