@@ -44,6 +44,7 @@ async function refreshDiscordStatus() {
 }
 
 function discordSection() {
+  if (IS_MOBILE) return ''; // Rich Presence есть только у Discord на компьютере
   const c = state.cfg.discord || {};
   const s = discordStatus;
   const on = c.enabled !== false;

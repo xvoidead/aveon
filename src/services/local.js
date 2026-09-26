@@ -133,6 +133,12 @@ function allowFiles(paths) {
   for (const p of paths) allowed.add(p);
 }
 
+// Адрес файла для <audio>: протокол media:// в main.js, с перемоткой
+function streamUrl(p) {
+  allowed.add(p);
+  return `media://local/?p=${encodeURIComponent(p)}`;
+}
+
 async function filesToTracks(paths) {
   const mm = await import('music-metadata');
   const out = [];
@@ -240,6 +246,6 @@ async function lookup(query) {
 }
 
 module.exports = {
-  loadCache, scan, coverOf, allowed, allowFiles, filesToTracks, EXT,
+  loadCache, scan, coverOf, allowed, allowFiles, streamUrl, filesToTracks, EXT,
   applyOverride, editMeta, resetMeta, lookup, readArt, allowCoverPick, COVER_TYPES,
 };

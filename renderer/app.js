@@ -1,6 +1,10 @@
 'use strict';
 
 const api = window.tishe;
+// Android-сборка (mobile/): тот же интерфейс, но телефонная раскладка и свои возможности
+const IS_MOBILE = !!api.mobile;
+document.documentElement.classList.toggle('mobile', IS_MOBILE);
+if (IS_MOBILE) document.getElementById('now-artist').textContent = 'Выбери трек в библиотеке';
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => [...r.querySelectorAll(s)];
 
@@ -805,13 +809,15 @@ function duckTick() {
   if (!d) return;
   const m = duck.meter;
 
-  mic.want = d.enabled && d.includeMic && !!m.call;
+  // На Android микрофон в звонке занят Discord — свой детектор речи там не работает
+  mic.want = !IS_MOBILE && d.enabled && d.includeMic && !!m.call;
   if (mic.want) micStart(); else micStop();
   micTick();
   if (mic.speaking) duck.lastVoice = now;
 
-  const talking = !!m.call && now - duck.lastVoice < d.hold;
-  const active = d.enabled && !!m.call && (d.mode === 'call' || talking);
+  // manual — бочка включена вручную (Android: кнопка на сцене и в уведомлении)
+  const talking = !!m.manual || (!!m.call && now - duck.lastVoice < d.hold);
+  const active = !!m.manual || (d.enabled && !!m.call && (d.mode === 'call' || talking));
   const want = active ? 1 : 0;
   const tau = want > duck.m ? d.attack : d.release;
   duck.m += (want - duck.m) * (1 - Math.exp(-dt / Math.max(10, tau / 3)));
@@ -838,12 +844,16 @@ function renderCall(talking) {
   const m = duck.meter;
   const broken = duck.ok === false;
   const inCall = !!m.call;
-  $('#discord').classList.toggle('off', !inCall && !broken);
-  $('#discord').classList.toggle('no-meters', !inCall);
+  // На телефоне плашка видна всегда: в ней кнопка «в бочку вручную», а шкал нет
+  $('#discord').classList.toggle('off', !IS_MOBILE && !inCall && !broken);
+  $('#discord').classList.toggle('no-meters', IS_MOBILE || !inCall);
+  if (IS_MOBILE) $('#duck-manual').setAttribute('aria-pressed', String(!!m.manual));
 
   const el = $('#duck-chip');
   let text, cls = '';
   if (broken) { text = 'Монитор звука не запустился'; cls = 'err'; }
+  else if (m.manual) { text = 'Музыка в бочке'; cls = 'talk'; }
+  else if (!inCall) text = 'Не в звонке';
   else if (!d.enabled) text = 'В звонке, эффект выключен';
   else if (talking) { text = 'Говорят, музыка в бочке'; cls = 'talk'; }
   else text = 'В звонке, тихо';
@@ -851,7 +861,7 @@ function renderCall(talking) {
   el.className = `call-state ${cls}`;
   el.title = broken ? duck.error : '';
 
-  if (!inCall) return; // шкалы скрыты — считать их незачем
+  if (!inCall || IS_MOBILE) return; // шкалы скрыты — считать их незачем
 
   $('#meter-fill').style.width = `${meterScale(m.o) * 100}%`;
   $('#meter-threshold').style.left = `${meterScale(d.threshold) * 100}%`;
@@ -875,6 +885,7 @@ makeSlider($('#meter'), {
 });
 
 $('#duck-enabled').addEventListener('change', (e) => saveCfg({ duck: { enabled: e.target.checked } }));
+if (IS_MOBILE) $('#duck-manual').addEventListener('click', () => api.mobile.barrel(!duck.meter.manual));
 
 // ---------- списки треков ----------
 
@@ -1438,7 +1449,7 @@ function renderLocal() {
   if (!all.length) {
     showEmpty({
       title: 'Добавь свою музыку',
-      text: 'Выбери папку с mp3, flac, ogg, m4a или wav. Можно просто перетащить файлы в окно.',
+      text: IS_MOBILE ? 'Выбери папку с музыкой в памяти телефона или открой отдельные файлы.' : 'Выбери папку с mp3, flac, ogg, m4a или wav. Можно просто перетащить файлы в окно.',
       actions: [['Добавить папку', addFolder, true], ['Открыть файлы', openFiles]],
     });
     return;
@@ -1516,7 +1527,7 @@ const SET_TABS = [
   ['services', 'Сервисы', 'i-plug'],
   ['library', 'Папки', 'i-folder'],
   ['keys', 'Клавиши', 'i-keys'],
-];
+].filter(([id]) => !(IS_MOBILE && id === 'keys')); // на телефоне клавиатуры нет
 const SEC_TAB = { sound: 'look', ui: 'look', duck: 'call', mic: 'call', ext: 'call', censor: 'censor', ym: 'services', sc: 'services', sp: 'services', discord: 'services', local: 'library', keys: 'keys' };
 let settingsTab = 'look';
 
@@ -1635,12 +1646,15 @@ async function renderSettings() {
       <h3 class="sec-title">Вид</h3>
       <p class="sec-desc">Интерфейс написан строчными буквами. Названия треков, артистов и тексты песен тоже, но их можно оставить как есть.</p>
       <div class="field"><label>Названия треков как есть</label><div class="ctl"><label class="switch"><input type="checkbox" id="keep-titles" ${c.ui?.keepTitles ? 'checked' : ''} aria-label="Названия треков как есть"><span></span></label></div></div>
-      <div class="field"><label>Прятать кнопки окна</label><div class="ctl"><label class="switch"><input type="checkbox" id="autohide-win" ${c.ui?.autoHideWin !== false ? 'checked' : ''} aria-label="Прятать кнопки окна"><span></span></label></div></div>
+      <div class="field"><label>Фон в цвет обложки</label><div class="ctl"><label class="switch"><input type="checkbox" id="tint-bg" ${(c.ui?.tintBg ?? !IS_MOBILE) ? 'checked' : ''} aria-label="Фон в цвет обложки"><span></span></label></div></div>
+      <div class="field desktop-only"><label>Прятать кнопки окна</label><div class="ctl"><label class="switch"><input type="checkbox" id="autohide-win" ${c.ui?.autoHideWin !== false ? 'checked' : ''} aria-label="Прятать кнопки окна"><span></span></label></div></div>
     </section>
 
     <section class="sec" data-sec="duck">
       <h3 class="sec-title">Когда в Discord говорят</h3>
-      <p class="sec-desc">Плеер слушает звук Discord через микшер Windows, бот и токен не нужны. Пока в звонке звучит голос, музыка уходит в бочку: глухо, с гулом, как из-за стенки. В паузах она возвращается.</p>
+      <p class="sec-desc">${IS_MOBILE
+        ? 'Android не даёт приложениям слышать звук чужого звонка, поэтому на телефоне музыка уходит в бочку на весь звонок в Discord. Ещё бочку можно включить вручную — кнопкой на экране плеера или в уведомлении.'
+        : 'Плеер слушает звук Discord через микшер Windows, бот и токен не нужны. Пока в звонке звучит голос, музыка уходит в бочку: глухо, с гулом, как из-за стенки. В паузах она возвращается.'}</p>
       <div class="field"><label>Включено</label><div class="ctl"><label class="switch"><input type="checkbox" data-duck-bool="enabled" ${d.enabled ? 'checked' : ''} aria-label="Включено"><span></span></label></div></div>
       <div class="field"><label>Эффект</label><div class="ctl"><div class="seg" data-duck-seg="effect">
         <button data-v="barrel" class="${barrel ? 'on' : ''}">Бочка</button>
@@ -1654,17 +1668,17 @@ async function renderSettings() {
       <div class="sub-fields" ${barrel ? 'data-off' : ''}>
         ${rangeField('level', 'Громкость музыки', 0, 1, 0.01)}
       </div>
-      <div class="field"><label>Когда включать</label><div class="ctl"><div class="seg" data-duck-seg="mode">
+      <div class="field desktop-only"><label>Когда включать</label><div class="ctl"><div class="seg" data-duck-seg="mode">
         <button data-v="voice" class="${d.mode === 'voice' ? 'on' : ''}">Пока говорят</button>
         <button data-v="call" class="${d.mode === 'call' ? 'on' : ''}">Весь звонок</button>
       </div></div></div>
-      ${rangeField('threshold', 'Порог для собеседников', 0.001, 0.25, 0.001)}
+      ${IS_MOBILE ? '' : rangeField('threshold', 'Порог для собеседников', 0.001, 0.25, 0.001)}
       ${rangeField('attack', 'Скорость ухода в бочку', 20, 1000, 10)}
       ${rangeField('release', 'Скорость возврата', 100, 4000, 50)}
-      ${rangeField('hold', 'Держать после фразы', 0, 3000, 50)}
+      ${IS_MOBILE ? '' : rangeField('hold', 'Держать после фразы', 0, 3000, 50)}
     </section>
 
-    <section class="sec" data-sec="mic">
+    <section class="sec desktop-only" data-sec="mic">
       <h3 class="sec-title">Твой голос</h3>
       <p class="sec-desc">Плеер сам слушает микрофон, пока ты в звонке, через шумоподавление и эхоподавление. Фоновый шум, щелчки клавиатуры и музыка из колонок не считаются речью: детектор ждёт звук в полосе голоса, заметно громче фона и дольше 120 мс. Записей не делается, звук никуда не отправляется.</p>
       <div class="field"><label>Реагировать на мой голос</label><div class="ctl"><label class="switch"><input type="checkbox" data-duck-bool="includeMic" ${d.includeMic ? 'checked' : ''} aria-label="Реагировать на мой голос"><span></span></label></div></div>
@@ -1715,11 +1729,11 @@ ${censorSettingsHtml()}
 
     <section class="sec" data-sec="local">
       <h3 class="sec-title">Папки с музыкой</h3>
-      <div class="folders">${c.localFolders.map((f) => `<div class="folder"><svg><use href="#i-folder"/></svg><span title="${esc(f)}">${esc(f)}</span><button data-rm-folder="${esc(f)}" aria-label="Убрать папку"><svg><use href="#i-close"/></svg></button></div>`).join('') || '<p class="sec-desc">Пока ни одной папки.</p>'}</div>
+      <div class="folders">${c.localFolders.map((f) => `<div class="folder"><svg><use href="#i-folder"/></svg><span title="${esc(f)}">${esc(f || 'Вся память телефона')}</span><button data-rm-folder="${esc(f)}" aria-label="Убрать папку"><svg><use href="#i-close"/></svg></button></div>`).join('') || '<p class="sec-desc">Пока ни одной папки.</p>'}</div>
       <div class="row-actions"><button class="btn" id="folder-add"><svg><use href="#i-plus"/></svg>Добавить папку</button>${c.localFolders.length ? '<button class="btn" id="folder-rescan"><svg><use href="#i-refresh"/></svg>Пересканировать</button>' : ''}</div>
     </section>
 
-    <section class="sec" data-sec="ext">
+    <section class="sec desktop-only" data-sec="ext">
       <h3 class="sec-title">Приглушать другие программы</h3>
       <p class="sec-desc">Можно заодно приглушать другие программы, например браузер. Бочку к ним не применить, только громкость. Впиши имена процессов через запятую.</p>
       <div class="field"><label for="duck-targets">Процессы</label><div class="ctl">
@@ -1747,6 +1761,11 @@ ${censorSettingsHtml()}
     state.cfg.ui.autoHideWin = e.target.checked;
     applyWinAutohide();
     saveCfg({ ui: { autoHideWin: e.target.checked } });
+  };
+  $('#tint-bg', body).onchange = (e) => {
+    state.cfg.ui.tintBg = e.target.checked;
+    reapplyTheme(); // extras.js
+    saveCfg({ ui: { tintBg: e.target.checked } });
   };
   $('#keep-titles', body).onchange = (e) => {
     document.body.classList.toggle('keep-titles', e.target.checked);

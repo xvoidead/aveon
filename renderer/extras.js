@@ -5,7 +5,12 @@
 // ---------- палитра из обложки ----------
 
 const THEME_VARS = ['--oak', '--oak-2', '--rivet', '--rivet-2', '--hoop', '--hoop-dim', '--text', '--text-2', '--text-3', '--amber', '--voice'];
+const BG_VARS = ['--oak', '--oak-2', '--rivet', '--rivet-2', '--hoop', '--hoop-dim', '--text', '--text-2', '--text-3'];
 let themeSeq = 0;
+let lastPalette = null;
+
+// Фон в цвет обложки: на компьютере по умолчанию включён, на телефоне — нет (только акцент)
+const tintBg = () => state.cfg?.ui?.tintBg ?? !IS_MOBILE;
 
 const hsl = (h, s, l) => `hsl(${Math.round(((h % 360) + 360) % 360)} ${Math.round(s * 100)}% ${Math.round(l * 100)}%)`;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
@@ -24,6 +29,7 @@ function rgbToHsl(r, g, b) {
 
 function resetTheme() {
   themeSeq++;
+  lastPalette = null;
   for (const v of THEME_VARS) document.documentElement.style.removeProperty(v);
 }
 
@@ -77,7 +83,13 @@ function analyzeCover(img) {
   return { bgHue, bgSat: avgSat, accentHue, accentSat, vivid };
 }
 
+// Перекрасить заново после смены настройки «фон в цвет обложки»
+function reapplyTheme() {
+  if (lastPalette) setTheme(lastPalette);
+}
+
 function setTheme(p) {
+  lastPalette = p;
   const bgS = clamp(p.bgSat * 0.7, 0.06, 0.38);
   const vars = {
     '--oak': hsl(p.bgHue, bgS, 0.075),
@@ -94,7 +106,11 @@ function setTheme(p) {
     // Цвет голосов не должен сливаться с акцентом музыки
     '--voice': p.vivid && hueDist(p.accentHue, 232) < 50 ? hsl(158, 0.55, 0.7) : '#9aa8ff',
   };
-  for (const [k, v] of Object.entries(vars)) document.documentElement.style.setProperty(k, v);
+  const root = document.documentElement.style;
+  for (const [k, v] of Object.entries(vars)) {
+    if (!tintBg() && BG_VARS.includes(k)) root.removeProperty(k);
+    else root.setProperty(k, v);
+  }
 }
 
 // Цвета для canvas-визуализатора (читаем раз в полсекунды, с учётом плавного перехода)

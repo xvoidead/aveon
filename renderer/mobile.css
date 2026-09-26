@@ -1,0 +1,194 @@
+/* Телефонная раскладка (Android, mobile/build.mjs подключает этот файл после styles.css).
+   Библиотека на весь экран, снизу мини-плеер; бочка — отдельный экран, выезжает снизу.
+   --sat / --sab — системные панели сверху и снизу: env() или то, что подставляет SystemBars Capacitor. */
+html.mobile {
+  --sat: max(var(--safe-area-inset-top, 0px), env(safe-area-inset-top, 0px));
+  --sab: max(var(--safe-area-inset-bottom, 0px), env(safe-area-inset-bottom, 0px));
+  --mini-h: 64px;
+  -webkit-tap-highlight-color: transparent;
+}
+html.mobile body {
+  display: block;
+  font-size: 15px;
+  overscroll-behavior: none;
+  touch-action: manipulation;
+}
+html.mobile .titlebar { display: none; }
+html.mobile .mobile-only { display: revert !important; }
+
+/* ---------- библиотека ---------- */
+html.mobile .library {
+  position: fixed; inset: 0;
+  padding: calc(var(--sat) + 10px) 16px 0;
+  padding-bottom: calc(var(--mini-h) + var(--sab) + 12px);
+}
+html.mobile .lib-top { gap: 6px; margin: 0 -16px; padding: 0 12px 0 16px; }
+html.mobile .sources {
+  gap: 6px; scroll-snap-type: x proximity; padding: 2px 0;
+  mask-image: linear-gradient(90deg, #000 88%, transparent);
+}
+html.mobile .source {
+  padding: 7px 14px; border-radius: 999px; background: var(--oak-2); border: 1px solid var(--rivet-2);
+  font-size: 14px; scroll-snap-align: start;
+}
+html.mobile .source.active { background: var(--text); color: var(--oak); border-color: transparent; }
+html.mobile .source.active::after { display: none; }
+html.mobile .search { margin-top: 12px; height: 44px; }
+html.mobile .lib-head { flex-wrap: wrap; gap: 12px; margin-top: 16px; }
+html.mobile .lib-head h1 { font-size: 24px; }
+html.mobile .head-actions { width: 100%; flex-wrap: wrap; }
+html.mobile .coll-arrow { display: none; }
+
+html.mobile .tracklist { margin: 0 -10px; padding: 0 0 16px; -webkit-overflow-scrolling: touch; }
+html.mobile .row { grid-template-columns: 48px minmax(0, 1fr) 40px; gap: 12px; padding: 7px 10px; }
+html.mobile .row .num, html.mobile .row .num img, html.mobile .row .num .ph { width: 48px; height: 48px; }
+html.mobile .row .col-album, html.mobile .row .col-time { display: none; }
+html.mobile .row .play-hover { opacity: 0; }
+html.mobile .row.playing .play-hover { opacity: 1; }
+html.mobile .row:hover { background: none; }
+html.mobile .row.playing { background: var(--rivet); }
+html.mobile .row-more { opacity: 1; width: 40px; height: 40px; }
+html.mobile .row:active { background: var(--oak-2); }
+
+html.mobile .artist-hero { margin-left: 0; height: 300px; }
+html.mobile .hero-body { left: 16px; right: 16px; bottom: 16px; flex-direction: column; align-items: flex-start; gap: 12px; }
+html.mobile .hero-name { font-size: 30px; }
+html.mobile .disc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; }
+html.mobile .artist-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); }
+
+/* ---------- мини-плеер ---------- */
+.mini { display: none; }
+html.mobile .mini {
+  position: fixed; left: 8px; right: 8px; bottom: calc(var(--sab) + 8px); z-index: 12; height: var(--mini-h);
+  display: grid; grid-template-columns: 48px minmax(0, 1fr) 44px 44px; align-items: center; gap: 12px;
+  padding: 0 8px; border-radius: 16px; overflow: hidden;
+  background: color-mix(in srgb, var(--rivet) 88%, var(--amber) 12%);
+  box-shadow: 0 12px 34px rgb(0 0 0 / .45);
+  transition: transform .3s cubic-bezier(.2, .9, .3, 1), opacity .2s ease;
+}
+html.mobile .mini.empty { transform: translateY(140%); opacity: 0; pointer-events: none; }
+html.mobile.now-open .mini { transform: translateY(140%); opacity: 0; pointer-events: none; }
+.mini-cover { width: 48px; height: 48px; border-radius: 10px; background: center / cover no-repeat var(--rivet-2); display: grid; place-items: center; color: var(--text-3); }
+.mini-text { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.mini-title { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini-artist { font-size: 13px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mini .icon-btn { width: 44px; height: 44px; }
+.mini .icon-btn svg { width: 24px; height: 24px; }
+.mini-progress { position: absolute; left: 12px; right: 12px; bottom: 0; height: 2px; background: rgb(255 255 255 / .08); border-radius: 2px; }
+.mini-progress i { display: block; height: 100%; width: 0; background: var(--amber); border-radius: 2px; }
+html.mobile .mini.barrel-on { box-shadow: 0 0 0 1.5px var(--voice), 0 12px 34px rgb(0 0 0 / .45); }
+
+/* ---------- экран «сейчас играет» (сцена с бочкой) ---------- */
+html.mobile .stage {
+  position: fixed; inset: 0; z-index: 14;
+  padding: calc(var(--sat) + 6px) 22px calc(var(--sab) + 16px);
+  gap: 12px; border-right: 0; overflow-y: auto; overflow-x: hidden;
+  transform: translateY(100%); visibility: hidden;
+  transition: transform .34s cubic-bezier(.2, .9, .3, 1), visibility 0s linear .34s;
+}
+html.mobile.now-open .stage { transform: none; visibility: visible; transition: transform .34s cubic-bezier(.2, .9, .3, 1), visibility 0s; }
+html.mobile .stage.dragging { transition: none; }
+.now-close { display: none; }
+html.mobile .now-close {
+  display: flex; align-self: stretch; align-items: center; justify-content: space-between;
+  min-height: 44px; color: var(--text-2);
+}
+html.mobile .now-close .grab { width: 40px; height: 4px; border-radius: 4px; background: var(--hoop-dim); }
+html.mobile .now-close svg { transform: rotate(90deg); width: 24px; height: 24px; }
+html.mobile .stage > .barrel { margin-top: 4px; }
+html.mobile .barrel { width: min(100%, 78vw, calc(100vh - 430px)); min-width: 180px; }
+html.mobile .now-title { font-size: 21px; }
+html.mobile .progress-row { width: 100%; }
+html.mobile .controls { gap: 18px; }
+html.mobile .controls .icon-btn { width: 48px; height: 48px; }
+html.mobile .play-btn { width: 68px; height: 68px; }
+html.mobile .volume-row .volume, html.mobile #btn-mute { display: none; }
+html.mobile .volume-row { justify-content: center; }
+html.mobile .volume-tools { gap: 10px; padding-left: 0; border-left: 0; }
+html.mobile .volume-tools .icon-btn.small { width: 44px; height: 44px; }
+html.mobile .slider { touch-action: none; }
+html.mobile .slider-knob { opacity: 1; }
+html.mobile .stage-foot { margin-top: auto; }
+html.mobile .stage-foot .call.off { margin-top: 0; }
+html.mobile .call-head { gap: 8px; }
+
+/* ---------- окна и панели ---------- */
+html.mobile .modal { place-items: end stretch; background: rgb(10 7 5 / .6); }
+html.mobile .sheet {
+  width: 100%; max-height: calc(100vh - var(--sat) - 12px);
+  border-radius: 20px 20px 0 0; border-bottom: 0; padding-bottom: var(--sab);
+  animation: sheet-up .26s cubic-bezier(.2, .9, .3, 1);
+}
+@keyframes sheet-up { from { transform: translateY(40%); opacity: 0; } }
+html.mobile .sheet-head { padding: 16px 12px 6px 20px; }
+html.mobile .sheet-body { padding: 0 16px 20px; }
+html.mobile .field { grid-template-columns: 1fr; gap: 8px; }
+html.mobile .settings-sheet { height: calc(100vh - var(--sat) - 12px); flex-direction: column; }
+html.mobile .settings-sheet .field { grid-template-columns: 1fr; }
+html.mobile .settings-sheet .sec { padding: 14px 14px; }
+html.mobile .set-nav {
+  order: 2; width: auto; flex-direction: row; overflow-x: auto; padding: 8px 10px calc(8px + var(--sab));
+  border-right: 0; border-top: 1px solid var(--rivet-2); scrollbar-width: none;
+}
+html.mobile .set-tab { display: flex; flex: 1 0 auto; flex-direction: column; align-items: center; gap: 3px; padding: 7px 10px; }
+html.mobile .set-tab span { display: block; font-size: 11px; white-space: nowrap; }
+html.mobile .set-tab small { display: none; }
+html.mobile .set-main { min-height: 0; }
+html.mobile .keys, html.mobile [data-sec="keys"], html.mobile [data-tab="keys"] { display: none; }
+html.mobile .editor { width: 100%; }
+html.mobile .editor-body { grid-template-columns: 1fr; }
+html.mobile .editor-foot { flex-wrap: wrap; }
+html.mobile .dialog { width: 100%; }
+
+html.mobile .menu {
+  left: 8px !important; right: 8px !important; top: auto !important; bottom: calc(var(--sab) + 8px) !important;
+  max-width: none; min-width: 0; max-height: 70vh; padding: 8px; border-radius: 18px;
+  animation: sheet-up .2s cubic-bezier(.2, .9, .3, 1);
+}
+html.mobile .menu-item { padding: 12px 12px; }
+html.mobile .menu-scrim { position: fixed; inset: 0; z-index: 39; background: rgb(10 7 5 / .5); }
+
+html.mobile .together {
+  top: auto; left: 0; right: 0; bottom: 0; width: auto; border-radius: 20px 20px 0 0;
+  padding: 20px 20px calc(20px + var(--sab)); animation: sheet-up .24s cubic-bezier(.2, .9, .3, 1);
+}
+/* «слушать вместе» встаёт под плашкой на сцене (together.js ставит left/top) — на телефоне это шторка */
+html.mobile .together.on-stage { left: 0 !important; top: auto !important; z-index: 35; }
+html.mobile .friends { width: auto; max-height: calc(100vh - var(--sat) - 40px); }
+html.mobile .toasts { left: 16px; right: 16px; bottom: calc(var(--mini-h) + var(--sab) + 20px); align-items: stretch; }
+html.mobile .toast { max-width: none; }
+
+html.mobile .lyrics { inset: 0; z-index: 6; padding: calc(var(--sat) + 6px) 16px calc(var(--mini-h) + var(--sab) + 12px); }
+html.mobile .lyric { font-size: 22px; }
+html.mobile .profile-scroll { padding: calc(var(--sat) + 10px) 16px calc(var(--mini-h) + var(--sab) + 20px); }
+html.mobile .profile { position: fixed; z-index: 11; }
+html.mobile .pf-hero { flex-direction: column; align-items: flex-start; }
+html.mobile .pf-grid { grid-template-columns: 1fr; }
+html.mobile .pf-card { padding: 18px 16px; }
+html.mobile .stats-cols { grid-template-columns: 1fr; }
+
+html.mobile .fs-main { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); padding: calc(var(--sat) + 40px) 22px calc(var(--sab) + 16px); gap: 18px; align-items: start; }
+html.mobile .fs-cover { width: min(100%, 38vh); margin-bottom: 6px; }
+html.mobile .fs-lyrics .lyrics-body { padding: 10vh 0 30vh; }
+html.mobile .fs-lyrics .lyric { font-size: 26px; }
+html.mobile .fs-exit { top: calc(var(--sat) + 8px); }
+
+/* вход в аккаунт: без бочки слева, форма на весь экран */
+html.mobile .auth { grid-template-columns: 1fr; }
+html.mobile .auth-stage { display: none; }
+html.mobile .auth-main { padding: calc(var(--sat) + 32px) 22px calc(var(--sab) + 24px); place-items: start center; }
+
+/* ---------- эквалайзер: шторка снизу (iframe с eqpop.html) ---------- */
+.eqpop-frame {
+  position: fixed; left: 0; right: 0; bottom: 0; z-index: 36; width: 100%; height: min(560px, 86vh);
+  border: 0; background: transparent; color-scheme: dark;
+  transform: translateY(105%); transition: transform .3s cubic-bezier(.2, .9, .3, 1);
+}
+.eqpop-frame.open { transform: none; }
+body.eqpop { padding: 0; }
+body.eqpop .eq-sheet { border-radius: 20px 20px 0 0; animation: none !important; }
+body.eqpop .eq-body { padding: 6px 14px 18px; gap: 12px; overflow-y: auto; }
+body.eqpop .eq-presets { max-width: 100%; overflow-x: auto; flex-wrap: nowrap; }
+body.eqpop .eq-band .hz, body.eqpop .eq-band .db { font-size: 10px; }
+body.eqpop .eq-foot { flex-wrap: wrap; gap: 10px; }
+body.eqpop .eq-foot input[type="range"] { flex: 1 1 140px; }

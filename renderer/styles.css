@@ -1059,3 +1059,9 @@ button.fr-main:not(:disabled):hover { background: var(--rivet); }
 .together-chip.idle .together-chip-icon { display: block; }
 .together-chip.idle .together-dot { display: none; }
 .together-chip[aria-expanded="true"]:not(.idle) { background: color-mix(in srgb, var(--voice) 22%, transparent); }
+
+/* Android-сборка (html.mobile, раскладка — renderer/mobile.css) */
+.mobile-only { display: none !important; }
+html.mobile .desktop-only { display: none !important; }
+.duck-manual { padding: 5px 12px; font-size: 12px; margin-left: auto; }
+.duck-manual[aria-pressed="true"] { background: var(--voice); color: var(--oak); border-color: transparent; }

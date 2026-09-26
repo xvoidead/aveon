@@ -6,7 +6,8 @@ const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
 
-const SRC = path.join(__dirname, '..', 'native', 'DuckMon.cs');
+// В установленном приложении исходник лежит рядом с app.asar (asarUnpack): csc.exe не читает asar
+const SRC = path.join(__dirname, '..', 'native', 'DuckMon.cs').replace(`app.asar${path.sep}`, `app.asar.unpacked${path.sep}`);
 const CSC = [
   path.join(process.env.WINDIR || 'C:\\Windows', 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe'),
   path.join(process.env.WINDIR || 'C:\\Windows', 'Microsoft.NET', 'Framework', 'v4.0.30319', 'csc.exe'),
