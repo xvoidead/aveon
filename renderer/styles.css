@@ -1637,15 +1637,16 @@ body.is-scratching { user-select: none; }
 
 /* ---------- поиск по настройкам ---------- */
 .set-search {
-  display: flex; align-items: center; gap: 10px; margin: 0 0 12px; padding: 0 12px; height: 44px; border-radius: 12px;
+  /* flex: none — в прокручиваемой колонке поле иначе сжималось до ~26 px */
+  flex: none; display: flex; align-items: center; gap: 12px; margin: 0 0 14px; padding: 0 16px; height: 60px; border-radius: 16px;
   background: var(--rivet); border: 1px solid transparent; transition: border-color .15s ease, background .15s ease;
 }
 .set-search:focus-within { border-color: color-mix(in srgb, var(--amber) 55%, transparent); background: var(--oak); }
-.set-search svg { width: 18px; height: 18px; flex: none; color: var(--text-3); }
-.set-search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; color: var(--text); font: 500 15px var(--ui); }
+.set-search svg { width: 20px; height: 20px; flex: none; color: var(--text-3); }
+.set-search input { flex: 1; min-width: 0; height: 100%; border: 0; outline: 0; background: none; color: var(--text); font: 500 16px var(--ui); }
 .set-search input::placeholder { color: var(--text-3); text-transform: lowercase; }
 .set-search input::-webkit-search-cancel-button { filter: invert(.6); cursor: pointer; }
-.set-tabs { display: flex; flex-direction: column; gap: 2px; }
+.set-tabs { flex: none; display: flex; flex-direction: column; gap: 2px; }
 .set-tab.ss-dim { opacity: .4; }
 .set-tab.ss-found small { color: var(--amber); font-weight: 600; }
 .ss-hide { display: none !important; }
