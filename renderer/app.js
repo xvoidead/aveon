@@ -1021,6 +1021,7 @@ function renderCall(talking) {
   if (el.textContent !== text) el.textContent = text;
   el.className = `call-state ${cls}`;
   el.title = broken ? duck.error : '';
+  $('#discord').title = broken ? duck.error : text; // в узком окне надпись спрятана — видна при наведении
 
   if (!inCall || IS_MOBILE) return; // шкалы скрыты — считать их незачем
 
@@ -1937,7 +1938,7 @@ document.addEventListener('keydown', (e) => {
   $('#set-q')?.select();
 }, true);
 function closeSettings() { $('#settings').hidden = true; }
-$('#open-settings').onclick = () => openSettings();
+// кнопки-шестерёнки больше нет: настройки — из профиля и по Ctrl+,
 $('#close-settings').onclick = closeSettings;
 $('#settings').addEventListener('pointerdown', (e) => { if (e.target.id === 'settings') closeSettings(); });
 
