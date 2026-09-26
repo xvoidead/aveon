@@ -66,6 +66,9 @@ function onMessage(m) {
       room.driver = m.driver;
       emit({ type: 'state', state: m.state, age: serverNow() - m.state.at, driver: m.driver, by: m.by, beat: m.beat });
       break;
+    case 'react':
+      if (room) emit({ type: 'react', e: m.e, by: m.by, from: m.from, mine: m.from === room.you });
+      break;
     case 'error':
       if (pending) { pending.reject(new Error(m.error)); pending = null; }
       else emit({ type: 'error', error: m.error });
@@ -169,6 +172,11 @@ function send(state, beat = false) {
   room.driver = room.you;
 }
 
+// Реакция всем в руме: одна из 8 эмодзи сервера (together.py, REACTS), не чаще раза в 300 мс
+function react(e) {
+  if (room) sendRaw({ t: 'react', e });
+}
+
 function init(onEvent) { notify = onEvent; }
 
-module.exports = { init, create, join, leave, send, status };
+module.exports = { init, create, join, leave, send, react, status };

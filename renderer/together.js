@@ -167,6 +167,9 @@ api.together.onEvent((ev) => {
     case 'error':
       toast(ev.error, 'err');
       break;
+    case 'react':
+      flyReact(ev.e, ev.mine ? '' : firstName(ev.by || ''));
+      return; // панель перерисовывать незачем
     default:
   }
   renderTogether();
@@ -245,8 +248,10 @@ function renderTogether() {
         <span class="together-name">${emo(m.name)}${m.id === r.you ? ' <em>ты</em>' : ''}</span>
         ${m.id === lead && r.members.length > 1 ? '<span class="together-lead">ведёт</span>' : ''}</li>`).join('')}
     </ul>
+    ${r.members.length > 1 ? `<div class="together-reacts" role="group" aria-label="Реакции">${TG_REACTS.map((e) => `<button data-react="${e}" aria-label="Реакция ${e}">${e}</button>`).join('')}</div>` : ''}
     ${r.connected ? '' : '<p class="together-note warn">Связь пропала, переподключаюсь…</p>'}
     <button class="btn danger together-wide" id="tg-leave">Выйти из румы</button>`;
+  $$('[data-react]', togetherEl).forEach((b) => { b.onclick = () => sendReact(b.dataset.react); });
   $('#tg-copy').onclick = async () => {
     if (await copyText(r.code)) toast('Код скопирован'); else toast(`Код румы: ${r.code}`); // share.js
   };
@@ -330,3 +335,37 @@ function placeTogetherChip() {
 }
 new MutationObserver(placeTogetherChip).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
 placeTogetherChip();
+
+// ---------- реакции ----------
+// Эмодзи летят над обложкой у всех в руме. Набор — как на сервере (together.py, REACTS).
+
+const TG_REACTS = ['🔥', '😍', '😂', '🎉', '👏', '💀', '🥁', '🛢'];
+let reactAt = 0;
+
+function sendReact(e) {
+  if (!Together.room || performance.now() - reactAt < 320) return; // сервер всё равно режет чаще 300 мс
+  reactAt = performance.now();
+  api.together.react(e);
+}
+
+function flyReact(e, who) {
+  if (!TG_REACTS.includes(e)) return;
+  // летят из-под обложки: на полноэкранном — из её центра
+  const fs = $('#fs');
+  const from = (fs && !fs.hidden ? $('.fs-cover', fs) : null) || $('.porthole') || $('.now');
+  const r = from?.getBoundingClientRect() || { left: innerWidth / 2, width: 0, top: innerHeight / 2, height: 0 };
+  const el = document.createElement('div');
+  el.className = 'react-fly';
+  el.innerHTML = `<span>${e}</span>${who ? `<em>${esc(who)}</em>` : ''}`;
+  el.style.left = `${r.left + r.width * (0.25 + Math.random() * 0.5)}px`;
+  el.style.top = `${r.top + r.height * 0.7}px`;
+  el.style.setProperty('--dx', `${Math.round((Math.random() - 0.5) * 120)}px`);
+  el.style.setProperty('--rot', `${Math.round((Math.random() - 0.5) * 40)}deg`);
+  document.body.append(el);
+  setTimeout(() => el.remove(), 2600);
+  // бочка — так бочка: музыка на секунду уходит в неё у всех
+  if (e === '🛢' && !duck.forced && !duck.reactBarrel) {
+    duck.reactBarrel = true;
+    setTimeout(() => { duck.reactBarrel = false; }, 1200);
+  }
+}

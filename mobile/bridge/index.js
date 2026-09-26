@@ -257,6 +257,7 @@ const api = {
     stream: call((track) => sharedStream(track)),
     avatar: call((userId, at) => account.avatarOf(userId, at)),
     send: (state, beat) => { ready.then(() => together.send(clone(state), beat)); },
+    react: (e) => { ready.then(() => together.react(String(e))); },
     onEvent: (cb) => on('together:event', cb),
   },
   app: { version: call(() => require('../../package.json').version) },

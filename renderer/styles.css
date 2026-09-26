@@ -1992,3 +1992,21 @@ img.emoji { display: inline-block; width: 1.2em; height: 1.2em; margin: 0 .04em;
 @media (prefers-reduced-motion: reduce) { .msg-menu { animation: none; } }
 .pf-keys { margin-top: -4px; font-size: 12px; color: var(--text-3); }
 .pf-keys.warn { color: var(--amber); }
+
+/* ---------- реакции в руме ---------- */
+.together-reacts { display: grid; grid-template-columns: repeat(8, 1fr); gap: 2px; padding: 4px; border-radius: 12px; background: var(--oak); }
+.together-reacts button { font-size: 20px; line-height: 1; padding: 6px 0; border-radius: 8px; transition: transform .12s ease; }
+.together-reacts button:hover { background: var(--rivet); transform: scale(1.15); }
+.together-reacts button:active { transform: scale(.9); }
+.react-fly {
+  position: fixed; z-index: 60; pointer-events: none; display: grid; justify-items: center; gap: 2px;
+  transform: translate(-50%, 0); animation: react-fly 2.5s cubic-bezier(.2, .7, .3, 1) forwards;
+}
+.react-fly span { font-size: 40px; line-height: 1; filter: drop-shadow(0 6px 14px rgb(0 0 0 / 0.4)); }
+.react-fly em { font-style: normal; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 99px; background: rgb(0 0 0 / 0.55); color: #fff; }
+@keyframes react-fly {
+  0% { opacity: 0; transform: translate(-50%, 10px) scale(.4); }
+  12% { opacity: 1; transform: translate(-50%, -20px) scale(1.15); }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), -220px) scale(.9) rotate(var(--rot)); }
+}
+@media (prefers-reduced-motion: reduce) { .react-fly { animation-duration: 1.2s; } }

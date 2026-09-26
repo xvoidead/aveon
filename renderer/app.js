@@ -1024,7 +1024,7 @@ function duckTick() {
 
   // manual — бочка включена вручную (Android: кнопка на сцене и в уведомлении)
   // вручную: кнопка на телефоне, остров или клавиша B на компьютере
-  const manual = !!m.manual || duck.forced || duck.dj || duck.focus; // dj — говорит диджей волны (wave.js)
+  const manual = !!m.manual || duck.forced || duck.dj || duck.focus || duck.reactBarrel; // dj — говорит диджей волны (wave.js)
   const talking = manual || (!!m.call && now - duck.lastVoice < d.hold);
   const active = manual || (d.enabled && !!m.call && (d.mode === 'call' || talking));
   const want = active ? 1 : 0;
@@ -1053,7 +1053,7 @@ function renderCall(talking) {
   const m = duck.meter;
   const broken = duck.ok === false;
   const inCall = !!m.call;
-  const manual = !!m.manual || duck.forced || duck.dj || duck.focus;
+  const manual = !!m.manual || duck.forced || duck.dj || duck.focus || duck.reactBarrel;
   // На телефоне плашка видна всегда: в ней кнопка «в бочку вручную», а шкал нет
   $('#discord').classList.toggle('off', !IS_MOBILE && !inCall && !broken && !manual);
   $('#discord').classList.toggle('no-meters', IS_MOBILE || !inCall);
