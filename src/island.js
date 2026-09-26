@@ -130,6 +130,15 @@ function level() {
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: cfg().overFullscreen });
 }
 
+// Игры и видео на весь экран сами встают «поверх всех» и отодвигают остров вниз — поднимаем его
+// обратно, пока он виден. Фокус не забирает. Над эксклюзивным полноэкранным режимом (не «без рамки»)
+// окно не нарисовать никак — там помогает только режим «оконный без рамки» в самой игре
+setInterval(() => {
+  if (!win || win.isDestroyed() || !win.isVisible() || !cfg().overFullscreen) return;
+  win.setAlwaysOnTop(true, 'screen-saver');
+  win.moveTop();
+}, 1500);
+
 // Когда показывать: включён, есть трек и (если так настроено) окно плеера не перед глазами
 function wanted() {
   const c = cfg();
