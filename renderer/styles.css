@@ -1657,7 +1657,9 @@ html.mobile .set-search { display: none; }
 html.mobile .set-tabs { flex-direction: row; }
 
 /* ---------- настройки деревом: раздел — ветка, секции — листья ---------- */
-.set-nav { overflow-y: auto; scrollbar-width: thin; }
+/* разделы листаются колесом, без полосы: scrollbar-width в Chromium включал системную полосу Windows */
+.set-nav { overflow-y: auto; scrollbar-width: none; }
+.set-nav::-webkit-scrollbar { display: none; }
 .set-tab { grid-template-columns: 18px minmax(0, 1fr) auto 12px; }
 .set-caret { width: 12px !important; height: 12px !important; color: var(--text-3); opacity: .7; transition: transform .2s ease; }
 .set-node.open .set-caret { transform: rotate(90deg); }
