@@ -191,3 +191,9 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 /* высота раскрытой капсулы: +30 px на событие (строка друзей при событиях спрятана) */
 .pill.open.has-events { height: calc(142px + 12px + var(--ev) * 30px); }
 .pill.open.has-events.has-lyr { height: calc(222px + 12px + var(--ev) * 30px); }
+
+/* строка текста в раскрытом острове: не влезает — шрифт меньше (fitLyricLine), совсем длинная — две строки */
+#l-cur.two { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 19px; }
+.pill.open.has-lyr { height: calc(222px + var(--lx, 0px)); }
+.pill.open.has-lyr.has-friends { height: calc(256px + var(--lx, 0px)); }
+.pill.open.has-events.has-lyr { height: calc(222px + 12px + var(--ev) * 30px + var(--lx, 0px)); }

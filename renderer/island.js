@@ -157,10 +157,25 @@ function renderLyr(ly) {
   $('#l-next').textContent = ly.next;
   if ($('#l-cur').textContent !== cur) {
     $('#l-cur').textContent = cur;
+    fitLyricLine();
     box.classList.remove('swap');
     void box.offsetWidth;
     box.classList.add('swap');
   }
+}
+
+// Длинная строка: сначала уменьшаем шрифт (до 12 px), не помещается и так — две строки,
+// а капсула становится выше на строку (--lx), чтобы следующая строка текста не обрезалась
+function fitLyricLine() {
+  const el = $('#l-cur');
+  el.classList.remove('two');
+  let size = 15;
+  el.style.fontSize = `${size}px`;
+  if (!el.clientWidth) { pill.style.setProperty('--lx', '0px'); return; } // капсула свёрнута — посчитаем при раскрытии
+  while (el.scrollWidth > el.clientWidth + 1 && size > 12) { size -= 0.5; el.style.fontSize = `${size}px`; }
+  const two = el.scrollWidth > el.clientWidth + 1;
+  el.classList.toggle('two', two);
+  pill.style.setProperty('--lx', two ? '20px' : '0px');
 }
 
 function renderFriends(f) {
@@ -269,6 +284,7 @@ function pointerIn() {
   renderLabel();
   fitWidth();
   window.sendPillRect?.(); // сразу, не дожидаясь кадра
+  requestAnimationFrame(fitLyricLine); // строку текста меряем, когда у неё появилась ширина
   // Пока остров раскрыт, окно ловит мышь целиком (src/hover.js → setHover), а ушёл ли курсор,
   // решаем здесь по :hover. Раньше решал главный процесс по границе капсулы — она отставала,
   // пока капсула росла вниз, и остров сворачивался, едва курсор доходил до кнопок ленты
