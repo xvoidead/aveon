@@ -2015,7 +2015,8 @@ img.emoji { display: inline-block; width: 1.25em; height: 1.25em; margin: 0 .05e
 @media (prefers-reduced-motion: reduce) { .react-fly { animation-duration: 1.2s; } }
 /* двойной клик по сообщению друга — ❤️ вспыхивает над ним */
 @keyframes msg-heart { 0% { opacity: 0; transform: translate(-50%, -50%) scale(.3); } 25% { opacity: 1; transform: translate(-50%, -50%) scale(1.25); } 45% { transform: translate(-50%, -50%) scale(.95); } 70% { opacity: 1; transform: translate(-50%, -50%) scale(1); } 100% { opacity: 0; transform: translate(-50%, -70%) scale(1); } }
-.msg-heart { position: absolute; left: 50%; top: 50%; pointer-events: none; animation: msg-heart .7s ease both; filter: drop-shadow(0 4px 10px rgb(0 0 0 / .4)); }
+.fr-msgs { position: relative; }
+.msg-heart { position: absolute; z-index: 2; pointer-events: none; animation: msg-heart .7s ease both; filter: drop-shadow(0 4px 10px rgb(0 0 0 / .4)); }
 .msg-heart .emoji { display: block; width: 38px; height: 38px; margin: 0; }
 .fr-msg { user-select: text; }
 @media (prefers-reduced-motion: reduce) { .msg-heart { animation: none; opacity: 0; } }
