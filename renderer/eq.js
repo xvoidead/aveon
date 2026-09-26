@@ -2,29 +2,7 @@
 // 10 полос от 32 Гц до 16 кГц, ±12 дБ: крайние — полки, остальные — колокола. Стоит первым в графе
 // (см. ensureGraph в app.js), поэтому бочка и цензура звучат уже поверх выровненного звука.
 
-const EQ_FREQS = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
-const EQ_MAX = 12;
-const EQ_PRESETS = [
-  ['flat', 'Ровно', [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]],
-  ['bass', 'Бас', [6, 5, 4, 2, 0, 0, 0, 0, 0, 0]],
-  ['vocal', 'Вокал', [-2, -2, -1, 1, 3, 4, 3, 1, 0, -1]],
-  ['treble', 'Высокие', [0, 0, 0, 0, 0, 1, 2, 4, 5, 6]],
-  ['loud', 'Громко', [5, 4, 2, 0, -1, -1, 0, 2, 4, 5]],
-  ['rock', 'Рок', [4, 3, 2, 0, -1, 0, 2, 3, 4, 4]],
-  ['electro', 'Электроника', [5, 4, 1, 0, -2, 1, 0, 2, 4, 5]],
-];
-
-const fmtHz = (f) => (f >= 1000 ? `${f / 1000}к` : String(f));
-const fmtDb = (v) => `${v > 0 ? '+' : ''}${v % 1 ? v.toFixed(1) : v}`;
-
-function eqFilter(c, i) {
-  const f = c.createBiquadFilter();
-  f.type = i === 0 ? 'lowshelf' : i === EQ_FREQS.length - 1 ? 'highshelf' : 'peaking';
-  f.frequency.value = EQ_FREQS[i];
-  f.Q.value = 1.41;
-  f.gain.value = 0;
-  return f;
-}
+// Полосы, пресеты, форматирование и кривая — в eq-core.js (общие с попапом eqpop.js)
 
 // Вызывается из ensureGraph: вход — источник звука, выход — после предусилителя
 function eqBuild(input) {
@@ -363,68 +341,10 @@ document.addEventListener('keydown', (e) => {
 // Считаем на своих фильтрах в OfflineAudioContext: так кривая видна, даже пока звук ни разу не играл.
 // По горизонтали частоты разложены так, чтобы центры полос совпали с ползунками.
 
-let eqProbe = null;
-
 // gains — промежуточные значения во время анимации; без них кривая по текущим настройкам
 function drawEqCurve(gainsNow) {
   if (!eqOpen()) return;
-  const cv = $('#eq-curve');
-  // Кривая ровно по ходу ручек ползунков: от центра ручки на +12 до центра на −12
-  const slider = $('#eq-bands input');
-  if (slider) {
-    const panel = $('#eq-panel').getBoundingClientRect();
-    const r = slider.getBoundingClientRect();
-    const knob = 8; // радиус стандартной ручки Chromium
-    cv.style.top = `${r.top - panel.top + knob}px`;
-    cv.style.height = `${r.height - knob * 2}px`;
-  }
-  const dpr = window.devicePixelRatio || 1;
-  const w = Math.round(cv.clientWidth * dpr), h = Math.round(cv.clientHeight * dpr);
-  if (!w || !h) return;
-  if (cv.width !== w || cv.height !== h) { cv.width = w; cv.height = h; }
-  if (!eqProbe) {
-    const oc = new OfflineAudioContext(1, 1, 48000);
-    eqProbe = EQ_FREQS.map((_, i) => eqFilter(oc, i));
-  }
-  const gains = Array.isArray(gainsNow) ? gainsNow : eqValues().gains;
-  eqProbe.forEach((f, i) => { f.gain.value = gains[i] || 0; });
-
-  const col = w / EQ_FREQS.length;
-  const span = Math.log2(EQ_FREQS[EQ_FREQS.length - 1] / EQ_FREQS[0]);
-  const freqs = new Float32Array(w);
-  for (let x = 0; x < w; x++) freqs[x] = Math.min(23000, EQ_FREQS[0] * Math.pow(2, ((x - col / 2) / (w - col)) * span));
-  const total = new Float32Array(w);
-  const mag = new Float32Array(w), ph = new Float32Array(w);
-  for (const f of eqProbe) {
-    f.getFrequencyResponse(freqs, mag, ph);
-    for (let x = 0; x < w; x++) total[x] += 20 * Math.log10(mag[x] || 1e-6);
-  }
-
-  const css = getComputedStyle(document.documentElement);
-  const accent = css.getPropertyValue('--amber').trim() || '#f0a63a';
-  const g = cv.getContext('2d');
-  g.clearRect(0, 0, w, h);
-  const y = (db) => h / 2 - (Math.max(-EQ_MAX, Math.min(EQ_MAX, db)) / EQ_MAX) * (h / 2);
-
-  g.strokeStyle = css.getPropertyValue('--rivet-2').trim() || '#33271f';
-  g.lineWidth = dpr;
-  g.setLineDash([4 * dpr, 4 * dpr]);
-  g.beginPath(); g.moveTo(0, h / 2); g.lineTo(w, h / 2); g.stroke();
-  g.setLineDash([]);
-
-  g.beginPath();
-  for (let x = 0; x < w; x++) (x ? g.lineTo(x, y(total[x])) : g.moveTo(x, y(total[x])));
-  g.lineTo(w, h / 2); g.lineTo(0, h / 2); g.closePath();
-  g.globalAlpha = 0.14;
-  g.fillStyle = accent;
-  g.fill();
-  g.globalAlpha = 1;
-  g.beginPath();
-  for (let x = 0; x < w; x++) (x ? g.lineTo(x, y(total[x])) : g.moveTo(x, y(total[x])));
-  g.strokeStyle = accent;
-  g.lineWidth = 2 * dpr;
-  g.lineJoin = 'round';
-  g.stroke();
+  drawEqCurveOn($('#eq-curve'), $('#eq-panel'), Array.isArray(gainsNow) ? gainsNow : eqValues().gains);
 }
 
 window.addEventListener('resize', () => drawEqCurve());
