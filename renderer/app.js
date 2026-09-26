@@ -2675,11 +2675,44 @@ api.win.onReveal?.((on) => { if (document.body.classList.contains('win-autohide'
 function applyWinAutohide() {
   document.body.classList.toggle('win-autohide', state.cfg.ui?.autoHideWin !== false);
 }
+// Кнопки панели задач, острова, мини-плеера и горячие клавиши на всю систему (src/hotkeys.js).
+// Клавиша нажата в другом окне — что поменялось, показываем на острове, иначе — уведомлением
+function hkNote(text) {
+  if (!document.hasFocus() && typeof islandNotify === 'function' && state.cfg.island?.enabled !== false) islandNotify(text);
+  else toast(text);
+}
+const SEEK_STEP = 10;
 api.win.onThumb((action) => {
   if (locked()) return;
   if (action === 'toggle') togglePlay();
   else if (action === 'next') next();
   else if (action === 'prev') prev();
+  else if (action === 'seekFwd' || action === 'seekBack') {
+    if (!state.track || !isFinite(audio.duration)) return;
+    audio.currentTime = Math.max(0, Math.min(audio.duration - 0.5, audio.currentTime + (action === 'seekFwd' ? SEEK_STEP : -SEEK_STEP)));
+  } else if (action === 'mute') {
+    toggleMute();
+    hkNote(state.muted ? 'Звук выключен' : 'Звук включён');
+  } else if (action === 'shuffle') {
+    toggleShuffle();
+    hkNote(state.cfg.shuffle ? 'Вперемешку' : 'По порядку');
+  } else if (action === 'repeat') {
+    cycleRepeat();
+    hkNote({ off: 'Повтор выключен', all: 'Повтор списка', one: 'Повтор трека' }[state.cfg.repeat]);
+  } else if (action === 'wave') {
+    if (Wave.active) togglePlay(); else waveStart(); // wave.js
+  } else if (action === 'like') {
+    if (!Wave.active) { hkNote('«Нравится» работает в волне'); return; }
+    waveLike();
+    hkNote(`Нравится: ${state.track?.title || ''}`);
+  } else if (action === 'karaoke') {
+    if (document.hasFocus()) toggleKaraoke(); // karaoke.js
+    else { toggleKaraoke(undefined, { screen: false }); hkNote(karaoke.on ? 'Караоке: голос убран' : 'Караоке выключено'); }
+  } else if (action === 'sleep') {
+    // в окне плеера таймер сам скажет, что включился; из другого окна — остров
+    const away = !document.hasFocus();
+    if (sleep.at || sleep.endOfTrack) { cancelSleep(away); if (away) hkNote('Таймер сна выключен'); } else { setSleep(30); if (away) hkNote('Сон через 30 минут'); } // sleep.js
+  }
 });
 
 // ---------- старт ----------
