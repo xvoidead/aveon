@@ -201,8 +201,25 @@ svg { width: 18px; height: 18px; flex: none; }
 .search input::placeholder { color: var(--text-3); }
 .search input::-webkit-search-cancel-button { filter: grayscale(1) invert(.6); }
 
-.collections { display: flex; gap: 8px; margin-top: 14px; overflow-x: auto; padding-bottom: 2px; min-height: 0; }
-.collections:empty { display: none; }
+.collections-wrap { position: relative; margin-top: 14px; flex: none; }
+.collections-wrap:has(.collections:empty) { display: none; }
+.collections { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 2px; min-height: 0; scroll-behavior: smooth; }
+.collections.grabbing { scroll-behavior: auto; cursor: grabbing; }
+.collections.grabbing > * { pointer-events: none; }
+/* края гаснут, если в ту сторону есть ещё плейлисты */
+.collections-wrap.more-l .collections { mask-image: linear-gradient(90deg, transparent, #000 56px); }
+.collections-wrap.more-r .collections { mask-image: linear-gradient(90deg, #000 calc(100% - 56px), transparent); }
+.collections-wrap.more-l.more-r .collections { mask-image: linear-gradient(90deg, transparent, #000 56px, #000 calc(100% - 56px), transparent); }
+.coll-arrow {
+  position: absolute; top: 0; z-index: 1; width: 32px; height: 32px; display: grid; place-items: center; border-radius: 50%;
+  background: var(--rivet-2); color: var(--text); box-shadow: 0 4px 14px rgb(0 0 0 / .35);
+  opacity: 0; pointer-events: none; transition: opacity .15s ease, transform .15s ease;
+}
+.coll-arrow.l { left: 0; transform: translateX(-4px); }
+.coll-arrow.r { right: 0; transform: translateX(4px); }
+.coll-arrow svg { width: 16px; height: 16px; }
+.collections-wrap.more-l:hover .coll-arrow.l, .collections-wrap.more-r:hover .coll-arrow.r { opacity: 1; pointer-events: auto; transform: none; }
+.coll-arrow:hover { background: var(--hoop-dim); }
 .chip {
   display: inline-flex; align-items: center; gap: 8px; height: 32px; padding: 0 14px; border-radius: 16px; flex: none;
   background: var(--oak-2); border: 1px solid var(--rivet-2); color: var(--text-2); white-space: nowrap; max-width: 240px;

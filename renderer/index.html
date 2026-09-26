@@ -141,7 +141,12 @@
       <input id="search" type="search" placeholder="Поиск" spellcheck="false">
     </form>
 
-    <div class="collections" id="collections"></div>
+    <!-- плейлисты листаются колесом, стрелками по краям и перетаскиванием -->
+    <div class="collections-wrap" id="collections-wrap">
+      <button class="coll-arrow l" data-dir="-1" tabindex="-1" aria-hidden="true"><svg><use href="#i-chevron-l"/></svg></button>
+      <div class="collections" id="collections"></div>
+      <button class="coll-arrow r" data-dir="1" tabindex="-1" aria-hidden="true"><svg><use href="#i-chevron-r"/></svg></button>
+    </div>
 
     <div class="lib-head">
       <div>

@@ -1216,6 +1216,62 @@ function renderCollections() {
   }
 }
 
+// Ряд плейлистов длиннее окна: колесо листает его вбок, по краям — стрелки и затухание,
+// можно тянуть мышью. Содержимое перерисовывают app.js и artists.js — следим за ним сами.
+const collBox = $('#collections');
+const collWrap = $('#collections-wrap');
+
+function collFades() {
+  const max = collBox.scrollWidth - collBox.clientWidth;
+  collWrap.classList.toggle('more-l', collBox.scrollLeft > 2);
+  collWrap.classList.toggle('more-r', max - collBox.scrollLeft > 2);
+}
+
+collBox.addEventListener('scroll', collFades, { passive: true });
+new ResizeObserver(collFades).observe(collBox);
+new MutationObserver(() => {
+  collFades();
+  collBox.querySelector('.chip.active')?.scrollIntoView({ block: 'nearest', inline: 'nearest' }); // открытый плейлист не прячется за краем
+}).observe(collBox, { childList: true });
+
+collBox.addEventListener('wheel', (e) => {
+  if (collBox.scrollWidth <= collBox.clientWidth) return;
+  const d = Math.abs(e.deltaX) > Math.abs(e.deltaY) ? e.deltaX : e.deltaY;
+  if (!d) return;
+  e.preventDefault();
+  collBox.scrollLeft += d * (e.deltaMode === 1 ? 40 : 1.2);
+}, { passive: false });
+
+$$('.coll-arrow', collWrap).forEach((b) => {
+  b.onclick = () => collBox.scrollBy({ left: +b.dataset.dir * collBox.clientWidth * 0.7 });
+});
+
+// Перетаскивание: пока палец/мышь не сдвинулись на 6px, это обычный клик по плейлисту
+let collDragAt = 0;
+collBox.addEventListener('click', (e) => {
+  if (performance.now() - collDragAt < 80) { e.stopPropagation(); e.preventDefault(); } // отпустили после перетаскивания
+}, true);
+collBox.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || collBox.scrollWidth <= collBox.clientWidth) return;
+  const x0 = e.clientX, s0 = collBox.scrollLeft;
+  let dragged = false;
+  const move = (ev) => {
+    const dx = ev.clientX - x0;
+    if (!dragged && Math.abs(dx) < 6) return;
+    if (!dragged) { dragged = true; collBox.classList.add('grabbing'); collBox.setPointerCapture(e.pointerId); }
+    collBox.scrollLeft = s0 - dx;
+  };
+  const up = () => {
+    collBox.removeEventListener('pointermove', move);
+    collBox.removeEventListener('pointerup', up);
+    collBox.removeEventListener('pointercancel', up);
+    if (dragged) { collBox.classList.remove('grabbing'); collDragAt = performance.now(); }
+  };
+  collBox.addEventListener('pointermove', move);
+  collBox.addEventListener('pointerup', up);
+  collBox.addEventListener('pointercancel', up);
+});
+
 let viewSeq = 0;
 
 async function openView(view, sub = null) {
