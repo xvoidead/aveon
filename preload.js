@@ -113,4 +113,17 @@ contextBridge.exposeInMainWorld('tishe', {
   },
   openExternal: (url) => ipcRenderer.send('open:external', url),
   copy: (text) => call('clipboard:write', text),
+  // Эквалайзер в своём окне (src/eqpop.js)
+  eqpop: {
+    toggle: (rect, payload) => ipcRenderer.send('eqpop:toggle', rect, payload),
+    close: () => ipcRenderer.send('eqpop:close'),
+    refresh: () => ipcRenderer.send('eqpop:refresh'),
+    live: (eq) => ipcRenderer.send('eqpop:live', eq),
+    action: (a) => ipcRenderer.send('eqpop:action', a),
+    onOpen: (cb) => on('eqpop:open', cb),
+    onRefresh: (cb) => on('eqpop:refresh', cb),
+    onLive: (cb) => on('eqpop:live', cb),
+    onShown: (cb) => on('eqpop:shown', cb),
+    onAction: (cb) => on('eqpop:action', cb),
+  },
 });

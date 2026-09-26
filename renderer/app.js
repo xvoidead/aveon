@@ -1735,7 +1735,7 @@ ${censorSettingsHtml()}
   const body = $('#settings-body');
   renderSettingsNav();
   bindDiscord(body);
-  $('#set-open-eq', body).onclick = () => { closeSettings(); toggleEq(); }; // eq.js: встроенный или стеклянный
+  $('#set-open-eq', body).onclick = () => { closeSettings(); openEq(); }; // eq.js: окно эквалайзера
 
   $$('[data-ext]', body).forEach((a) => { a.onclick = (e) => { e.preventDefault(); api.openExternal(a.dataset.ext); }; });
   $('#crossfade', body).oninput = (e) => {
@@ -1887,7 +1887,7 @@ function applySynced(changed) {
       renderMe(); // profile.js: аватар и имя
       syncDuckSwitch();
       eqApply(); // eq.js: эквалайзер и свои пресеты тоже приходят с других компьютеров
-      if (eqOpen()) renderEq();
+      renderEq(); // открытое окно эквалайзера перечитает настройки
       if (!$('#settings').hidden) renderSettings();
     });
   }

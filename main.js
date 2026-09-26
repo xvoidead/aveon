@@ -17,6 +17,7 @@ const censor = require('./src/censor');
 const account = require('./src/account');
 const together = require('./src/together');
 const discord = require('./src/discord');
+const eqpop = require('./src/eqpop');
 
 const SOURCES = { sc, ym, sp };
 const MIME = {
@@ -379,6 +380,14 @@ function registerIpc() {
   handle('tg:avatar', (userId, at) => account.avatarOf(userId, at));
   ipcMain.on('tg:send', (e, state, beat) => together.send(state, beat));
 
+  // Эквалайзер в своём окне (src/eqpop.js). Попап сохраняет настройки сам (cfg:set), а окну плеера
+  // пересылает их для звука; «поделиться» и «вставить код» делает окно плеера
+  ipcMain.on('eqpop:toggle', (e, rect, payload) => eqpop.toggle(win, rect, payload));
+  ipcMain.on('eqpop:close', () => eqpop.hide());
+  ipcMain.on('eqpop:refresh', () => eqpop.refresh());
+  ipcMain.on('eqpop:live', (e, eq) => send('eqpop:live', eq));
+  ipcMain.on('eqpop:action', (e, action) => { eqpop.hide(); send('eqpop:action', action); });
+
   // Discord: что сейчас играет
   ipcMain.on('discord:update', (e, p) => discord.update(p));
   handle('discord:status', () => discord.status());
@@ -434,6 +443,7 @@ app.whenReady().then(() => {
   duck.setTargets(config.get().duck.targets);
   duck.start((m) => send('duck:meter', m), (s) => send('duck:status', s));
   together.init((ev) => send('together:event', ev));
+  eqpop.init((open) => send('eqpop:shown', open));
   discord.init();
   account.init((ev) => {
     if (ev.changed?.albums) local.allowFiles(albums.localPaths());
@@ -443,6 +453,7 @@ app.whenReady().then(() => {
 });
 
 app.on('window-all-closed', () => {
+  eqpop.destroy();
   duck.stop();
   discord.stop();
   config.flush();

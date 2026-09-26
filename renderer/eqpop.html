@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data:">
+  <title>эквалайзер</title>
+  <link rel="stylesheet" href="../node_modules/@fontsource/unbounded/700.css">
+  <link rel="stylesheet" href="../node_modules/@fontsource/onest/400.css">
+  <link rel="stylesheet" href="../node_modules/@fontsource/onest/500.css">
+  <link rel="stylesheet" href="../node_modules/@fontsource/onest/600.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<!-- Эквалайзер в своём окне (src/eqpop.js): раскрывается вниз от кнопки, может выходить за край плеера -->
+<body class="eqpop">
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.5 6.5 11 11m0-11-11 11" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5.5v13M5.5 12h13" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+    <symbol id="i-more" viewBox="0 0 24 24"><circle cx="6" cy="12" r="1.7" fill="currentColor"/><circle cx="12" cy="12" r="1.7" fill="currentColor"/><circle cx="18" cy="12" r="1.7" fill="currentColor"/></symbol>
+    <symbol id="i-code" viewBox="0 0 24 24"><rect x="3.5" y="6" width="17" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M7.5 10.5v3M10.5 10.5v3M13.5 10.5v3M16.5 10.5v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-eq" viewBox="0 0 24 24"><path d="M6 4v16M12 4v16M18 4v16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity=".45"/><path d="M3.8 14h4.4M9.8 8h4.4M15.8 12h4.4" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+    <symbol id="i-pencil" viewBox="0 0 24 24"><path d="M5 19l1-4 9.5-9.5a2.1 2.1 0 0 1 3 3L9 18z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4.5v4h-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 14.5V4m0 0L8 8m4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.5 11H7a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2h-1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
+  </svg>
+
+  <div class="sheet eq-sheet" id="eq" role="dialog" aria-labelledby="eq-title">
+    <div class="sheet-head">
+      <div class="eq-title">
+        <h2 id="eq-title">Эквалайзер</h2>
+        <label class="switch"><input type="checkbox" id="eq-enabled" aria-label="Эквалайзер включён"><span></span></label>
+      </div>
+      <button class="icon-btn" id="eq-close" aria-label="Закрыть эквалайзер"><svg><use href="#i-close"/></svg></button>
+    </div>
+    <div class="eq-body">
+      <div class="seg eq-presets" id="eq-presets"></div>
+      <div class="eq-mine" id="eq-mine" aria-label="Мои пресеты"></div>
+      <form class="eq-name" id="eq-name" hidden autocomplete="off">
+        <input class="input" id="eq-name-input" maxlength="40" spellcheck="false" placeholder="название пресета">
+        <button class="btn primary" type="submit" id="eq-name-ok">Сохранить</button>
+        <button class="btn" type="button" id="eq-name-cancel">Отмена</button>
+      </form>
+      <div class="eq-panel" id="eq-panel">
+        <canvas class="eq-curve" id="eq-curve"></canvas>
+        <div class="eq-bands" id="eq-bands"></div>
+      </div>
+      <div class="eq-foot">
+        <label for="eq-preamp">Предусилитель</label>
+        <input type="range" id="eq-preamp" min="-12" max="6" step="0.5">
+        <span class="val" id="eq-preamp-val"></span>
+        <button class="btn" id="eq-reset">Сбросить</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="menu" id="menu" role="menu" hidden></div>
+
+  <script src="eq-core.js"></script>
+  <script src="eqpop.js"></script>
+</body>
+</html>

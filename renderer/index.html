@@ -224,32 +224,6 @@
     </div>
   </section>
 
-  <div class="modal" id="eq" hidden>
-    <div class="sheet eq-sheet" role="dialog" aria-labelledby="eq-title">
-      <div class="sheet-head">
-        <div class="eq-title">
-          <h2 id="eq-title">Эквалайзер</h2>
-          <label class="switch"><input type="checkbox" id="eq-enabled" aria-label="Эквалайзер включён"><span></span></label>
-        </div>
-        <button class="icon-btn" id="eq-close" aria-label="Закрыть эквалайзер"><svg><use href="#i-close"/></svg></button>
-      </div>
-      <div class="eq-body">
-        <div class="seg eq-presets" id="eq-presets"></div>
-        <div class="eq-mine" id="eq-mine" aria-label="Мои пресеты"></div>
-        <div class="eq-panel" id="eq-panel">
-          <canvas class="eq-curve" id="eq-curve"></canvas>
-          <div class="eq-bands" id="eq-bands"></div>
-        </div>
-        <div class="eq-foot">
-          <label for="eq-preamp">Предусилитель</label>
-          <input type="range" id="eq-preamp" min="-12" max="6" step="0.5">
-          <span class="val" id="eq-preamp-val"></span>
-          <button class="btn" id="eq-reset">Сбросить</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- настройки: разделы слева, содержимое раздела справа (app.js → renderSettings) -->
   <div class="modal" id="settings" hidden>
     <div class="sheet settings-sheet" role="dialog" aria-labelledby="set-title">

@@ -111,7 +111,7 @@ api.win.onState((s) => { if (s?.fullscreen === false) exitFs(true); });
 document.addEventListener('keydown', (e) => {
   if (locked()) return; // под экраном входа (app.js) клавиши плеера не работают
   if (e.target.matches('input, textarea, select') || e.ctrlKey || e.altKey) return;
-  const modal = ['#settings', '#eq', '#editor', '#dialog'].some((id) => !$(id).hidden);
+  const modal = ['#settings', '#editor', '#dialog'].some((id) => !$(id).hidden);
   if (e.code === 'KeyF' && !modal) { fsOpen() ? exitFs() : enterFs(); return; }
   if (e.key === 'Escape' && fsOpen() && !modal && $('#menu').hidden) exitFs();
   if (fsOpen()) fsWake();

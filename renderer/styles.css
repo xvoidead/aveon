@@ -575,13 +575,23 @@ body.keep-titles :is(.t-title, .t-artist, .t-album, .artist-card-name, .album-me
 .search input::placeholder, .input::placeholder { text-transform: lowercase; }
 
 /* ---------- эквалайзер ---------- */
-/* всплывающая панель у кнопки (eq.js → placeEq), фон приложения не затемняется */
-#eq { background: transparent !important; pointer-events: none; display: block; }
-#eq[hidden] { display: none !important; }
-.eq-sheet {
-  position: fixed; pointer-events: auto; width: min(620px, calc(100vw - 24px)); max-height: calc(100vh - 56px);
-  border-radius: 16px; box-shadow: 0 24px 60px rgb(0 0 0 / .5); animation: rise .16s ease; transform-origin: bottom left;
+/* ---------- окно эквалайзера (eqpop.html, src/eqpop.js) ---------- */
+/* Окно прозрачное: по краям поля 28px под тень, панель выезжает из-под кнопки */
+body.eqpop { display: block; height: 100vh; padding: 28px; background: transparent; overflow: hidden; }
+body.eqpop .eq-sheet {
+  width: 100%; height: 100%; max-height: none; border-radius: 16px;
+  box-shadow: 0 16px 36px rgb(0 0 0 / .45), 0 0 0 1px rgb(255 255 255 / .04);
+  animation: none; transform-origin: top left;
 }
+body.eqpop .eq-sheet.up { transform-origin: bottom left; }
+body.eqpop .eq-sheet.appear { animation: eq-drop .22s cubic-bezier(.2, .9, .3, 1.05); }
+body.eqpop .eq-sheet.up.appear { animation-name: eq-rise; }
+@keyframes eq-drop { from { opacity: 0; transform: translateY(-10px) scale(.97); } }
+@keyframes eq-rise { from { opacity: 0; transform: translateY(10px) scale(.97); } }
+body.eqpop .eq-body { height: calc(100% - 58px); }
+body.eqpop .eq-panel { height: auto; flex: 1; min-height: 0; }
+.eq-name { display: flex; gap: 8px; margin-top: -6px; }
+.eq-name .input { height: 32px; }
 .eq-sheet .sheet-head { padding: 16px 16px 4px 22px; }
 .eq-sheet .sheet-head h2 { font-size: 18px; }
 .eq-body { display: flex; flex-direction: column; gap: 14px; padding: 8px 22px 20px; }
