@@ -286,3 +286,35 @@ def test_now_stale_and_validation(client):
         conn.execute("UPDATE nowplaying SET at = at - 3600000 WHERE user_id = ?", (uid(client, t2),))
     now = client.get("/api/friends", headers=h(t1)).json()["friends"][0]["now"]
     assert now["track"]["title"] == "Старое" and not now["live"] and not now["playing"]
+
+
+def test_room_invite_and_knock(client):
+    from aveon_api import friends as fr
+    from aveon_api.together import ROOMS, Room, Member
+    t1, l1 = register(client)
+    t2, l2 = register(client)
+    id1, id2 = uid(client, t1), uid(client, t2)
+    client.post("/api/friends", json={"login": l2}, headers=h(t1))
+    client.post("/api/friends", json={"login": l1}, headers=h(t2))
+
+    assert client.post(f"/api/friends/{id2}/invite", json={"code": "ZZZZZZ"}, headers=h(t1)).status_code == 404
+    assert client.post(f"/api/friends/{id1}/knock", headers=h(t2)).status_code == 404  # друг не в руме
+
+    ROOMS["ABCDEF"] = Room(code="ABCDEF", members={"m1": Member(id="m1", user_id=id1, name="a", ws=None)})
+    try:
+        f = client.get("/api/friends", headers=h(t2)).json()["friends"][0]
+        assert f["in_room"] is True
+        assert client.post(f"/api/friends/{id1}/knock", headers=h(t2)).status_code == 200
+        assert client.get("/api/friends", headers=h(t1)).json()["knocks"][0]["id"] == id2
+
+        assert client.post(f"/api/friends/{id2}/invite", json={"code": "abcdef"}, headers=h(t1)).status_code == 200
+        d = client.get("/api/friends", headers=h(t2)).json()
+        assert d["invites"][0]["code"] == "ABCDEF" and d["invites"][0]["id"] == id1
+        assert client.get("/api/friends", headers=h(t1)).json()["knocks"] == []  # пустили — просьба ушла
+
+        client.delete(f"/api/friends/{id1}/invite", headers=h(t2))
+        assert client.get("/api/friends", headers=h(t2)).json()["invites"] == []
+    finally:
+        ROOMS.pop("ABCDEF", None)
+        fr.INVITES.clear()
+        fr.KNOCKS.clear()

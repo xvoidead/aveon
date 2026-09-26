@@ -1243,3 +1243,8 @@ html.look-react-glow .stage {
 }
 html.look-react-hoops .hoop-outer { stroke-width: calc(2 + var(--m) * 3 + var(--beat, 0) * 5); }
 html.look-react-hoops .hoops { transform: scale(calc(1 - var(--m) * 0.07 + var(--beat, 0) * 0.035)); }
+
+/* друзья и рума: метка «в руме», кнопка «попроситься» */
+.fr-tag { margin-left: 6px; padding: 1px 6px; border-radius: 99px; font: 500 10px var(--ui); font-style: normal; color: var(--voice); background: color-mix(in srgb, var(--voice) 14%, transparent); vertical-align: 1px; }
+.icon-btn.fr-knock { color: var(--voice); }
+.icon-btn:disabled { opacity: .4; cursor: default; }

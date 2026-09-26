@@ -336,6 +336,10 @@ function registerIpc() {
   handle('fr:add', (login) => friends.add(login));
   handle('fr:accept', (id) => friends.accept(id));
   handle('fr:remove', (id) => friends.remove(id));
+  handle('fr:invite', (id, code) => friends.invite(id, code));
+  handle('fr:dismiss', (id) => friends.dismiss(id));
+  handle('fr:knock', (id) => friends.knock(id));
+  handle('fr:unknock', (id) => friends.unknock(id));
   handle('fr:avatar', (userId, at) => account.avatarOf(userId, at));
   ipcMain.on('fr:now', (e, p) => friends.now(p));
 

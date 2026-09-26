@@ -6,7 +6,7 @@
 // панель открыта. Трек друга можно включить у себя — с начала или с того же места, где сейчас он.
 
 const FR_POLL_OPEN = 10 * 1000;
-const FR_POLL_CLOSED = 60 * 1000;
+const FR_POLL_CLOSED = 20 * 1000; // приглашения в руму не должны ждать долго
 
 const Friends = {
   data: null,        // ответ /api/friends
@@ -14,6 +14,9 @@ const Friends = {
   error: '',
   loading: false,
   seenIncoming: null, // id заявок, о которых уже сказали
+  seenInvites: null,  // `${id}:${code}` приглашений в руму, о которых уже сказали
+  seenKnocks: null,   // id друзей, которые просятся в руму и о которых уже сказали
+  knocked: new Map(), // к кому мы попросились → когда: его приглашение принимаем сами
   busy: new Set(),   // id, по которым сейчас идёт запрос
 };
 
@@ -94,8 +97,9 @@ function friendItem(f) {
   return `<li class="fr-item">
     <button class="fr-main" data-fr-play="${f.id}" ${canPlay ? `title="Включить у себя: ${esc(trackLine(n.track))}"` : 'tabindex="-1"'}${canPlay ? '' : ' disabled'}>
       ${frAvatarHtml(f, !!n?.playing)}
-      <span class="fr-text"><b>${esc(f.name)}</b>${friendStatus(f)}</span>
+      <span class="fr-text"><b>${esc(f.name)}${f.in_room ? ' <em class="fr-tag">в руме</em>' : ''}</b>${friendStatus(f)}</span>
     </button>
+    ${roomButton(f)}
     <button class="icon-btn small" data-fr-more="${f.id}" aria-label="Ещё" aria-haspopup="menu"><svg><use href="#i-more"/></svg></button>
   </li>`;
 }
@@ -112,10 +116,42 @@ function requestItem(p, kind) {
   </li>`;
 }
 
+// Кнопка румы у друга: мы в руме — позвать; он в руме — попроситься; никто — создать и позвать
+function roomAction(f) {
+  if (Together.room) return 'invite';
+  return f.in_room ? 'knock' : 'invite';
+}
+
+function roomButton(f) {
+  const act = roomAction(f);
+  const knocked = Friends.knocked.has(f.id);
+  const title = act === 'knock' ? (knocked ? 'Просьба отправлена, ждём ответа' : 'Попроситься в руму')
+    : Together.room ? `Позвать в руму ${Together.room.code}` : 'Создать руму и позвать';
+  return `<button class="icon-btn small${act === 'knock' ? ' fr-knock' : ''}" data-fr-room="${f.id}" aria-label="${esc(title)}" title="${esc(title)}"${knocked && act === 'knock' ? ' disabled' : ''}><svg><use href="#i-${act === 'knock' ? 'enter' : 'together'}"/></svg></button>`;
+}
+
+function knockItem(p) {
+  return `<li class="fr-item fr-request">
+    <span class="fr-main static">${frAvatarHtml(p)}<span class="fr-text"><b>${esc(p.name)}</b><small class="fr-status">просится к тебе</small></span></span>
+    <button class="btn primary fr-btn" data-fr-letin="${p.id}">Пустить</button>
+    <button class="icon-btn small" data-fr-unknock="${p.id}" aria-label="Не пускать" title="Не пускать"><svg><use href="#i-close"/></svg></button>
+  </li>`;
+}
+
+function inviteItem(p) {
+  const here = Together.room?.code === p.code;
+  return `<li class="fr-item fr-request">
+    <span class="fr-main static">${frAvatarHtml(p)}<span class="fr-text"><b>${esc(p.name)}</b><small class="fr-status">рума ${esc(p.code)}</small></span></span>
+    ${here ? '<small class="fr-status">ты уже там</small>' : `<button class="btn primary fr-btn" data-fr-join="${p.id}">Войти</button>`}
+    <button class="icon-btn small" data-fr-dismiss="${p.id}" aria-label="Не пойду" title="Не пойду"><svg><use href="#i-close"/></svg></button>
+  </li>`;
+}
+
 function renderFriendsBadge() {
   const n = Friends.data?.incoming.length || 0;
-  $('#friends-badge').hidden = !n;
-  friendsBtn.title = n ? `Друзья · ${n} ${plural(n, 'заявка', 'заявки', 'заявок')}` : 'Друзья';
+  const inv = (Friends.data?.invites?.length || 0) + (Together.room ? Friends.data?.knocks?.length || 0 : 0);
+  $('#friends-badge').hidden = !n && !inv;
+  friendsBtn.title = inv ? `Друзья · зовут в руму` : n ? `Друзья · ${n} ${plural(n, 'заявка', 'заявки', 'заявок')}` : 'Друзья';
 }
 
 function renderFriends() {
@@ -133,7 +169,13 @@ function renderFriends() {
       : '<div class="spinner small"></div>';
   } else {
     const listening = d.friends.filter((f) => f.now?.playing).length;
+    const invites = d.invites || [];
+    const knocks = Together.room ? d.knocks || [] : [];
     body = `
+      ${knocks.length ? `<h3 class="fr-sub">Просятся в руму</h3>
+        <ul class="fr-list">${knocks.map(knockItem).join('')}</ul>` : ''}
+      ${invites.length ? `<h3 class="fr-sub">Зовут в руму</h3>
+        <ul class="fr-list">${invites.map(inviteItem).join('')}</ul>` : ''}
       ${d.incoming.length ? `<h3 class="fr-sub">Хотят дружить <span>${d.incoming.length}</span></h3>
         <ul class="fr-list">${d.incoming.map((p) => requestItem(p, 'in')).join('')}</ul>` : ''}
       ${d.friends.length ? `<h3 class="fr-sub">${listening ? `Слушают сейчас <span>${listening} из ${d.friends.length}</span>` : `Все друзья <span>${d.friends.length}</span>`}</h3>
@@ -195,6 +237,16 @@ function bindFriends() {
       if (f?.now) playFriend(f, !f.now.playing);
     };
   });
+  $$('[data-fr-room]', friendsEl).forEach((b) => {
+    b.onclick = () => {
+      const f = friendById(+b.dataset.frRoom);
+      if (f) (roomAction(f) === 'knock' ? knockFriend(f) : inviteFriend(f));
+    };
+  });
+  $$('[data-fr-letin]', friendsEl).forEach((b) => { b.onclick = () => letIn(+b.dataset.frLetin); });
+  $$('[data-fr-unknock]', friendsEl).forEach((b) => { b.onclick = () => refuseKnock(+b.dataset.frUnknock); });
+  $$('[data-fr-join]', friendsEl).forEach((b) => { b.onclick = () => joinInvite(+b.dataset.frJoin); });
+  $$('[data-fr-dismiss]', friendsEl).forEach((b) => { b.onclick = () => dismissInvite(+b.dataset.frDismiss); });
   $$('[data-fr-more]', friendsEl).forEach((b) => {
     b.onclick = () => (b.getAttribute('aria-expanded') === 'true' ? closeMenu() : friendMenu(friendById(+b.dataset.frMore), b));
   });
@@ -227,6 +279,8 @@ function friendMenu(f, anchor) {
     items.push({ label: n.playing ? 'Включить с начала' : `Включить «${n.track.title}»`, icon: n.playing ? 'i-prev' : 'i-play', onClick: () => playFriend(f, true) });
     items.push({ sep: true });
   }
+  if (roomAction(f) === 'knock') items.push({ label: 'Попроситься в руму', icon: 'i-enter', onClick: () => knockFriend(f) });
+  else items.push({ label: Together.room ? 'Позвать в руму' : 'Создать руму и позвать', icon: 'i-together', onClick: () => inviteFriend(f) });
   items.push({ label: `Скопировать @${f.login}`, icon: 'i-copy', onClick: async () => { if (await copyText(`@${f.login}`)) toast('Логин скопирован'); } });
   items.push({ sep: true });
   items.push({
@@ -237,6 +291,63 @@ function friendMenu(f, anchor) {
     },
   });
   showMenu(items, { anchor });
+}
+
+// ---- рума с друзьями ----
+
+// Позвать друга: румы нет — сначала создаём (together.js), потом отправляем другу её код
+async function inviteFriend(f) {
+  if (!f) return;
+  if (!Together.room) await enterRoom(() => api.together.create());
+  const code = Together.room?.code;
+  if (!code) return;
+  try {
+    await api.friends.invite(f.id, code);
+    toast(`${firstName(f.name)} получит приглашение в руму ${code}`);
+  } catch (e) { toast(e.message, 'err'); }
+}
+
+async function knockFriend(f) {
+  try {
+    await api.friends.knock(f.id);
+    Friends.knocked.set(f.id, Date.now());
+    toast(`Просьба ушла ${firstName(f.name)} — как пустит, зайдёшь сам`);
+  } catch (e) { toast(e.message, 'err'); }
+  renderFriends();
+}
+
+// Пустить: просто зовём его в свою руму, а его плеер войдёт сам (он же просился)
+async function letIn(id) {
+  const p = Friends.data?.knocks?.find((x) => x.id === id);
+  if (!p) return;
+  Friends.data.knocks = Friends.data.knocks.filter((x) => x.id !== id);
+  await inviteFriend(p);
+  renderFriends();
+}
+
+async function refuseKnock(id) {
+  if (Friends.data?.knocks) Friends.data.knocks = Friends.data.knocks.filter((x) => x.id !== id);
+  renderFriends();
+  api.friends.unknock(id).catch(() => {});
+}
+
+async function joinInvite(id) {
+  const p = Friends.data?.invites?.find((x) => x.id === id);
+  if (!p) return;
+  await enterRoom(() => api.together.join(p.code));
+  if (Together.room?.code === p.code) {
+    api.friends.dismiss(id).catch(() => {});
+    Friends.data.invites = Friends.data.invites.filter((x) => x.id !== id);
+    closeFriends();
+    toast(`Ты в руме с ${firstName(p.name)}`);
+  }
+  renderFriends();
+}
+
+async function dismissInvite(id) {
+  if (Friends.data?.invites) Friends.data.invites = Friends.data.invites.filter((x) => x.id !== id);
+  renderFriends();
+  api.friends.dismiss(id).catch(() => {});
 }
 
 // Трек друга — у себя. Играет через свой сервис или найденный аналог, как в «Слушать вместе»
@@ -265,7 +376,28 @@ async function loadFriends() {
       toast(`${firstName(p.name)} (@${p.login}) хочет добавить тебя в друзья`);
       islandNotify(`${firstName(p.name)} хочет в друзья`, 'friend'); // island-feed.js
     }
+    const inv = d.invites || [];
+    const newInv = inv.filter((p) => Friends.seenInvites && !Friends.seenInvites.has(`${p.id}:${p.code}`));
+    Friends.seenInvites = new Set(inv.map((p) => `${p.id}:${p.code}`));
+    const knocks = d.knocks || [];
+    const newKnocks = knocks.filter((p) => Friends.seenKnocks && !Friends.seenKnocks.has(p.id));
+    Friends.seenKnocks = new Set(knocks.map((p) => p.id));
+    for (const p of newKnocks) {
+      toast(`${firstName(p.name)} просится к тебе в руму — открой «Друзья»`);
+      islandNotify(`${firstName(p.name)} просится в руму`, 'friend');
+    }
     Friends.data = d;
+    // просились — и нас позвали: заходим сами
+    const accepted = !Together.room && inv.find((p) => Date.now() - (Friends.knocked.get(p.id) || 0) < 10 * 60 * 1000);
+    for (const p of newInv) {
+      if (p === accepted) continue;
+      toast(`${firstName(p.name)} зовёт тебя в руму — открой «Друзья»`);
+      islandNotify(`${firstName(p.name)} зовёт в руму`, 'friend'); // island-feed.js
+    }
+    if (accepted) {
+      Friends.knocked.delete(accepted.id);
+      joinInvite(accepted.id);
+    }
     Friends.fetchedAt = performance.now();
     Friends.error = '';
   } catch (e) {
@@ -332,6 +464,9 @@ api.account.onEvent(() => {
   frLogin = login;
   Friends.data = null;
   Friends.seenIncoming = null;
+  Friends.seenInvites = null;
+  Friends.seenKnocks = null;
+  Friends.knocked.clear();
   frAvatars.clear();
   if (login) { sendNow(); loadFriends(); } else { closeFriends(); renderFriendsBadge(); }
 });
@@ -343,3 +478,6 @@ api.account.onEvent(() => {
   frLogin = state.account.login;
   loadFriends();
 })();
+
+// вошли в руму или вышли — кнопки у друзей меняются: «позвать» ↔ «попроситься»
+api.together.onEvent(() => renderFriends());

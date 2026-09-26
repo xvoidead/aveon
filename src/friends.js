@@ -32,6 +32,10 @@ const list = () => call('GET', '/api/friends');
 const add = (login) => call('POST', '/api/friends', { login });
 const accept = (id) => call('POST', `/api/friends/${encodeURIComponent(id)}/accept`);
 const remove = (id) => call('DELETE', `/api/friends/${encodeURIComponent(id)}`);
+const invite = (id, code) => call('POST', `/api/friends/${encodeURIComponent(id)}/invite`, { code });
+const dismiss = (id) => call('DELETE', `/api/friends/${encodeURIComponent(id)}/invite`);
+const knock = (id) => call('POST', `/api/friends/${encodeURIComponent(id)}/knock`);
+const unknock = (id) => call('DELETE', `/api/friends/${encodeURIComponent(id)}/knock`);
 
 async function push(force = false) {
   if (!loggedIn() || unsupported) return;
@@ -76,4 +80,4 @@ async function offline() {
   sentKey = '';
 }
 
-module.exports = { init, list, add, accept, remove, now, settingsChanged, reset, offline };
+module.exports = { init, list, add, accept, remove, invite, dismiss, knock, unknock, now, settingsChanged, reset, offline };

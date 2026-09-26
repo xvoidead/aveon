@@ -9,6 +9,13 @@
   POST   /api/friends/{id}/accept     → {ok}
   DELETE /api/friends/{id}            → {ok}   удалить из друзей, отклонить или отозвать заявку
   PUT    /api/now    {track, playing, pos} → {ok}   track: null — ничего не играет
+  POST   /api/friends/{id}/invite {code}  → {ok}   позвать друга в руму
+  DELETE /api/friends/{id}/invite         → {ok}   убрать приглашение от друга (вошёл или отказался)
+
+  POST   /api/friends/{id}/knock          → {ok}   попроситься в руму к другу (он сейчас в руме)
+  DELETE /api/friends/{id}/knock          → {ok}   убрать просьбу друга (пустил или отказал)
+
+Приглашения и просьбы живут в памяти 10 минут и пропадают, когда рума закрылась.
 """
 from __future__ import annotations
 
@@ -21,6 +28,7 @@ from pydantic import BaseModel, Field
 
 from . import db
 from .app import Me
+from .together import ROOMS
 
 router = APIRouter()
 
@@ -28,10 +36,46 @@ MAX_FRIENDS = 200
 MAX_OUTGOING = 50  # висящих заявок от одного человека
 MAX_TRACK = 16 * 1024  # JSON трека
 LIVE_FOR = 150  # с без напоминаний — плеер закрыт
+INVITE_FOR = 10 * 60  # с
+
+# кому → {от кого → {code, at}}
+INVITES: dict[int, dict[int, dict]] = {}
+# кому → {кто просится → когда}
+KNOCKS: dict[int, dict[int, float]] = {}
+
+
+def in_rooms() -> set[int]:
+    return {m.user_id for r in ROOMS.values() for m in r.members.values()}
+
+
+def fresh_knocks(user_id: int) -> dict[int, float]:
+    mine = KNOCKS.get(user_id, {})
+    if user_id not in in_rooms():
+        mine.clear()
+    t = time.time()
+    for s in [s for s, at in mine.items() if t - at > INVITE_FOR]:
+        del mine[s]
+    if not mine:
+        KNOCKS.pop(user_id, None)
+    return mine
 
 
 class AddFriend(BaseModel):
     login: str = Field(max_length=64)
+
+
+class Invite(BaseModel):
+    code: str = Field(max_length=16)
+
+
+def fresh_invites(user_id: int) -> dict[int, dict]:
+    t = time.time()
+    mine = INVITES.get(user_id, {})
+    for sender in [s for s, inv in mine.items() if t - inv["at"] > INVITE_FOR or inv["code"] not in ROOMS]:
+        del mine[sender]
+    if not mine:
+        INVITES.pop(user_id, None)
+    return mine
 
 
 class NowPlaying(BaseModel):
@@ -77,6 +121,14 @@ def friends_list(me: Me):
             "JOIN users u ON u.id = r.from_id WHERE r.to_id = ? ORDER BY r.created DESC",
             (me.user_id,),
         ).fetchall()
+        invites = fresh_invites(me.user_id)
+        knocks = fresh_knocks(me.user_id)
+        ids = list(set(invites) | set(knocks))
+        senders = {
+            r["id"]: r for r in conn.execute(
+                f"SELECT id, login, name, avatar_at FROM users WHERE id IN ({','.join('?' * len(ids))})", ids,
+            )
+        } if ids else {}
         outgoing = conn.execute(
             "SELECT u.id, u.login, u.name, u.avatar_at, r.created FROM friend_requests r "
             "JOIN users u ON u.id = r.to_id WHERE r.from_id = ? ORDER BY r.created DESC",
@@ -89,8 +141,9 @@ def friends_list(me: Me):
             live = t - r["at"] < LIVE_FOR * 1000
             now = {"track": json.loads(r["track"]), "playing": bool(r["playing"]) and live,
                    "pos": r["pos"], "at": r["at"], "live": live}
-        return person(r) | {"since": r["since"], "now": now}
+        return person(r) | {"since": r["since"], "now": now, "in_room": r["id"] in busy}
 
+    busy = in_rooms()
     items = [view(r) for r in friends]
     # сверху — кто слушает прямо сейчас, потом кто в сети, потом по времени последнего трека
     items.sort(key=lambda f: (
@@ -101,6 +154,9 @@ def friends_list(me: Me):
         "friends": items,
         "incoming": [person(r) | {"created": r["created"]} for r in incoming],
         "outgoing": [person(r) | {"created": r["created"]} for r in outgoing],
+        "invites": [person(senders[s]) | {"code": inv["code"], "at": int(inv["at"])}
+                    for s, inv in sorted(invites.items(), key=lambda x: -x[1]["at"]) if s in senders],
+        "knocks": [person(senders[s]) | {"at": int(at)} for s, at in sorted(knocks.items(), key=lambda x: -x[1]) if s in senders],
         "now": t,
     }
 
@@ -156,6 +212,42 @@ def friends_remove(user_id: int, me: Me):
     with db.tx() as conn:
         conn.execute("DELETE FROM friends WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)", (a, b, b, a))
         conn.execute("DELETE FROM friend_requests WHERE (from_id = ? AND to_id = ?) OR (from_id = ? AND to_id = ?)", (a, b, b, a))
+    return {"ok": True}
+
+
+@router.post("/api/friends/{user_id}/invite")
+def friends_invite(user_id: int, body: Invite, me: Me):
+    code = body.code.strip().upper()
+    if code not in ROOMS:
+        raise HTTPException(404, "Рума уже закрылась")
+    with db.tx() as conn:
+        if not are_friends(conn, me.user_id, user_id):
+            raise HTTPException(403, "Звать в руму можно только друзей")
+    INVITES.setdefault(user_id, {})[me.user_id] = {"code": code, "at": time.time()}
+    KNOCKS.get(me.user_id, {}).pop(user_id, None)  # он просился — считаем, что пустили
+    return {"ok": True}
+
+
+@router.delete("/api/friends/{user_id}/invite")
+def friends_invite_dismiss(user_id: int, me: Me):
+    INVITES.get(me.user_id, {}).pop(user_id, None)
+    return {"ok": True}
+
+
+@router.post("/api/friends/{user_id}/knock")
+def friends_knock(user_id: int, me: Me):
+    with db.tx() as conn:
+        if not are_friends(conn, me.user_id, user_id):
+            raise HTTPException(403, "Проситься можно только к друзьям")
+    if user_id not in in_rooms():
+        raise HTTPException(404, "Друг уже не в руме")
+    KNOCKS.setdefault(user_id, {})[me.user_id] = time.time()
+    return {"ok": True}
+
+
+@router.delete("/api/friends/{user_id}/knock")
+def friends_knock_dismiss(user_id: int, me: Me):
+    KNOCKS.get(me.user_id, {}).pop(user_id, None)
     return {"ok": True}
 
 

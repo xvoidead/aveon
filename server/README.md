@@ -108,6 +108,8 @@ server {
 | `POST` | `/api/friends` | `{login}` → `{status: "sent" \| "friends"}` |
 | `POST` | `/api/friends/{id}/accept` | принять заявку |
 | `DELETE` | `/api/friends/{id}` | удалить из друзей, отклонить или отозвать заявку |
+| `POST` / `DELETE` | `/api/friends/{id}/invite` | `{code}` — позвать друга в руму / убрать приглашение от него |
+| `POST` / `DELETE` | `/api/friends/{id}/knock` | попроситься в руму к другу / убрать его просьбу |
 | `PUT` | `/api/now` | `{track, playing, pos}`; `track: null` — ничего не играет |
 
 ## слушать вместе
