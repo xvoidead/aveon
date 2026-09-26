@@ -171,10 +171,21 @@ function renderFriends(f) {
   const parts = [];
   if (f.count) parts.push(f.count === 1 ? `${esc(f.live[0].name)} слушает «${esc(f.live[0].title)}»` : `${f.count} ${plural(f.count, 'друг слушает', 'друга слушают', 'друзей слушают')} музыку`);
   if (f.room) parts.push(`вместе: ${f.room}`);
-  box.innerHTML = `${f.live.map((x) => {
+  // кнопки: один друг — «слушать с ним» и «написать»; несколько — клик по аватарке и «друзья»; рума — «рума»
+  const one = f.count === 1 ? f.live[0] : null;
+  const btns = [
+    ...(one ? [`<button class="primary" data-fa="listen" data-f="${one.id}" title="Включить у себя с того же места">▶ Слушать</button>`,
+      `<button data-fa="chat" data-f="${one.id}" title="Открыть чат в плеере">Написать</button>`] : []),
+    ...(f.count > 1 ? ['<button data-fa="friends">Друзья</button>'] : []),
+    ...(f.room ? ['<button data-fa="room">Рума</button>'] : []),
+  ];
+  const html = `${f.live.map((x) => {
     const bg = avatarCss(x.av);
-    return `<i title="${esc(x.name)} — ${esc(x.title)}"${bg ? ` class="pic" style='background-image:${bg}'` : ''}>${bg ? '' : esc(x.letter)}</i>`;
-  }).join('')}<span>${parts.join(' · ')}</span>`;
+    return `<i data-fa="listen" data-f="${x.id}" title="${esc(x.name)} — ${esc(x.title)}: включить у себя"${bg ? ` class="pic" style='background-image:${bg}'` : ''}>${bg ? '' : esc(x.letter)}</i>`;
+  }).join('')}<span>${parts.join(' · ')}</span>${btns.length ? `<div class="fbtns">${btns.join('')}</div>` : ''}`;
+  // перерисовываем, только если поменялось: состояние приходит 15 раз в секунду, и клик по
+  // пересозданной кнопке терялся бы
+  if (box.dataset.html !== html) { box.innerHTML = html; box.dataset.html = html; }
 }
 
 // Новый трек — капсула на пару секунд показывает, что заиграло
@@ -318,3 +329,12 @@ pill.addEventListener('wheel', (e) => { e.preventDefault(); act('volume', { delt
   setInterval(send, 150);
   send();
 })();
+
+
+// строка друзей: кнопки и аватарки — действие выполняет окно плеера (island-feed.js)
+$('#friends').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-fa]');
+  if (!b) return;
+  e.stopPropagation();
+  act('friend', { action: b.dataset.fa, id: b.dataset.f ? +b.dataset.f : null });
+});

@@ -120,7 +120,7 @@ function islandNotify(text, kind = 'info', person = null) {
     for (const f of Friends.data?.friends || []) if (!heard.has(f.id)) heard.set(f.id, { playing: false, said: 0 });
     const room = Together.room;
     return {
-      live: list.slice(0, 4).map((f) => ({ name: f.name, letter: (f.name || '?').trim()[0]?.toUpperCase() || '?', title: f.now.track.title || '', av: avatarKey(f) })),
+      live: list.slice(0, 4).map((f) => ({ id: f.id, name: f.name, letter: (f.name || '?').trim()[0]?.toUpperCase() || '?', title: f.now.track.title || '', av: avatarKey(f) })),
       count: list.length,
       room: room && room.members.length > 1 ? room.members.length : 0,
     };
@@ -199,6 +199,16 @@ function islandNotify(text, kind = 'info', person = null) {
 
   api.island.onAction((a) => {
     if (locked()) return;
+    // кнопки в строке друзей раскрытого острова (island.js → renderFriends)
+    if (a.type === 'friend') {
+      const f = friendById(a.id); // friends.js
+      if (a.action === 'listen' && f?.now) playFriend(f, false);
+      else if (a.action === 'chat') chatFromIsland(a.id);
+      else if (a.action === 'friends') { api.island.action({ type: 'focus' }); openFriends(); }
+      else if (a.action === 'room') { api.island.action({ type: 'focus' }); openTogether(); } // together.js
+      setTimeout(push, 50);
+      return;
+    }
     if (a.type === 'thumb') {
       if (a.action === 'toggle') togglePlay();
       else if (a.action === 'next') next();

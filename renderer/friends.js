@@ -1120,3 +1120,12 @@ function heartBurst(node) {
   h.addEventListener('animationend', () => h.remove(), { once: true });
   setTimeout(() => h.remove(), 900);
 }
+
+// Из острова: показать плеер, открыть чат с другом и поставить курсор в поле ввода.
+// В самом острове печатать нельзя — он не забирает фокус (чтобы не выбивать из игры)
+function chatFromIsland(id) {
+  api.island.action({ type: 'focus' }); // главный процесс покажет окно плеера
+  if (!friendById(id)) return;
+  openChat(id);
+  setTimeout(() => $('#fr-text', friendsEl)?.focus(), 150);
+}
