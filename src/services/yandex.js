@@ -58,6 +58,7 @@ function mapTrack(t) {
     cover: cover(t.coverUri || album?.coverUri),
     link: album ? `https://music.yandex.ru/album/${album.id}/track/${t.id}` : '',
     playable: t.available !== false,
+    explicit: t.contentWarning === 'explicit' || t.explicit === true, // 18+: мат в тексте
     // id исполнителей — чтобы открыть страницу артиста без поиска по имени
     ref: { id: String(t.id), artists: (t.artists || []).map((a) => ({ id: String(a.id), name: a.name })) },
   };

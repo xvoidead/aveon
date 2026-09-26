@@ -133,6 +133,7 @@ function mapTrack(t) {
     cover: (images.find((i) => i.width && i.width <= 320) || images[0])?.url || '',
     link: t.external_urls?.spotify || '',
     playable: !t.is_local,
+    explicit: t.explicit === true, // 18+
     ref: { uri: t.uri, isrc: t.external_ids?.isrc || '' },
   };
 }

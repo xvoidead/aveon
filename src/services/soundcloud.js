@@ -58,6 +58,7 @@ function mapTrack(t) {
     link: t.permalink_url,
     playable: t.streamable !== false && t.policy !== 'BLOCK',
     preview: t.policy === 'SNIP',
+    explicit: t.publisher_metadata?.explicit === true, // 18+: так отмечает издатель
     ref: { id: t.id, auth: t.track_authorization, transcodings: t.media?.transcodings || [] },
   };
 }

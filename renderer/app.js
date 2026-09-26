@@ -812,6 +812,7 @@ function prev() {
 function showNow(track, stream) {
   state.via = stream?.via || null;
   $('#now-title').textContent = track.title;
+  $('#now-title').toggleAttribute('data-explicit', !!track.explicit); // значок 18+ (styles.css)
   $('#btn-now-album').disabled = false;
   $('#btn-now-sc').disabled = false;
   $('#btn-now-sc').hidden = track.source === 'sc'; // из SoundCloud и так — кнопку прячем
@@ -1115,6 +1116,7 @@ function rowHtml(t, i) {
     ? `<img loading="lazy" decoding="async" src="${esc(t.cover)}" alt="">`
     : `<div class="ph">${esc((t.title || '?').trim()[0]?.toUpperCase() || '♪')}</div>`;
   const tags = [
+    t.explicit ? '<span class="tag e18" title="Нецензурный текст">18+</span>' : '',
     state.view !== t.source ? `<span class="tag">${SHORT[t.source]}</span>` : '',
     t.preview ? '<span class="tag preview">30 сек</span>' : '',
   ].join('') + dlTag(t); // downloads.js: скачан для офлайна
