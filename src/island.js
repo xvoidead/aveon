@@ -14,7 +14,7 @@ let main = null;
 let last = null; // последнее состояние из окна плеера
 let ready = false;
 
-const cfg = () => ({ enabled: true, pos: 'top', onlyAway: true, overFullscreen: false, ...(config.get().island || {}) });
+const cfg = () => ({ enabled: true, pos: 'top', onlyAway: true, ...(config.get().island || {}) });
 
 // На каком экране остров. Плеер перед глазами — на его экране (там и настройки мини-экрана);
 // плеер свёрнут или позади — там, где курсор: с двумя мониторами игра обычно не на экране плеера
@@ -132,9 +132,8 @@ function ensure() {
 
 function level() {
   if (!win || win.isDestroyed()) return;
-  // screen-saver — выше полноэкранных приложений; floating — только над обычными окнами
-  win.setAlwaysOnTop(true, cfg().overFullscreen ? 'screen-saver' : 'floating');
-  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: cfg().overFullscreen });
+  win.setAlwaysOnTop(true, 'screen-saver'); // выше и полноэкранных окон; в играх прячет «прятать в играх»
+  win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 }
 
 // Игры и видео на весь экран сами встают «поверх всех» и отодвигают остров вниз — поднимаем его
@@ -143,7 +142,6 @@ function level() {
 setInterval(() => {
   if (!win || win.isDestroyed() || !win.isVisible()) return;
   if (display().id !== placedOn) place(); // курсор ушёл на другой монитор — остров за ним
-  if (!cfg().overFullscreen) return;
   win.setAlwaysOnTop(true, 'screen-saver');
   win.moveTop();
 }, 1500);
