@@ -35,6 +35,7 @@ const LOOK_DEFAULTS = {
   hidden: [],            // скрытые вкладки
   startView: 'last',     // last — где остановился; иначе id вкладки
   badge: true,           // плашка «в бочке» на обложке
+  dock: 'left',          // где плеер на компьютере: left | right | bottom | top
 };
 
 // Фон: [оттенок, насыщенность %] — светлоты те же, что у палитры из обложки (extras.js → setTheme)
@@ -111,6 +112,7 @@ function applyLook() {
     'look-stage-cover': look.stageBg === 'cover', 'look-stage-flat': look.stageBg === 'flat',
     'look-wall': look.wallpaper && !!wallpaperUrl, 'look-lyrics-center': look.lyricsAlign === 'center',
     'look-lyrics-sharp': !look.lyricsBlur, 'look-no-badge': !look.badge,
+    'dock-right': !IS_MOBILE && look.dock === 'right', 'dock-bottom': !IS_MOBILE && look.dock === 'bottom', 'dock-top': !IS_MOBILE && look.dock === 'top',
   };
   for (const [k, on] of Object.entries(cls)) root.classList.toggle(k, on);
   applyRadius(look.radius / 100);
@@ -256,10 +258,32 @@ const range = (key, label, min, max, step, val, unit) => `<div class="field"><la
   <input type="range" id="lk-${key}" data-look-range="${key}" data-unit="${unit}" min="${min}" max="${max}" step="${step}" value="${val}">
   <span class="val" data-look-val="${key}">${val}${unit}</span></div></div>`;
 
+const ISLAND_DEFAULTS = { enabled: true, pos: 'top', onlyAway: true, overFullscreen: false };
+const islandCfg = () => ({ ...ISLAND_DEFAULTS, ...(state.cfg?.island || {}) });
+const islandSw = (key, label, on) => `<div class="field"><label>${label}</label><div class="ctl"><label class="switch"><input type="checkbox" data-island-bool="${key}" ${on ? 'checked' : ''} aria-label="${label}"><span></span></label></div></div>`;
+
+// Только на компьютере: где стоит плеер и остров поверх всех окон
+function dockSection(l) {
+  if (IS_MOBILE) return '';
+  const i = islandCfg();
+  return `<section class="sec" data-sec="dock">
+    <h3 class="sec-title">Плеер и остров</h3>
+    <div class="field"><label>Где плеер</label><div class="ctl">${seg('dock', [['left', 'Слева'], ['right', 'Справа'], ['bottom', 'Снизу'], ['top', 'Сверху']], l.dock)}</div></div>
+    <p class="sec-desc">Остров — чёрная капсула поверх всех окон и рабочего стола, как на айфоне: обложка и живой спектр, в бочке светится. Наведи — появятся кнопки, перемотка и «в бочку». При смене трека на пару секунд показывает, что заиграло.</p>
+    ${islandSw('enabled', 'Остров поверх всех окон', i.enabled)}
+    <div class="sub-fields" ${i.enabled ? '' : 'data-off'}>
+      <div class="field"><label>Где остров</label><div class="ctl"><div class="seg" data-island-seg="pos">${[['top', 'Сверху'], ['left', 'Слева сверху'], ['right', 'Справа сверху'], ['bottom', 'Снизу']].map(([v, t]) => `<button data-v="${v}" class="${i.pos === v ? 'on' : ''}">${t}</button>`).join('')}</div></div></div>
+      ${islandSw('onlyAway', 'Только когда плеер свёрнут или не в фокусе', i.onlyAway)}
+      ${islandSw('overFullscreen', 'Поверх игр и полноэкранных окон', i.overFullscreen)}
+    </div>
+  </section>`;
+}
+
 function lookSection() {
   const l = lookCfg();
   const order = sourceOrder();
-  return `
+  return `${dockSection(l)}
+
   <section class="sec" data-sec="theme">
     <h3 class="sec-title">Тема</h3>
     <p class="sec-desc">Цвет фона всего плеера. «Фон в цвет обложки» ниже перекрашивает его под трек, пока тот играет.</p>
@@ -374,7 +398,9 @@ function rerenderLook() {
 }
 
 function bindLook(body) {
-  $$('[data-sec="theme"], [data-sec="colors"], [data-sec="type"], [data-sec="bg"], [data-sec="barrel"], [data-sec="list"], [data-sec="lyricslook"], [data-sec="motion"]', body)
+  $$('[data-island-bool]', body).forEach((inp) => { inp.onchange = async () => { await saveCfg({ island: { [inp.dataset.islandBool]: inp.checked } }); rerenderLook(); }; });
+  $$('[data-island-seg] button', body).forEach((b) => { b.onclick = async () => { await saveCfg({ island: { pos: b.dataset.v } }); rerenderLook(); }; });
+  $$('[data-sec="dock"], [data-sec="theme"], [data-sec="colors"], [data-sec="type"], [data-sec="bg"], [data-sec="barrel"], [data-sec="list"], [data-sec="lyricslook"], [data-sec="motion"]', body)
     .forEach((s) => { s.dataset.lookRoot = '1'; });
 
   $$('[data-theme]', body).forEach((b) => { b.onclick = async () => { await saveLook({ theme: b.dataset.theme }); rerenderLook(); }; });

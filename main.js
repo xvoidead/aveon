@@ -19,6 +19,7 @@ const together = require('./src/together');
 const friends = require('./src/friends');
 const discord = require('./src/discord');
 const eqpop = require('./src/eqpop');
+const island = require('./src/island');
 const resolve = require('./src/resolve');
 const cache = require('./src/cache');
 const cacheFiles = require('./src/cache-files');
@@ -85,6 +86,8 @@ function createWindow() {
   win.on('maximize', () => win.webContents.send('win:state', { maximized: true }));
   win.on('unmaximize', () => win.webContents.send('win:state', { maximized: false }));
   win.on('leave-full-screen', () => win.webContents.send('win:state', { fullscreen: false }));
+  win.on('closed', () => island.destroy()); // остров не держит приложение открытым
+  island.init(win);
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//.test(url)) shell.openExternal(url);
     return { action: 'deny' };
@@ -197,6 +200,7 @@ function registerIpc() {
     if (patch.discord) discord.settingsChanged();
     if (patch.friends) friends.settingsChanged();
     if (patch.cache) cache.settingsChanged();
+    if (patch.island) island.settingsChanged();
     return config.publicView();
   });
   handle('cfg:secret', (key, value) => {
@@ -328,6 +332,19 @@ function registerIpc() {
   // Кэш треков и текстов: сколько занимает, очистка
   handle('cache:info', () => cache.info());
   handle('cache:clear', (kind) => cache.clear(kind));
+
+  // Остров поверх всех окон (src/island.js): состояние — из окна плеера, кнопки — обратно в него
+  ipcMain.on('island:state', (e, st) => island.state(st));
+  ipcMain.on('island:hover', (e, on) => island.hover(!!on));
+  ipcMain.on('island:action', (e, a) => {
+    if (a?.type === 'focus') {
+      if (win.isMinimized()) win.restore();
+      win.show();
+      win.focus();
+      return;
+    }
+    send('island:action', a);
+  });
 
   // Discord: что сейчас играет
   ipcMain.on('discord:update', (e, p) => discord.update(p));

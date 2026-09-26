@@ -1147,3 +1147,56 @@ html.look-lyrics-sharp .lyric { filter: none !important; }
 .look-src-name { flex: 1; }
 .look-sources .icon-btn:disabled { opacity: .25; }
 .switch.small { transform: scale(.85); transform-origin: left center; }
+
+/* ---------- где плеер: справа, панелью снизу или сверху (look.js → dock) ---------- */
+html.dock-right body { grid-template-columns: 1fr minmax(340px, 400px); }
+html.dock-right .stage { grid-column: 2; grid-row: 1; border-right: 0; border-left: 1px solid var(--rivet-2); }
+html.dock-right .library { grid-column: 1; grid-row: 1; }
+
+/* Панель как у Spotify и Яндекс Музыки: слева трек, по центру кнопки и перемотка, справа громкость и аккаунт */
+html.dock-bottom body, html.dock-top body { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
+html.dock-top body { grid-template-rows: auto minmax(0, 1fr); }
+html.dock-bottom .library { grid-row: 1; }
+html.dock-bottom .stage { grid-row: 2; }
+html.dock-top .stage { grid-row: 1; }
+html.dock-top .library { grid-row: 2; padding-top: 14px; }
+html:is(.dock-bottom, .dock-top) .stage {
+  display: grid; align-items: center; justify-items: start;
+  grid-template-columns: 64px minmax(120px, 1fr) minmax(300px, 1.4fr) minmax(0, 1fr) auto auto;
+  grid-template-rows: auto auto; column-gap: 16px; row-gap: 2px;
+  padding: 10px 20px; min-height: 92px; overflow: visible;
+  border-right: 0; border-top: 1px solid var(--rivet-2);
+  background:
+    radial-gradient(60% 180% at 12% 50%, color-mix(in srgb, var(--amber) calc(12% - var(--m) * 8%), transparent), transparent 70%),
+    var(--oak-2);
+}
+html.dock-top .stage { border-top: 0; border-bottom: 1px solid var(--rivet-2); padding-top: 12px; padding-right: 150px; }
+html:is(.dock-bottom, .dock-top) .stage > .barrel {
+  grid-column: 1; grid-row: 1 / 3; width: 64px; min-width: 0; margin: 0;
+}
+html:is(.dock-bottom, .dock-top) .stage .porthole { width: 76%; }
+html:is(.dock-bottom, .dock-top) .stage .in-barrel { display: none; }
+html:is(.dock-bottom, .dock-top) .stage .hoop-inner { display: none; }
+html:is(.dock-bottom, .dock-top) .now { grid-column: 2; grid-row: 1 / 3; text-align: left; min-height: 0; min-width: 0; width: 100%; }
+html:is(.dock-bottom, .dock-top) .now-title { font-size: 15px; -webkit-line-clamp: 1; }
+html:is(.dock-bottom, .dock-top) .now-artist { margin-top: 2px; font-size: 13px; }
+html:is(.dock-bottom, .dock-top) .controls { grid-column: 3; grid-row: 1; justify-self: center; gap: 12px; }
+html:is(.dock-bottom, .dock-top) .play-btn { width: 40px; height: 40px; }
+html:is(.dock-bottom, .dock-top) .play-btn svg { width: 18px; height: 18px; }
+html:is(.dock-bottom, .dock-top) .progress-row { grid-column: 3; grid-row: 2; }
+html:is(.dock-bottom, .dock-top) .volume-row { grid-column: 4; grid-row: 1 / 3; justify-self: end; width: auto; max-width: 100%; }
+html:is(.dock-bottom, .dock-top) .volume-row .volume { width: 90px; min-width: 0; flex: none; }
+html:is(.dock-bottom, .dock-top) .together-chip { grid-column: 5; grid-row: 1 / 3; margin: 0; max-width: 180px; }
+html:is(.dock-bottom, .dock-top) .together-chip.idle { padding: 8px; }
+html:is(.dock-bottom, .dock-top) .together-chip.idle #together-chip-text { display: none; }
+/* узкое окно: громкость ужимается до кнопки */
+@media (max-width: 1100px) { html:is(.dock-bottom, .dock-top) .volume-row .volume { display: none; } }
+html:is(.dock-bottom, .dock-top) .stage-foot { grid-column: 6; grid-row: 1 / 3; margin: 0; width: auto; flex-direction: row; align-items: center; gap: 8px; }
+html:is(.dock-bottom, .dock-top) .stage-account { margin: 0; }
+html:is(.dock-bottom, .dock-top) .me-text { display: none; }
+html:is(.dock-bottom, .dock-top) .me { padding: 3px; max-width: none; }
+html:is(.dock-bottom, .dock-top) .call { width: auto; max-width: 260px; padding: 7px 12px; border-radius: 99px; }
+html:is(.dock-bottom, .dock-top) .call .meters { display: none; }
+html:is(.dock-bottom, .dock-top) .call .call-head { margin: 0; }
+html:is(.dock-bottom, .dock-top) .call.off { display: none; }
+html:is(.dock-bottom, .dock-top) .brand { display: none; }

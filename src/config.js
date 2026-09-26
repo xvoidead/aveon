@@ -64,6 +64,8 @@ const DEFAULTS = {
     preamp: 0, // дБ
     custom: [], // свои пресеты: { id: 'u:…', name, gains, preamp }
   },
+  // Остров поверх всех окон: pos — top | left | right | bottom; onlyAway — только когда плеер не в фокусе
+  island: { enabled: true, pos: 'top', onlyAway: true, overFullscreen: false },
   look: {}, // оформление: тема, цвета, шрифты… (значения по умолчанию — renderer/look.js)
   cache: { keep: true, limitMb: 2048 }, // треки сохраняются сами, пока их слушаешь (src/cache.js)
   mxm: { token: '' }, // токен Musixmatch: выдаётся редко, поэтому храним

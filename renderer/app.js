@@ -789,7 +789,7 @@ function micTick() {
 // Монитор присылает уровни ~30 раз в секунду. Голос выше порога → эффект быстро нарастает,
 // тишина дольше «держать после фразы» → плавно уходит.
 
-const duck = { m: 0, meter: { o: 0, m: 0, call: 0, dc: 0 }, lastVoice: -1e9, last: performance.now(), sent: 1, ok: null, error: '', streak: 0 };
+const duck = { forced: false, m: 0, meter: { o: 0, m: 0, call: 0, dc: 0 }, lastVoice: -1e9, last: performance.now(), sent: 1, ok: null, error: '', streak: 0 };
 
 api.duck.onMeter((m) => {
   duck.meter = m;
@@ -816,8 +816,10 @@ function duckTick() {
   if (mic.speaking) duck.lastVoice = now;
 
   // manual — бочка включена вручную (Android: кнопка на сцене и в уведомлении)
-  const talking = !!m.manual || (!!m.call && now - duck.lastVoice < d.hold);
-  const active = !!m.manual || (d.enabled && !!m.call && (d.mode === 'call' || talking));
+  // вручную: кнопка на телефоне, остров или клавиша B на компьютере
+  const manual = !!m.manual || duck.forced;
+  const talking = manual || (!!m.call && now - duck.lastVoice < d.hold);
+  const active = manual || (d.enabled && !!m.call && (d.mode === 'call' || talking));
   const want = active ? 1 : 0;
   const tau = want > duck.m ? d.attack : d.release;
   duck.m += (want - duck.m) * (1 - Math.exp(-dt / Math.max(10, tau / 3)));
@@ -844,15 +846,16 @@ function renderCall(talking) {
   const m = duck.meter;
   const broken = duck.ok === false;
   const inCall = !!m.call;
+  const manual = !!m.manual || duck.forced;
   // На телефоне плашка видна всегда: в ней кнопка «в бочку вручную», а шкал нет
-  $('#discord').classList.toggle('off', !IS_MOBILE && !inCall && !broken);
+  $('#discord').classList.toggle('off', !IS_MOBILE && !inCall && !broken && !manual);
   $('#discord').classList.toggle('no-meters', IS_MOBILE || !inCall);
   if (IS_MOBILE) $('#duck-manual').setAttribute('aria-pressed', String(!!m.manual));
 
   const el = $('#duck-chip');
   let text, cls = '';
   if (broken) { text = 'Монитор звука не запустился'; cls = 'err'; }
-  else if (m.manual) { text = 'Музыка в бочке'; cls = 'talk'; }
+  else if (manual) { text = 'Музыка в бочке'; cls = 'talk'; }
   else if (!inCall) text = 'Не в звонке';
   else if (!d.enabled) text = 'В звонке, эффект выключен';
   else if (talking) { text = 'Говорят, музыка в бочке'; cls = 'talk'; }
@@ -883,6 +886,12 @@ makeSlider($('#meter'), {
     toast(`Порог для голосов собеседников: ${Math.round(f * 100)}%`);
   },
 });
+
+// Бочка вручную на компьютере — без звонка, просто по желанию
+function toggleForcedBarrel() {
+  duck.forced = !duck.forced;
+  toast(duck.forced ? 'Музыка в бочке' : 'Бочка выключена');
+}
 
 $('#duck-enabled').addEventListener('change', (e) => saveCfg({ duck: { enabled: e.target.checked } }));
 if (IS_MOBILE) $('#duck-manual').addEventListener('click', () => api.mobile.barrel(!duck.meter.manual));
@@ -1531,7 +1540,7 @@ const SET_TABS = [
   ['keys', 'Клавиши', 'i-keys'],
 ].filter(([id]) => !(IS_MOBILE && id === 'keys')); // на телефоне клавиатуры нет
 const SEC_TAB = {
-  theme: 'style', colors: 'style', type: 'style', bg: 'style', barrel: 'style', list: 'style', lyricslook: 'style', motion: 'style', // look.js
+  dock: 'style', theme: 'style', colors: 'style', type: 'style', bg: 'style', barrel: 'style', list: 'style', lyricslook: 'style', motion: 'style', // look.js
   sound: 'look', duck: 'call', mic: 'call', ext: 'call', censor: 'censor', ym: 'services', sc: 'services', sp: 'services', discord: 'services', local: 'library', cache: 'cache', keys: 'keys' };
 let settingsTab = 'style';
 
@@ -1617,6 +1626,7 @@ const KEYS = [
   ['E', 'эквалайзер'],
   ['L', 'текст песни'],
   ['F', 'во весь экран'],
+  ['B', 'бочка вручную'],
   ['Ctrl + F', 'поиск'],
   ['Ctrl + ,', 'настройки'],
   ['Ctrl + V', 'открыть код альбома или пресета'],
@@ -2161,6 +2171,7 @@ document.addEventListener('keydown', (e) => {
   else if (e.ctrlKey && e.key === 'ArrowLeft') prev();
   else if (e.key === 'ArrowRight') audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 5);
   else if (e.key === 'ArrowLeft') audio.currentTime = Math.max(0, audio.currentTime - 5);
+  else if (e.key.toLowerCase() === 'b' || e.key.toLowerCase() === 'и') toggleForcedBarrel();
   else if (e.key === 'ArrowUp') { e.preventDefault(); setVolume(Math.min(1, state.cfg.volume + 0.05), true); }
   else if (e.key === 'ArrowDown') { e.preventDefault(); setVolume(Math.max(0, state.cfg.volume - 0.05), true); }
   else if (e.code === 'KeyM') toggleMute();
