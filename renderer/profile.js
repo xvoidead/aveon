@@ -12,6 +12,65 @@ const pf = { devices: null, devicesError: '', loadingDevices: false };
 const profileOpen = () => !profileEl.hidden;
 const displayName = () => state.account.name || state.account.login || 'гость';
 const initial = (s) => (String(s || '?').trim()[0] || '?').toUpperCase();
+const avatarUrl = () => state.cfg.ui?.avatar || '';
+
+// Аватар: своя картинка или первая буква имени на градиенте
+function paintAvatar(el, name) {
+  const url = avatarUrl();
+  el.classList.toggle('has-pic', !!url);
+  el.style.backgroundImage = url ? `url("${url}")` : '';
+  el.textContent = url ? '' : initial(name);
+}
+
+// Картинка → квадрат 256×256 по центру, JPEG. Небольшой, чтобы спокойно синхронизироваться
+function cropAvatar(file) {
+  return new Promise((resolve, reject) => {
+    if (!/^image\//.test(file.type)) { reject(new Error('Это не картинка')); return; }
+    if (file.size > 20 * 1024 * 1024) { reject(new Error('Картинка больше 20 МБ')); return; }
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      const side = Math.min(img.naturalWidth, img.naturalHeight);
+      const c = document.createElement('canvas');
+      c.width = c.height = 256;
+      const g = c.getContext('2d');
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, 256, 256);
+      resolve(c.toDataURL('image/jpeg', 0.86));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Картинка не открылась')); };
+    img.src = url;
+  });
+}
+
+async function setAvatar(dataUrl) {
+  await saveCfg({ ui: { avatar: dataUrl } });
+  renderMe();
+  if (profileOpen()) renderProfileParts(['hero']);
+}
+
+function pickAvatar() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/png,image/jpeg,image/webp,image/gif';
+  input.onchange = async () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    try {
+      await setAvatar(await cropAvatar(file));
+      toast('Аватар обновлён');
+    } catch (e) { toast(e.message, 'err'); }
+  };
+  input.click();
+}
+
+function avatarMenu(anchor) {
+  showMenu([
+    { label: avatarUrl() ? 'Загрузить другое фото' : 'Загрузить фото', icon: 'i-user', onClick: pickAvatar },
+    ...(avatarUrl() ? [{ sep: true }, { label: 'Убрать фото', icon: 'i-trash', danger: true, onClick: () => setAvatar('').then(() => toast('Аватар убран')) }] : []),
+  ], { anchor });
+}
 
 function syncLine() {
   const a = state.account;
@@ -24,7 +83,7 @@ function syncLine() {
 // Плашка слева сверху
 function renderMe() {
   const name = displayName();
-  $('#me-avatar').textContent = initial(name);
+  paintAvatar($('#me-avatar'), name);
   $('#me-name').textContent = name;
   const sub = $('#me-sub');
   sub.textContent = syncLine();
@@ -123,7 +182,7 @@ function heroHtml() {
   const name = displayName();
   const host = (a.server || '').replace(/^https?:\/\//, '');
   return `
-    <div class="pf-avatar">${esc(initial(name))}</div>
+    <button class="pf-avatar" id="pf-avatar" aria-label="Сменить аватар" title="Сменить аватар" aria-haspopup="menu"></button>
     <div class="pf-who">
       <div class="pf-name"><h1>${esc(name)}</h1>
         <button class="icon-btn small" id="pf-rename" aria-label="Изменить имя" title="Изменить имя"><svg><use href="#i-pencil"/></svg></button></div>
@@ -188,6 +247,11 @@ function closeProfile() {
 
 function bindProfile() {
   const on = (id, fn) => { const el = $(id, profileEl); if (el) el.onclick = fn; };
+  const av = $('#pf-avatar', profileEl);
+  if (av) {
+    paintAvatar(av, displayName());
+    av.onclick = () => (av.getAttribute('aria-expanded') === 'true' ? closeMenu() : avatarMenu(av));
+  }
   on('#pf-settings', () => openSettings());
   on('#pf-rename', async () => {
     const name = await ask({ title: 'Как тебя зовут', text: 'Имя видят друзья в «Слушать вместе» и в кодах альбомов.', value: state.account.name || '', ok: 'Сохранить' });

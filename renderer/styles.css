@@ -998,3 +998,12 @@ body.liquid-glass .modal { background: rgb(10 7 5 / .3); }
 .stage-foot .call.off { margin-top: -10px; }
 .stage > .barrel { margin-top: auto; } /* плеер посередине между верхом и подвалом */
 .sheet.eq-sheet.lg { position: fixed; } /* попап эквалайзера остаётся у кнопки и со стеклом */
+
+/* ---------- аватар ---------- */
+.me-avatar.has-pic, .pf-avatar.has-pic { background-size: cover; background-position: center; }
+.pf-avatar { position: relative; cursor: pointer; overflow: hidden; }
+.pf-avatar::after {
+  content: "сменить"; position: absolute; inset: 0; display: grid; place-items: center; border-radius: 50%;
+  font: 600 12px var(--ui); color: #fff; background: rgb(0 0 0 / .45); opacity: 0; transition: opacity .15s ease;
+}
+.pf-avatar:hover::after, .pf-avatar[aria-expanded="true"]::after, .pf-avatar:focus-visible::after { opacity: 1; }
