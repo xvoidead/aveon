@@ -18,6 +18,7 @@ const Friends = {
   seenKnocks: null,   // id друзей, которые просятся в руму и о которых уже сказали
   knocked: new Map(), // к кому мы попросились → когда: его приглашение принимаем сами
   seenMsg: new Map(), // от кого → id последнего непрочитанного, о котором уже сказали
+  seenReact: new Map(), // от кого → последняя реакция на моё сообщение, о которой уже сказали
   msgPrimed: false,   // первый опрос: о старых непрочитанных не тостим, их видно по счётчику
   unreadWas: new Map(), // сколько непрочитанного было при прошлой отрисовке: вырос — счётчик подпрыгивает
   viewAnim: null,     // 'in' — открыли чат или профиль, 'back' — вернулись к списку (анимация перехода)
@@ -413,9 +414,25 @@ async function loadFriends() {
       if (last) Friends.seenMsg.set(f.id, Math.max(seen, last.id));
       if (!last || !Friends.msgPrimed || last.id <= seen) continue;
       if (Chat.id === f.id && !friendsEl.hidden) continue; // чат открыт — сообщение и так видно
-      const what = last.track_title ? `♪ ${last.track_title}` : last.text;
+      const what = last.track_title ? `♪ ${last.track_title}` : last.album_title ? `💿 альбом «${last.album_title}»` : last.text;
       toast(`${firstName(f.name)}: ${what}`);
       islandNotify(`${firstName(f.name)}: ${what}`, 'friend', f); // island-feed.js
+    }
+    // приняли мою заявку — был в «ждут ответа», стал другом
+    const nowFriends = new Set(d.friends.map((f) => f.id));
+    for (const p of Friends.data?.outgoing || []) {
+      if (!nowFriends.has(p.id)) continue;
+      toast(`${firstName(p.name)} теперь в друзьях`);
+      islandNotify(`${firstName(p.name)} теперь в друзьях`, 'friend', p);
+    }
+    // реакция друга на моё сообщение
+    for (const f of d.friends) {
+      const r = f.react;
+      const key = r ? `${r.msg}:${r.e}:${r.at}` : '';
+      const seen = Friends.seenReact.get(f.id);
+      Friends.seenReact.set(f.id, key);
+      if (!r || !Friends.msgPrimed || seen === key || (Chat.id === f.id && !friendsEl.hidden)) continue;
+      islandNotify(`${firstName(f.name)} ${r.e} ${r.text ? `«${r.text}»` : 'твоё сообщение'}`, 'friend', f);
     }
     Friends.msgPrimed = true;
     Friends.data = d;
@@ -516,6 +533,7 @@ api.account.onEvent(() => {
   Friends.seenKnocks = null;
   Friends.knocked.clear();
   Friends.seenMsg.clear();
+  Friends.seenReact.clear();
   Friends.msgPrimed = false;
   Chat.id = null;
   FP.id = null;

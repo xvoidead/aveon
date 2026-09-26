@@ -149,7 +149,10 @@ api.together.onEvent((ev) => {
     case 'state': {
       const fresh = ev.state.track.id !== state.track?.id; // до применения: потом трек уже будет тем же
       applyRemote(ev.state, ev.age, { beat: ev.beat });
-      if (fresh && !ev.beat && !ev.initial && ev.by) toast(`${firstName(ev.by)} включает «${ev.state.track.title}»`);
+      if (fresh && !ev.beat && !ev.initial && ev.by) {
+        toast(`${firstName(ev.by)} включает «${ev.state.track.title}»`);
+        islandNotify(`${firstName(ev.by)} включает «${ev.state.track.title}»`, 'together'); // island-feed.js
+      }
       break;
     }
     case 'members':
@@ -159,10 +162,12 @@ api.together.onEvent((ev) => {
       if (ev.joined && T.isDriver() && state.track) T.send();
       break;
     case 'reconnecting':
+      if (was?.connected) islandNotify('Связь с румой пропала — переподключаюсь', 'together');
       break;
     case 'closed':
       T.remote = null;
       if (was) toast(ev.error || 'Ты вышел из румы', ev.error ? 'err' : '');
+      if (was && ev.error) islandNotify(ev.error, 'together'); // «рума закрылась», «связь потеряна»
       break;
     case 'error':
       toast(ev.error, 'err');
