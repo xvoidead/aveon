@@ -3,6 +3,7 @@
 // Состояние присылает окно плеера (renderer/island-feed.js), нарисован остров в renderer/island.html.
 const { BrowserWindow, screen } = require('electron');
 const hoverWatch = require('./hover');
+const games = require('./games');
 const path = require('path');
 const config = require('./config');
 
@@ -152,6 +153,7 @@ function wanted() {
   const c = cfg();
   if (Date.now() < previewUntil) return true;
   if (!c.enabled || !last?.hasTrack) return false;
+  if (c.hideInGames && games.current()) return false; // идёт игра — остров не мешает (src/games.js)
   if (!c.onlyAway || !main || main.isDestroyed()) return true;
   return main.isMinimized() || !main.isVisible() || !main.isFocused();
 }
@@ -177,6 +179,7 @@ function init(mainWindow) {
   screen.on('display-metrics-changed', place);
   screen.on('display-added', place);
   screen.on('display-removed', place);
+  games.start(() => cfg().enabled && !!cfg().hideInGames, () => update());
 }
 
 function state(s) {
