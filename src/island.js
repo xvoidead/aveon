@@ -108,7 +108,9 @@ function ensure() {
       backgroundThrottling: false,
     },
   });
-  hoverWatch.watch(win);
+  // заход курсора на капсулу решает главный процесс: события мыши в прозрачном окне врут при
+  // переключении «пропускать клики / ловить» (ложный mouseleave — капсула закрывалась и клики уходили)
+  hoverWatch.watch(win, { onInside: (on) => { if (ready && !win.isDestroyed()) win.webContents.send('island:pointer', on); } });
   level();
   win.loadFile(path.join(__dirname, '..', 'renderer', 'island.html'));
   win.webContents.once('did-finish-load', () => {

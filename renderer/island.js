@@ -240,25 +240,25 @@ function tick() {
 }
 requestAnimationFrame(tick);
 
-// Наведение: окно начинает ловить мышь, капсула раскрывается
-pill.addEventListener('mouseenter', () => {
+// Наведение: капсула раскрывается. Зашёл ли курсор и ушёл ли, говорит главный процесс (src/hover.js):
+// свои mouseenter/mouseleave здесь врут, когда окно переключается «пропускать клики / ловить»
+function pointerIn() {
   clearTimeout(leaveTimer);
-  api.island.hover(true);
+  if (is('open')) return;
   pill.classList.remove('peek', 'notice');
   pill.classList.add('open');
   renderLabel();
   fitWidth();
-});
-// курсор ушёл за окно острова целиком — тоже «ушёл с капсулы»
-document.addEventListener('mouseleave', () => pill.dispatchEvent(new Event('mouseleave')));
-pill.addEventListener('mouseleave', () => {
+}
+function pointerOut() {
   clearTimeout(leaveTimer);
   leaveTimer = setTimeout(() => {
     pill.classList.remove('open');
-    api.island.hover(false);
     renderLabel();
   }, 220);
-});
+}
+pill.addEventListener('mouseenter', pointerIn); // быстрее часов главного процесса, если событие пришло
+api.island.onPointer((on) => (on ? pointerIn() : pointerOut()));
 
 const act = (type, extra) => api.island.action({ type, ...extra });
 $('#b-play').onclick = () => act('thumb', { action: 'toggle' });

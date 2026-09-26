@@ -100,6 +100,7 @@ contextBridge.exposeInMainWorld('tishe', {
     onAction: (cb) => on('island:action', cb),
     action: (a) => ipcRenderer.send('island:action', a),
     hover: (h) => ipcRenderer.send('island:hover', h),
+    onPointer: (cb) => on('island:pointer', cb),
     onState: (cb) => on('island:state', cb),
     onConfig: (cb) => on('island:config', cb),
     onWallConfig: (cb) => on('livewall:config', cb),

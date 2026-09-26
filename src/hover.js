@@ -5,7 +5,7 @@
 const { screen } = require('electron');
 
 const EVERY = 60;
-const watched = new Map(); // BrowserWindow → { rect: {x, y, w, h} | null, hovered, on }
+const watched = new Map(); // BrowserWindow → { rect: {x, y, w, h} | null, hovered, on, inside, onInside }
 let timer = null;
 
 function apply(win, s) {
@@ -16,6 +16,7 @@ function apply(win, s) {
     const x = p.x - b.x, y = p.y - b.y;
     inside = x >= s.rect.x && x < s.rect.x + s.rect.w && y >= s.rect.y && y < s.rect.y + s.rect.h;
   }
+  if (inside !== s.inside) { s.inside = inside; s.onInside?.(inside); }
   const on = s.hovered || inside;
   if (on === s.on) return;
   s.on = on;
@@ -30,8 +31,9 @@ function tick() {
   if (!watched.size) { clearInterval(timer); timer = null; }
 }
 
-function watch(win) {
-  watched.set(win, { rect: null, hovered: false, on: false });
+// onInside(on) — курсор зашёл на панель / ушёл с неё (по часам, а не по событиям мыши окна)
+function watch(win, { onInside } = {}) {
+  watched.set(win, { rect: null, hovered: false, on: false, inside: false, onInside });
   win.setIgnoreMouseEvents(true, { forward: true });
   if (!timer) timer = setInterval(tick, EVERY);
 }
@@ -55,6 +57,7 @@ function reset(win) {
   if (!s || win.isDestroyed()) return;
   s.hovered = false;
   s.on = false;
+  s.inside = false;
   win.setIgnoreMouseEvents(true, { forward: true });
 }
 
