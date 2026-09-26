@@ -262,10 +262,10 @@ function stopDj() {
 
 // ---------- экран «Волна»: эфир и фраза-настройка ----------
 // Сверху — эфир: тонкие линии, которые качаются под музыку, и слово «волна», чьи буквы плывут
-// на средней линии. Ниже — настройки одной фразой, слова в ней меняются по клику.
+// на средней линии. Ниже — настройки одной фразой, слова в ней листаются кликами.
 
 // Настройки волны — одной фразой: «Хочу спокойное, незнакомое, на русском. Диджей говорит через трек».
-// Слова с волнистым подчёркиванием меняются по клику — меню с вариантами прямо под словом.
+// Слова с волнистым подчёркиванием: ЛКМ — дальше по кругу, ПКМ — назад, колёсико — окно со всеми.
 const PHRASE = {
   mood: [['all', 'что угодно'], ['active', 'бодрое'], ['fun', 'весёлое'], ['calm', 'спокойное'], ['sad', 'грустное']],
   diversity: [['default', 'как обычно'], ['favorite', 'из любимого'], ['discover', 'незнакомое'], ['popular', 'популярное']],
@@ -315,33 +315,126 @@ function renderWaveHero() {
   bindWaveOpts(tuner);
 }
 
-async function setWave(key, v) {
-  if (key === 'dj') {
-    const dj = v !== 'off';
-    await saveCfg({ wave: dj ? { dj, djEvery: +v } : { dj } });
-    if (dj && Wave.active && state.track) { Wave.sinceDj = 99; maybeDj(state.track); }
-    if (!dj) stopDj();
-  } else if (key === 'voice') {
-    await saveCfg({ wave: { djVoice: v } });
-    speak('Привет! Теперь говорю я.');
-  } else {
-    await saveCfg({ wave: { [key]: v } });
-    if (Wave.active) waveStart(); // новое настроение, характер или язык — волна перестраивается
-  }
+// Слова фразы: ЛКМ — следующий вариант по кругу, ПКМ — предыдущий, колёсико — окно со всеми.
+// Сохраняем и перерисовываем сразу, а перестраиваем волну (и диджея) через миг после последнего
+// клика — чтобы быстрое перелистывание не перезапускало волну на каждом слове
+const WAVE_TITLES = { mood: 'Настроение', diversity: 'Характер', language: 'Язык', dj: 'Диджей', voice: 'Голос диджея' };
+const WAVE_APPLY_AFTER = 700;
+const wavePending = {};
+let waveApplyTimer = 0;
+
+function waveChoice(key) {
+  const cfg = waveCfg();
+  const cur = key === 'dj' ? djStop(cfg) : key === 'voice' ? (cfg.djVoice || djVoices[0]?.name) : cfg[key];
+  const opts = key === 'voice' ? djVoices.map((v) => [v.name, voiceShort(v.name)]) : PHRASE[key];
+  return { cur, opts };
+}
+
+async function setWave(key, v, { soon = false } = {}) {
+  const patch = key === 'dj' ? (v !== 'off' ? { dj: true, djEvery: +v } : { dj: false })
+    : key === 'voice' ? { djVoice: v } : { [key]: v };
+  // сразу в state: следующий клик должен листать уже от нового слова, не дожидаясь сохранения
+  state.cfg.wave = { ...(state.cfg.wave || {}), ...patch };
   renderWaveHero();
+  flipWord(key);
+  wavePending[key] = v;
+  clearTimeout(waveApplyTimer);
+  waveApplyTimer = setTimeout(applyWave, soon ? WAVE_APPLY_AFTER : 0);
+  await saveCfg({ wave: patch });
+}
+
+function applyWave() {
+  const p = { ...wavePending };
+  for (const k of Object.keys(wavePending)) delete wavePending[k];
+  if ('dj' in p) {
+    if (p.dj !== 'off' && Wave.active && state.track) { Wave.sinceDj = 99; maybeDj(state.track); }
+    if (p.dj === 'off') stopDj();
+  }
+  if ('voice' in p) speak('Привет! Теперь говорю я.');
+  if (['mood', 'diversity', 'language'].some((k) => k in p) && Wave.active) waveStart(); // волна перестраивается
+}
+
+function cycleWave(key, step) {
+  const { cur, opts } = waveChoice(key);
+  if (opts.length < 2) return;
+  const i = Math.max(0, opts.findIndex(([v]) => v === cur));
+  setWave(key, opts[(i + step + opts.length) % opts.length][0], { soon: true });
+}
+
+// сменившееся слово плавно въезжает снизу
+function flipWord(key) {
+  const b = $(`#wave-tuner .wave-word-opt[data-key="${key}"]`);
+  if (!b) return;
+  b.classList.remove('flip');
+  void b.offsetWidth;
+  b.classList.add('flip');
 }
 
 function bindWaveOpts(box) {
   box.querySelectorAll('.wave-word-opt').forEach((b) => {
-    b.onclick = () => {
-      const key = b.dataset.key;
-      const cfg = waveCfg();
-      const cur = key === 'dj' ? djStop(cfg) : key === 'voice' ? (cfg.djVoice || djVoices[0]?.name) : cfg[key];
-      const opts = key === 'voice' ? djVoices.map((v) => [v.name, voiceShort(v.name)]) : PHRASE[key];
-      showMenu(opts.map(([v, t]) => ({ label: t, icon: v === cur ? 'i-check' : 'i-blank', onClick: () => setWave(key, v) })), { anchor: b });
+    const key = b.dataset.key;
+    b.title = 'ЛКМ — дальше, ПКМ — назад, колёсико — все варианты';
+    b.onclick = () => cycleWave(key, 1);
+    b.oncontextmenu = (e) => { e.preventDefault(); cycleWave(key, -1); };
+    b.onmousedown = (e) => { if (e.button === 1) e.preventDefault(); }; // без автопрокрутки колёсиком
+    b.onauxclick = (e) => { if (e.button === 1) { e.preventDefault(); openWavePop(key, b); } };
+    b.onkeydown = (e) => {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); cycleWave(key, 1); }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); cycleWave(key, -1); }
+      if (e.key === 'ContextMenu' || (e.key === 'Enter' && e.shiftKey)) { e.preventDefault(); openWavePop(key, b); }
     };
   });
 }
+
+// ---- окно со всеми вариантами (колёсико) ----
+
+let wavePop = null;
+
+function closeWavePop() {
+  if (!wavePop) return;
+  const el = wavePop;
+  wavePop = null;
+  $$('.wave-word-opt[aria-expanded="true"]').forEach((b) => b.setAttribute('aria-expanded', 'false'));
+  el.classList.add('out');
+  setTimeout(() => el.remove(), 160);
+}
+
+function openWavePop(key, anchor) {
+  closeWavePop();
+  const { cur, opts } = waveChoice(key);
+  const el = document.createElement('div');
+  el.className = `wave-pop${key === 'dj' || key === 'voice' ? ' dj' : ''}`;
+  el.setAttribute('role', 'menu');
+  el.innerHTML = `<div class="wave-pop-title">${esc(WAVE_TITLES[key] || '')}</div>
+    <div class="wave-pop-opts">${opts.map(([v, t], i) => `<button role="menuitemradio" aria-checked="${v === cur}" class="${v === cur ? 'on' : ''}" data-v="${esc(v)}" style="--i:${i}">${esc(t)}</button>`).join('')}</div>`;
+  document.body.append(el);
+  wavePop = el;
+  anchor.setAttribute('aria-expanded', 'true');
+  // под словом, по его центру; не влезает вниз — над ним
+  const r = anchor.getBoundingClientRect();
+  const w = el.offsetWidth, h = el.offsetHeight, edge = 12;
+  el.style.left = `${Math.min(Math.max(edge, r.left + r.width / 2 - w / 2), innerWidth - w - edge)}px`;
+  const below = r.bottom + 10;
+  el.style.top = `${below + h > innerHeight - edge ? Math.max(edge, r.top - 10 - h) : below}px`;
+  el.style.setProperty('--ox', `${r.left + r.width / 2 - parseFloat(el.style.left)}px`);
+  el.querySelectorAll('button').forEach((b) => {
+    b.onclick = () => { closeWavePop(); setWave(key, b.dataset.v); };
+  });
+  (el.querySelector('button.on') || el.querySelector('button'))?.focus();
+}
+
+document.addEventListener('pointerdown', (e) => { if (wavePop && !wavePop.contains(e.target)) closeWavePop(); }, true);
+document.addEventListener('keydown', (e) => {
+  if (!wavePop) return;
+  if (e.key === 'Escape') { e.stopPropagation(); closeWavePop(); return; }
+  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(e.key)) return;
+  const btns = [...wavePop.querySelectorAll('button')];
+  const i = btns.indexOf(document.activeElement);
+  const step = e.key === 'ArrowLeft' || e.key === 'ArrowUp' ? -1 : 1;
+  btns[(i + step + btns.length) % btns.length]?.focus();
+  e.preventDefault();
+}, true);
+window.addEventListener('resize', closeWavePop);
 
 function ensureWaveHero() {
   let box = $('#wave-hero');

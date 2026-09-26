@@ -1611,3 +1611,41 @@ body.is-scratching { user-select: none; }
 @media (prefers-reduced-motion: reduce) {
   .fr-msg.enter, .fr-unread.pop, .v-in, .v-back { animation: none; }
 }
+
+/* ---------- фраза волны: смена слова и окно со всеми вариантами ---------- */
+@keyframes wave-flip { from { opacity: 0; transform: translateY(.45em); filter: blur(3px); } }
+.wave-word-opt { display: inline-block; }
+.wave-word-opt.flip { animation: wave-flip .28s cubic-bezier(.2, .8, .2, 1); }
+
+@keyframes wave-pop-in { from { opacity: 0; transform: translateY(-6px) scale(.96); } }
+@keyframes wave-pop-out { to { opacity: 0; transform: translateY(-4px) scale(.97); } }
+@keyframes wave-pop-opt { from { opacity: 0; transform: translateY(6px); } }
+.wave-pop {
+  position: fixed; z-index: 40; max-width: min(460px, calc(100vw - 24px)); padding: 14px;
+  border-radius: 20px; border: 1px solid color-mix(in srgb, var(--amber) 35%, var(--rivet-2));
+  background:
+    radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--amber) 14%, transparent), transparent 70%),
+    color-mix(in srgb, var(--oak-2) 92%, transparent);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 24px 60px rgb(0 0 0 / .5), 0 0 0 1px rgb(255 255 255 / .03) inset;
+  transform-origin: var(--ox, 50%) 0; animation: wave-pop-in .2s cubic-bezier(.2, .9, .3, 1.1);
+}
+.wave-pop.out { animation: wave-pop-out .15s ease forwards; pointer-events: none; }
+.wave-pop::before {
+  content: ""; position: absolute; top: -6px; left: calc(var(--ox, 50%) - 6px); width: 12px; height: 12px; transform: rotate(45deg);
+  background: inherit; border-left: inherit; border-top: inherit; border-radius: 3px 0 0 0;
+}
+.wave-pop-title { margin: 0 4px 10px; color: var(--text-3); font: 600 11px var(--ui); letter-spacing: .08em; text-transform: uppercase; }
+.wave-pop-opts { display: flex; flex-wrap: wrap; gap: 6px; }
+.wave-pop-opts button {
+  padding: 8px 14px; border-radius: 99px; background: var(--rivet); color: var(--text-2); font: 500 14px var(--ui);
+  border: 1px solid transparent; transition: background .15s ease, color .15s ease, transform .12s ease, border-color .15s ease;
+  animation: wave-pop-opt .22s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i) * 25ms);
+}
+.wave-pop-opts button:hover, .wave-pop-opts button:focus-visible { background: var(--rivet-2); color: var(--text); border-color: color-mix(in srgb, var(--amber) 40%, transparent); outline: none; }
+.wave-pop-opts button:active { transform: scale(.96); }
+.wave-pop-opts button.on { background: var(--amber); color: var(--oak); font-weight: 600; }
+.wave-pop.dj { border-color: color-mix(in srgb, var(--voice) 35%, var(--rivet-2)); background: radial-gradient(120% 90% at 50% 0%, color-mix(in srgb, var(--voice) 14%, transparent), transparent 70%), color-mix(in srgb, var(--oak-2) 92%, transparent); }
+.wave-pop.dj .wave-pop-opts button.on { background: var(--voice); }
+.wave-pop.dj .wave-pop-opts button:hover { border-color: color-mix(in srgb, var(--voice) 40%, transparent); }
+@media (prefers-reduced-motion: reduce) { .wave-word-opt.flip, .wave-pop, .wave-pop.out, .wave-pop-opts button { animation: none; } }
