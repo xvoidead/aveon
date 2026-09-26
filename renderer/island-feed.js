@@ -10,16 +10,40 @@ const islandOpt = (k) => ({ ...ISLAND_OPTS, ...(state.cfg?.island || {}) })[k];
 // Уведомление в острове: заявка в друзья, друг включил трек, кто-то зашёл в комнату…
 const islandNotices = [];
 // person — друг, о котором уведомление: в острове вместо обложки его аватарка.
-// actions — кнопки события [{ label, run, primary? }]. Всплывает уведомление как обычно (без кнопок),
-// а в раскрытом острове внизу — лента последних событий с этими кнопками (islandHistory)
-const islandHistory = []; // новые в начале; { id, text, kind, at, person, actions }
+// actions — кнопки события [{ label, do, arg?, primary? }] (что делают — EVENT_DO). Всплывает уведомление
+// как обычно (без кнопок), а в раскрытом острове внизу — лента последних событий с этими кнопками.
+// Лента сохраняется (localStorage) и переживает перезапуск плеера
 const HISTORY_KEEP = 2 * 3600 * 1000; // событие старше двух часов из ленты уходит
+const islandHistory = (() => { // новые в начале; { id, text, kind, at, person, actions }
+  try {
+    const saved = JSON.parse(localStorage.getItem('aveon.events') || '[]');
+    return Array.isArray(saved) ? saved.filter((e) => Date.now() - e.at < HISTORY_KEEP) : [];
+  } catch { return []; }
+})();
+function saveHistory() {
+  try { localStorage.setItem('aveon.events', JSON.stringify(islandHistory)); } catch {}
+}
+
+// что делают кнопки событий — все в окне плеера (friends.js, together.js)
+const EVENT_DO = {
+  chat: (id) => chatFromIsland(id),
+  listen: (id) => { const f = friendById(id); if (f?.now) playFriend(f, false); else chatFromIsland(id); },
+  accept: (id) => friendAction(id, 'accept'),
+  decline: (id) => friendAction(id, 'remove'),
+  join: (id) => joinInvite(id),
+  nojoin: (id) => dismissInvite(id),
+  letin: (id) => letIn(id),
+  refuse: (id) => refuseKnock(id),
+  room: () => { api.island.action({ type: 'focus' }); openTogether(); },
+  play: (track) => { if (track?.title) playShared(track); },
+};
 function islandNotify(text, kind = 'info', person = null, actions = []) {
   if (IS_MOBILE || !api.island) return;
   const p = person ? { id: person.id, avatar: person.avatar, name: person.name } : null;
   const id = `${Date.now()}-${Math.random()}`;
-  islandHistory.unshift({ id, text, kind, at: Date.now(), person: p, actions });
+  islandHistory.unshift({ id, text, kind, at: Date.now(), person: p, actions: actions.map(({ label, primary, do: d, arg }) => ({ label, primary, do: d, arg })) });
   if (islandHistory.length > 10) islandHistory.length = 10;
+  saveHistory();
   if (!islandOpt('notify')) return;
   islandNotices.push({ id, text, kind, person: p });
   if (islandNotices.length > 5) islandNotices.shift();
@@ -120,8 +144,8 @@ function islandNotify(text, kind = 'info', person = null, actions = []) {
       const was = heard.get(f.id);
       if (was && !was.playing && t - was.said > 10 * 60 * 1000 && !inRoom.has(f.id)) {
         islandNotify(`${firstName(f.name)} слушает «${f.now.track.title}»`, 'friend', f, [
-          { label: '▶ Слушать', primary: true, run: () => { const x = friendById(f.id); if (x?.now) playFriend(x, false); } }, // friends.js
-          { label: 'Написать', run: () => chatFromIsland(f.id) },
+          { label: '▶ Слушать', primary: true, do: 'listen', arg: f.id },
+          { label: 'Написать', do: 'chat', arg: f.id },
         ]);
         was.said = t;
       }
@@ -222,9 +246,10 @@ function islandNotify(text, kind = 'info', person = null, actions = []) {
     if (a.type === 'event') {
       const k = islandHistory.findIndex((x) => x.id === a.id);
       const ev = k >= 0 ? islandHistory[k] : null;
-      if (k >= 0) islandHistory.splice(k, 1);
+      if (k >= 0) { islandHistory.splice(k, 1); saveHistory(); }
       push();
-      try { if (a.i != null) ev?.actions[a.i]?.run(); } catch (e) { console.warn('кнопка события:', e); }
+      const b = a.i != null ? ev?.actions[a.i] : null;
+      try { if (b) EVENT_DO[b.do]?.(b.arg); } catch (e) { console.warn('кнопка события:', e); }
       return;
     }
     if (a.type === 'thumb') {

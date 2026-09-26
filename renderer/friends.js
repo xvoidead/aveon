@@ -397,8 +397,8 @@ async function loadFriends() {
     for (const p of fresh) {
       toast(`${firstName(p.name)} (@${p.login}) хочет добавить тебя в друзья`);
       islandNotify(`${firstName(p.name)} хочет в друзья`, 'friend', p, [ // island-feed.js
-        { label: 'Принять', primary: true, run: () => friendAction(p.id, 'accept') },
-        { label: 'Отклонить', run: () => friendAction(p.id, 'remove') },
+        { label: 'Принять', primary: true, do: 'accept', arg: p.id },
+        { label: 'Отклонить', do: 'decline', arg: p.id },
       ]);
     }
     const inv = d.invites || [];
@@ -410,8 +410,8 @@ async function loadFriends() {
     for (const p of newKnocks) {
       toast(`${firstName(p.name)} просится к тебе в руму — открой «Друзья»`);
       islandNotify(`${firstName(p.name)} просится в руму`, 'friend', p, [
-        { label: 'Пустить', primary: true, run: () => letIn(p.id) },
-        { label: 'Нет', run: () => refuseKnock(p.id) },
+        { label: 'Пустить', primary: true, do: 'letin', arg: p.id },
+        { label: 'Нет', do: 'refuse', arg: p.id },
       ]);
     }
     for (const f of d.friends) {
@@ -422,14 +422,14 @@ async function loadFriends() {
       if (Chat.id === f.id && !friendsEl.hidden) continue; // чат открыт — сообщение и так видно
       const what = last.track_title ? `♪ ${last.track_title}` : last.album_title ? `💿 альбом «${last.album_title}»` : last.text;
       toast(`${firstName(f.name)}: ${what}`);
-      islandNotify(`${firstName(f.name)}: ${what}`, 'friend', f, [{ label: 'Ответить', primary: true, run: () => chatFromIsland(f.id) }]); // island-feed.js
+      islandNotify(`${firstName(f.name)}: ${what}`, 'friend', f, [{ label: 'Ответить', primary: true, do: 'chat', arg: f.id }]); // island-feed.js
     }
     // приняли мою заявку — был в «ждут ответа», стал другом
     const nowFriends = new Set(d.friends.map((f) => f.id));
     for (const p of Friends.data?.outgoing || []) {
       if (!nowFriends.has(p.id)) continue;
       toast(`${firstName(p.name)} теперь в друзьях`);
-      islandNotify(`${firstName(p.name)} теперь в друзьях`, 'friend', p, [{ label: 'Написать', run: () => chatFromIsland(p.id) }]);
+      islandNotify(`${firstName(p.name)} теперь в друзьях`, 'friend', p, [{ label: 'Написать', do: 'chat', arg: p.id }]);
     }
     // реакция друга на моё сообщение
     for (const f of d.friends) {
@@ -438,7 +438,7 @@ async function loadFriends() {
       const seen = Friends.seenReact.get(f.id);
       Friends.seenReact.set(f.id, key);
       if (!r || !Friends.msgPrimed || seen === key || (Chat.id === f.id && !friendsEl.hidden)) continue;
-      islandNotify(`${firstName(f.name)} ${r.e} ${r.text ? `«${r.text}»` : 'твоё сообщение'}`, 'friend', f, [{ label: 'Открыть чат', run: () => chatFromIsland(f.id) }]);
+      islandNotify(`${firstName(f.name)} ${r.e} ${r.text ? `«${r.text}»` : 'твоё сообщение'}`, 'friend', f, [{ label: 'Открыть чат', do: 'chat', arg: f.id }]);
     }
     Friends.msgPrimed = true;
     Friends.data = d;
@@ -449,8 +449,8 @@ async function loadFriends() {
       if (p === accepted) continue;
       toast(`${firstName(p.name)} зовёт тебя в руму — открой «Друзья»`);
       islandNotify(`${firstName(p.name)} зовёт в руму`, 'friend', p, [ // island-feed.js
-        { label: 'Войти', primary: true, run: () => joinInvite(p.id) },
-        { label: 'Не пойду', run: () => dismissInvite(p.id) },
+        { label: 'Войти', primary: true, do: 'join', arg: p.id },
+        { label: 'Не пойду', do: 'nojoin', arg: p.id },
       ]);
     }
     if (accepted) {

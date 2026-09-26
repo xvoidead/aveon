@@ -152,7 +152,7 @@ api.together.onEvent((ev) => {
       if (fresh && !ev.beat && !ev.initial && ev.by) {
         toast(`${firstName(ev.by)} включает «${ev.state.track.title}»`);
         islandNotify(`${firstName(ev.by)} включает «${ev.state.track.title}»`, 'together', null, [ // island-feed.js
-          { label: 'Открыть руму', run: () => { api.island.action({ type: 'focus' }); openTogether(); } },
+          { label: 'Открыть руму', do: 'room' },
         ]);
       }
       break;
