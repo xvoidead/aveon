@@ -668,7 +668,7 @@ function startViz() {
   const g = viz.getContext('2d');
   const data = new Uint8Array(fx.analyser.frequencyBinCount);
   const draw = () => {
-    if (audio.paused || document.hidden) { vizRunning = false; g.clearRect(0, 0, viz.width, viz.height); return; }
+    if (audio.paused || document.hidden || window.LOOK?.viz === false) { vizRunning = false; g.clearRect(0, 0, viz.width, viz.height); return; }
     const dpr = window.devicePixelRatio || 1;
     const w = viz.clientWidth * dpr, h = viz.clientHeight * dpr;
     if (viz.width !== w || viz.height !== h) { viz.width = w; viz.height = h; }
@@ -676,7 +676,7 @@ function startViz() {
     g.clearRect(0, 0, w, h);
     const cx = w / 2, cy = h / 2;
     const inner = w * 0.43;       // чуть снаружи внешнего обруча
-    const reach = w * 0.065;
+    const reach = w * 0.065 * ((window.LOOK?.vizPower ?? 100) / 100); // look.js: длина лучей
     const bars = 96;
     const m = duck.m;
     g.lineCap = 'round';
@@ -1521,7 +1521,8 @@ window.addEventListener('drop', async (e) => {
 
 // Разделы настроек: какой открыт и в каком разделе лежит каждая секция (data-sec)
 const SET_TABS = [
-  ['look', 'Звук и вид', 'i-palette'],
+  ['style', 'Оформление', 'i-palette'],
+  ['look', 'Звук', 'i-eq'],
   ['call', 'Звонок', 'i-phone'],
   ['censor', 'Цензура', 'i-shield'],
   ['services', 'Сервисы', 'i-plug'],
@@ -1529,8 +1530,10 @@ const SET_TABS = [
   ['cache', 'Кэш', 'i-disk'],
   ['keys', 'Клавиши', 'i-keys'],
 ].filter(([id]) => !(IS_MOBILE && id === 'keys')); // на телефоне клавиатуры нет
-const SEC_TAB = { sound: 'look', ui: 'look', duck: 'call', mic: 'call', ext: 'call', censor: 'censor', ym: 'services', sc: 'services', sp: 'services', discord: 'services', local: 'library', cache: 'cache', keys: 'keys' };
-let settingsTab = 'look';
+const SEC_TAB = {
+  theme: 'style', colors: 'style', type: 'style', bg: 'style', barrel: 'style', list: 'style', lyricslook: 'style', motion: 'style', // look.js
+  sound: 'look', duck: 'call', mic: 'call', ext: 'call', censor: 'censor', ym: 'services', sc: 'services', sp: 'services', discord: 'services', local: 'library', cache: 'cache', keys: 'keys' };
+let settingsTab = 'style';
 
 function openSettings(focus) {
   if (focus === 'account') { openProfile(); return; } // аккаунт теперь в профиле (profile.js)
@@ -1645,13 +1648,7 @@ async function renderSettings() {
         <button class="btn" id="set-open-eq"><svg><use href="#i-eq"/></svg>Открыть</button></div></div>
     </section>
 
-    <section class="sec" data-sec="ui">
-      <h3 class="sec-title">Вид</h3>
-      <p class="sec-desc">Интерфейс написан строчными буквами. Названия треков, артистов и тексты песен тоже, но их можно оставить как есть.</p>
-      <div class="field"><label>Названия треков как есть</label><div class="ctl"><label class="switch"><input type="checkbox" id="keep-titles" ${c.ui?.keepTitles ? 'checked' : ''} aria-label="Названия треков как есть"><span></span></label></div></div>
-      <div class="field"><label>Фон в цвет обложки</label><div class="ctl"><label class="switch"><input type="checkbox" id="tint-bg" ${(c.ui?.tintBg ?? !IS_MOBILE) ? 'checked' : ''} aria-label="Фон в цвет обложки"><span></span></label></div></div>
-      <div class="field desktop-only"><label>Прятать кнопки окна</label><div class="ctl"><label class="switch"><input type="checkbox" id="autohide-win" ${c.ui?.autoHideWin !== false ? 'checked' : ''} aria-label="Прятать кнопки окна"><span></span></label></div></div>
-    </section>
+    ${lookSection()}
 
     <section class="sec" data-sec="duck">
       <h3 class="sec-title">Когда в Discord говорят</h3>
@@ -1762,20 +1759,7 @@ ${censorSettingsHtml()}
     $('#crossfade-val', body).textContent = fadeLabel(+e.target.value);
   };
   $('#crossfade', body).onchange = (e) => saveCfg({ crossfade: +e.target.value });
-  $('#autohide-win', body).onchange = (e) => {
-    state.cfg.ui.autoHideWin = e.target.checked;
-    applyWinAutohide();
-    saveCfg({ ui: { autoHideWin: e.target.checked } });
-  };
-  $('#tint-bg', body).onchange = (e) => {
-    state.cfg.ui.tintBg = e.target.checked;
-    reapplyTheme(); // extras.js
-    saveCfg({ ui: { tintBg: e.target.checked } });
-  };
-  $('#keep-titles', body).onchange = (e) => {
-    document.body.classList.toggle('keep-titles', e.target.checked);
-    saveCfg({ ui: { keepTitles: e.target.checked } });
-  };
+  bindLook(body); // look.js
 
   $$('input[data-duck]', body).forEach((inp) => {
     const key = inp.dataset.duck;
@@ -1908,6 +1892,7 @@ function applySynced(changed) {
     api.config.get().then((cfg) => {
       state.cfg = cfg;
       document.body.classList.toggle('keep-titles', !!cfg.ui?.keepTitles);
+      applyLook(); // look.js: оформление тоже приходит с других устройств
       applyWinAutohide();
       syncDuckSwitch();
       eqApply(); // eq.js: эквалайзер и свои пресеты тоже приходят с других компьютеров
@@ -2215,6 +2200,7 @@ api.win.onThumb((action) => {
 
 async function init() {
   state.cfg = await api.config.get();
+  applyLook(); // look.js
   state.account = await api.account.status().catch(() => state.account);
   if (!state.account.loggedIn) showAuth();
   document.body.classList.toggle('keep-titles', !!state.cfg.ui?.keepTitles);
@@ -2224,7 +2210,7 @@ async function init() {
   renderModes();
   applyVolume();
   await Promise.all([refreshAlbums(), loadStats()]);
-  const start = VIEWS.includes(state.cfg.view) ? state.cfg.view : 'local';
+  const start = lookStartView(VIEWS.includes(state.cfg.view) ? state.cfg.view : 'local'); // look.js
   if (state.cfg.localFolders.length) scanLocal();
   api.sp.status().then((s) => {
     state.sp = s;

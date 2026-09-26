@@ -5,7 +5,8 @@ const fs = require('fs');
 const path = require('path');
 
 // cache и lyrics — индекс кэша треков и тексты песен (src/cache.js)
-const NAMES = new Set(['session', 'stats', 'statsRemote', 'cache', 'lyrics']);
+// wallpaper — своя картинка фона (renderer/look.js), только на этом устройстве
+const NAMES = new Set(['session', 'stats', 'statsRemote', 'cache', 'lyrics', 'wallpaper']);
 const cache = new Map();
 
 function fileOf(name) {

@@ -34,6 +34,7 @@ function resetTheme() {
 }
 
 function applyThemeFrom(url) {
+  lookCover(url); // look.js: фон «размытая обложка»
   const seq = ++themeSeq;
   if (!url) { resetTheme(); return; }
   const img = new Image();
@@ -107,8 +108,11 @@ function setTheme(p) {
     '--voice': p.vivid && hueDist(p.accentHue, 232) < 50 ? hsl(158, 0.55, 0.7) : '#9aa8ff',
   };
   const root = document.documentElement.style;
+  const l = window.LOOK || {};
   for (const [k, v] of Object.entries(vars)) {
-    if (!tintBg() && BG_VARS.includes(k)) root.removeProperty(k);
+    // look.js: свой акцент или цвет бочки важнее палитры обложки
+    const own = (k === '--amber' && l.accentMode === 'fixed') || (k === '--voice' && l.voice);
+    if (own || (!tintBg() && BG_VARS.includes(k))) root.removeProperty(k);
     else root.setProperty(k, v);
   }
 }

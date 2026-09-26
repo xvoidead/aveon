@@ -279,7 +279,7 @@ body.win-autohide.win-reveal .win-buttons, body.win-autohide .win-buttons:focus-
 
 .tracklist { flex: 1; overflow-y: auto; margin: 0 -14px 0 -12px; padding: 0 8px 24px 0; }
 .row {
-  display: grid; grid-template-columns: 44px minmax(0, 1fr) minmax(0, 0.7fr) 52px 32px; gap: 14px; align-items: center;
+  display: grid; grid-template-columns: var(--c-num, 44px) minmax(0, 1fr) var(--c-album, minmax(0, 0.7fr)) var(--c-time, 52px) 32px; gap: 14px; align-items: center;
   padding: 7px 12px; border-radius: 10px;
   content-visibility: auto; contain-intrinsic-size: auto 58px;
 }
@@ -1077,3 +1077,73 @@ html.mobile .desktop-only { display: none !important; }
 .cache-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 0; border-top: 1px solid var(--rivet-2); }
 .cache-row b { display: block; font-weight: 500; }
 .cache-row small { color: var(--text-3); font-size: 12px; }
+
+/* ---------- оформление под себя (renderer/look.js) ---------- */
+/* плотность и колонки списка */
+html.look-compact .row { padding-top: 3px; padding-bottom: 3px; contain-intrinsic-size: auto 46px; }
+html.look-compact { --c-num: 36px; }
+html.look-compact .row .num, html.look-compact .row .num img, html.look-compact .row .num .ph { width: 36px; height: 36px; }
+html.look-cozy .row { padding-top: 11px; padding-bottom: 11px; contain-intrinsic-size: auto 72px; }
+html.look-cozy { --c-num: 52px; }
+html.look-cozy .row .num, html.look-cozy .row .num img, html.look-cozy .row .num .ph { width: 52px; height: 52px; }
+html.look-no-covers { --c-num: 0px; }
+html.look-no-covers .row .num { visibility: hidden; width: 0; }
+html.look-no-album { --c-album: 0px; }
+html.look-no-album .row .col-album { visibility: hidden; }
+html.look-no-time { --c-time: 0px; }
+html.look-no-time .row .col-time { visibility: hidden; }
+
+/* анимации */
+html.look-calm *, html.look-calm *::before, html.look-calm *::after { transition-duration: .08s !important; animation-duration: .08s !important; }
+html.look-still *, html.look-still *::before, html.look-still *::after { transition: none !important; animation: none !important; }
+
+/* бочка */
+html.look-no-viz .viz { display: none; }
+html.look-spin body:not(.paused) .stage .hoop-inner { animation: hoop-turn 30s linear infinite; transform-box: fill-box; transform-origin: center; }
+html.look-port-rounded .porthole, html.look-port-rounded .porthole::after { border-radius: 22%; }
+html.look-port-square .porthole, html.look-port-square .porthole::after { border-radius: 6%; }
+html.look-no-badge .in-barrel { display: none; }
+
+/* фон за бочкой */
+html.look-stage-flat .stage { background: var(--oak-2); }
+html.look-stage-cover .stage { background: var(--oak-2); isolation: isolate; }
+html.look-stage-cover .stage::before {
+  content: ""; position: absolute; inset: -60px; z-index: -1; pointer-events: none;
+  background: var(--cover-img, none) center / cover no-repeat;
+  filter: blur(48px) saturate(1.3) brightness(.45); opacity: calc(.9 - var(--m) * .3);
+  transition: background-image .6s ease;
+}
+
+/* своя картинка на фоне всего плеера */
+.look-wallpaper { display: none; }
+html.look-wall .look-wallpaper {
+  display: block; position: fixed; inset: calc(var(--wall-blur) * -2); z-index: -1; pointer-events: none;
+  background: center / cover no-repeat; filter: blur(var(--wall-blur));
+}
+html.look-wall .look-wallpaper::after { content: ""; position: absolute; inset: 0; background: rgb(0 0 0 / var(--wall-dim)); }
+html.look-wall body { background: transparent; }
+html.look-wall { background: var(--oak); }
+html.look-wall .stage { background: color-mix(in srgb, var(--oak-2) 55%, transparent); }
+html.look-wall .stage::before { opacity: .5; }
+
+/* текст песни */
+.lyrics-body { zoom: var(--lyrics-scale, 1); }
+html.look-lyrics-center .lyric { text-align: center; margin-left: auto; margin-right: auto; transform-origin: center; }
+html.look-lyrics-sharp .lyric { filter: none !important; }
+
+/* раздел настроек */
+.look-themes { display: grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap: 8px; margin: 12px 0 6px; }
+.look-theme { display: flex; flex-direction: column; align-items: stretch; gap: 6px; padding: 6px; border-radius: 12px; border: 1px solid var(--rivet-2); color: var(--text-2); font-size: 12px; }
+.look-theme i { height: 42px; border-radius: 8px; background: linear-gradient(135deg, var(--a) 0 55%, var(--b) 55% 80%, var(--c) 80%); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .06); }
+.look-theme:hover { border-color: var(--hoop-dim); }
+.look-theme.on { border-color: var(--amber); color: var(--text); }
+.look-swatches { flex-wrap: wrap; gap: 8px; }
+.look-swatch { width: 26px; height: 26px; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgb(0 0 0 / .2); }
+.look-swatch.on { box-shadow: 0 0 0 2px var(--oak-2), 0 0 0 4px var(--c); }
+.look-swatches input[type="color"] { width: 34px; height: 28px; padding: 0; border: 0; background: none; cursor: pointer; flex: none; }
+.look-swatches .btn.on { border-color: var(--amber); color: var(--text); }
+.look-sources { list-style: none; margin: 8px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.look-sources li { display: flex; align-items: center; gap: 10px; padding: 4px 0; }
+.look-src-name { flex: 1; }
+.look-sources .icon-btn:disabled { opacity: .25; }
+.switch.small { transform: scale(.85); transform-origin: left center; }
