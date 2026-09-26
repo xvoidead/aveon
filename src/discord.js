@@ -32,6 +32,17 @@ let sentAt = 0;
 let sendTimer = null;
 let lastSent = '';
 const coverCache = new Map(); // «артист — название» → https-обложка из iTunes для своих файлов
+let assets = null; // имена картинок, загруженных в приложение (Rich Presence → Art Assets); null — ещё не знаем
+
+// Картинка, которой нет в приложении, ломает статус: у себя Discord его показывает, а друзьям
+// сервер его не отдаёт. Поэтому спрашиваем, что загружено, и ставим только это
+async function loadAssets() {
+  try {
+    const res = await fetch(`https://discord.com/api/v10/oauth2/applications/${CLIENT_ID}/assets`, { signal: AbortSignal.timeout(10000) });
+    if (res.ok) assets = new Set((await res.json()).map((a) => a.name));
+  } catch {}
+}
+const asset = (name) => (assets?.has(name) ? name : '');
 
 const enabled = () => config.get().discord?.enabled !== false;
 
@@ -59,9 +70,9 @@ function onData(chunk) {
     if (op === OP.PING) write(OP.PONG, msg);
     else if (op === OP.CLOSE) { drop(); return; } // чаще всего — неверный ID приложения
     else if (op === OP.FRAME && msg?.evt === 'READY') {
-      ready = true;
       lastSent = 'null'; // после подключения статуса ещё нет — пустой не шлём
-      flush();
+      // список картинок — до первого статуса (картинки могли догрузить, пока плеер был открыт)
+      loadAssets().finally(() => { ready = true; flush(); });
     }
   }
 }
@@ -139,14 +150,18 @@ async function activity(p) {
     status_display_type: 2, // в списке участников — название трека, а не «авеон»
     details: clip(t.title),
     state: clip(t.artist || 'исполнитель неизвестен'),
-    assets: {
-      large_image: cover || 'logo',
-      large_text: clip(t.album || t.title),
-      small_image: src.icon,
-      small_text: clip(p.via?.label || (p.via ? `${SOURCES[t.source]?.name || ''} через ${SOURCES[p.via.source]?.name}` : src.name)),
-    },
+    assets: {},
     instance: false,
   };
+  const large = cover || asset('logo');
+  if (large) Object.assign(a.assets, { large_image: large, large_text: clip(t.album || t.title) });
+  if (asset(src.icon)) {
+    Object.assign(a.assets, {
+      small_image: src.icon,
+      small_text: clip(p.via?.label || (p.via ? `${SOURCES[t.source]?.name || ''} через ${SOURCES[p.via.source]?.name}` : src.name)),
+    });
+  }
+  if (!Object.keys(a.assets).length) delete a.assets;
   if (link) a.details_url = link;
   if (p.duration > 0) {
     const start = now - Math.max(0, p.pos) * 1000;
