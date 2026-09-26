@@ -105,7 +105,7 @@ function changelogHtml(sinceVersion) {
   return CHANGELOG.map((r) => {
     const fresh = sinceVersion != null && cmpVersion(r.v, sinceVersion) > 0;
     return `<section class="cl-release${fresh ? ' fresh' : ''}">
-      <h3><span class="cl-v">${esc(r.v)}</span>${esc(r.title)}${r.v === appVersion ? '<em>у тебя</em>' : ''}</h3>
+      <h3><span class="cl-v">${esc(r.v)}</span><span class="cl-title">${esc(r.title)}</span>${r.v === appVersion ? '<em>у тебя</em>' : ''}</h3>
       <ul>${r.items.map((x) => `<li>${esc(x)}</li>`).join('')}</ul>
     </section>`;
   }).join('');

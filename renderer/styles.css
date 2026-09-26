@@ -1447,8 +1447,14 @@ html.mobile .wave-phrase { font-size: 19px; line-height: 1.7; }
 /* ---------- что нового ---------- */
 .cl-sheet { width: min(620px, calc(100vw - 48px)); }
 .cl-body { display: flex; flex-direction: column; gap: 18px; padding-bottom: 24px; }
-.cl-release h3 { display: flex; align-items: baseline; gap: 10px; margin: 0 0 8px; font: 700 16px var(--display); letter-spacing: -0.01em; }
-.cl-release h3 em { font: 500 11px var(--ui); font-style: normal; color: var(--voice); }
+.cl-release h3 { display: flex; align-items: flex-start; gap: 10px; margin: 0 0 8px; font: 700 16px/1.35 var(--display); letter-spacing: -0.01em; }
+.cl-title { flex: 1; min-width: 0; }
+/* «у тебя» — плашка, которая не сжимается и не переносится по буквам */
+.cl-release h3 em {
+  flex: none; margin-top: 1px; padding: 2px 9px; border-radius: 99px; white-space: nowrap;
+  font: 600 11px/1.5 var(--ui); font-style: normal; color: var(--voice); background: color-mix(in srgb, var(--voice) 14%, transparent);
+}
+.cl-v { flex: none; margin-top: 1px; }
 .cl-v { padding: 2px 8px; border-radius: 99px; background: var(--rivet-2); color: var(--text-2); font: 600 12px var(--ui); }
 .cl-release.fresh .cl-v { background: var(--amber); color: var(--oak); }
 .cl-release ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 5px; color: var(--text-2); line-height: 1.45; }
