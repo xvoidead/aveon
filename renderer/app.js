@@ -258,7 +258,36 @@ function ensureGraph() {
   // tap — вход эффектов; между ним и микшером встаёт скретч обложкой (scratch.js), когда загрузится
   fx.tap = ctx.createGain();
   fx.mix.connect(fx.tap);
-  const src = eqBuild(fx.tap); // eq.js: 10 полос и предусилитель
+  // Умная громкость (smartvol.js): анализатор меряет громкость трека до регулятора fx.norm
+  fx.normAn = ctx.createAnalyser();
+  fx.normAn.fftSize = 2048;
+  fx.tap.connect(fx.normAn);
+  fx.norm = ctx.createGain();
+  fx.tap.connect(fx.norm);
+  // Караоке (karaoke.js): левый минус правый убирает голос, который звучит по центру;
+  // бас (он тоже по центру) подмешиваем обратно отдельно, чтобы музыка не стала «тонкой»
+  fx.post = ctx.createGain();
+  fx.kDry = ctx.createGain();
+  fx.norm.connect(fx.kDry).connect(fx.post);
+  const kSplit = ctx.createChannelSplitter(2);
+  const kL = ctx.createGain();
+  const kR = ctx.createGain();
+  kR.gain.value = -1;
+  fx.kWet = ctx.createGain();
+  fx.kWet.gain.value = 0;
+  fx.norm.connect(kSplit);
+  kSplit.connect(kL, 0);
+  kSplit.connect(kR, 1);
+  kL.connect(fx.kWet);
+  kR.connect(fx.kWet);
+  fx.kWet.connect(fx.post);
+  const kLow = ctx.createBiquadFilter();
+  kLow.type = 'lowpass';
+  kLow.frequency.value = 160;
+  fx.kBass = ctx.createGain();
+  fx.kBass.gain.value = 0;
+  fx.norm.connect(kLow).connect(fx.kBass).connect(fx.post);
+  const src = eqBuild(fx.post); // eq.js: 10 полос и предусилитель
   fx.lp = ctx.createBiquadFilter();
   fx.lp.type = 'lowpass';
   fx.lp.frequency.value = 20000;
@@ -335,6 +364,7 @@ function ensureGraph() {
   applyVolume();
   applyEffect(duck.m);
   if (typeof ensureScratchNode === 'function') ensureScratchNode(); // scratch.js: и для переходов, и для цензуры
+  if (typeof applyKaraoke === 'function') applyKaraoke(); // karaoke.js: режим мог быть включён до первого звука
 }
 
 // m: 0 — чистый звук, 1 — полностью «в бочке» (или приглушено, если выбран режим громкости).
@@ -974,7 +1004,7 @@ function duckTick() {
 
   // manual — бочка включена вручную (Android: кнопка на сцене и в уведомлении)
   // вручную: кнопка на телефоне, остров или клавиша B на компьютере
-  const manual = !!m.manual || duck.forced || duck.dj; // dj — говорит диджей волны (wave.js)
+  const manual = !!m.manual || duck.forced || duck.dj || duck.focus; // dj — говорит диджей волны (wave.js)
   const talking = manual || (!!m.call && now - duck.lastVoice < d.hold);
   const active = manual || (d.enabled && !!m.call && (d.mode === 'call' || talking));
   const want = active ? 1 : 0;
@@ -1003,7 +1033,7 @@ function renderCall(talking) {
   const m = duck.meter;
   const broken = duck.ok === false;
   const inCall = !!m.call;
-  const manual = !!m.manual || duck.forced || duck.dj;
+  const manual = !!m.manual || duck.forced || duck.dj || duck.focus;
   // На телефоне плашка видна всегда: в ней кнопка «в бочку вручную», а шкал нет
   $('#discord').classList.toggle('off', !IS_MOBILE && !inCall && !broken && !manual);
   $('#discord').classList.toggle('no-meters', IS_MOBILE || !inCall);
@@ -2020,6 +2050,8 @@ const KEYS = [
   ['L', 'текст песни'],
   ['F', 'во весь экран'],
   ['B', 'бочка вручную'],
+  ['K', 'караоке: убрать голос'],
+  ['V', 'визуализатор на весь экран'],
   ['Ctrl + F', 'поиск'],
   ['Ctrl + ,', 'настройки'],
   ['Ctrl + V', 'открыть код альбома или пресета'],
@@ -2054,6 +2086,8 @@ async function renderSettings() {
       <div class="field"><label>Эквалайзер</label><div class="ctl">
         <span class="set-note">${c.eq.enabled ? esc(eqPresetName()) : 'выключен'}</span>
         <button class="btn" id="set-open-eq"><svg><use href="#i-eq"/></svg>Открыть</button></div></div>
+      <div class="field"><label for="smart-volume">Умная громкость</label><div class="ctl"><label class="switch"><input type="checkbox" id="smart-volume" ${c.smartVolume !== false ? 'checked' : ''}><span></span></label></div></div>
+      <p class="sec-desc">Все треки звучат одинаково громко: тихие подтягиваются, громкие приглушаются. Громкость трека запоминается — в следующий раз он сразу звучит ровно.</p>
     </section>
 
     ${lookSection()}
@@ -2188,6 +2222,7 @@ ${censorSettingsHtml()}
   $$('input[data-duck-bool]', body).forEach((inp) => {
     inp.onchange = async () => { await saveCfg({ duck: { [inp.dataset.duckBool]: inp.checked } }); syncDuckSwitch(); };
   });
+  $('#smart-volume', body).onchange = (e) => saveCfg({ smartVolume: e.target.checked });
   $$('[data-duck-seg] button', body).forEach((b) => {
     b.onclick = async () => {
       await saveCfg({ duck: { [b.parentElement.dataset.duckSeg]: b.dataset.v } });
@@ -2580,6 +2615,8 @@ document.addEventListener('keydown', (e) => {
   else if (e.key === 'ArrowRight') audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 5);
   else if (e.key === 'ArrowLeft') audio.currentTime = Math.max(0, audio.currentTime - 5);
   else if (e.code === 'KeyB') toggleForcedBarrel();
+  else if (e.code === 'KeyK') toggleKaraoke(); // karaoke.js
+  else if (e.code === 'KeyV') openVisualizer(); // visualizer.js
   else if (e.key === 'ArrowUp') { e.preventDefault(); setVolume(Math.min(1, state.cfg.volume + 0.05), true); }
   else if (e.key === 'ArrowDown') { e.preventDefault(); setVolume(Math.max(0, state.cfg.volume - 0.05), true); }
   else if (e.code === 'KeyM') toggleMute();

@@ -111,6 +111,8 @@ function renderHome() {
       <div class="h-wave-text"><b>${ym ? 'Моя волна' : 'Своя волна'}</b><span>${esc(waveNote)}${cfg.dj ? ', с диджеем' : ''}</span></div>
     </div>
 
+    ${[11, 0].includes(new Date().getMonth()) && tracks.length ? `<button class="h-wrapped" id="h-wrapped"><b>Итоги ${wrappedYear()}</b><span>Сколько музыки, любимые треки и кто ты как слушатель</span></button>` : ''}
+
     ${tracks.length ? `<section class="h-sec"><div class="h-head"><h2>Часто слушаешь</h2></div>
       <div class="h-tiles">${tracks.map(tileHtml).join('')}</div></section>` : ''}
 
@@ -136,6 +138,7 @@ function renderHome() {
   box.querySelectorAll('[data-list]').forEach((b) => { b.onclick = () => lists[+b.dataset.list].open(); });
   box.querySelectorAll('[data-artist-i]').forEach((b) => { b.onclick = () => openArtist(artists[+b.dataset.artistI].name); });
   box.querySelectorAll('[data-friend-i]').forEach((b) => { b.onclick = () => openFriendProfile(friends[+b.dataset.friendI].id); });
+  $('#h-wrapped')?.addEventListener('click', openWrapped); // wrapped.js
   box.querySelectorAll('[data-go]').forEach((b) => { b.onclick = () => openView(b.dataset.go); });
   const card = $('#h-wave');
   card.onclick = (e) => { if (!e.target.closest('#h-wave-go')) openView('wave'); };
