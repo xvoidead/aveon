@@ -763,7 +763,8 @@ function showNow(track, stream) {
   state.via = stream?.via || null;
   $('#now-title').textContent = track.title;
   $('#btn-now-album').disabled = false;
-  $('#btn-now-sc').disabled = track.source === 'sc'; // из SoundCloud и так — искать там нечего
+  $('#btn-now-sc').disabled = false;
+  $('#btn-now-sc').hidden = track.source === 'sc'; // из SoundCloud и так — кнопку прячем
   $('#now-artist').innerHTML = track.artist ? artistLinks(track.artist) : 'Исполнитель неизвестен'; // имя — ссылка на артиста
   $('#now-cover').innerHTML = track.cover ? `<img src="${esc(track.cover)}" alt="">` : '<span class="porthole-empty">♪</span>';
   const via = $('#now-via');
