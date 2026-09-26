@@ -13,7 +13,7 @@ const OP = { HANDSHAKE: 0, FRAME: 1, CLOSE: 2, PING: 3, PONG: 4 };
 const RETRY = 15000;
 const MIN_GAP = 4200; // Discord пропускает не больше 5 обновлений за 20 секунд
 
-// «Где слушаю»: подпись к значку сервиса и кнопка. Ключи картинок — ассеты приложения в Discord
+// «Где слушаю»: подпись к значку сервиса. Ключи картинок — ассеты приложения в Discord
 // (Rich Presence → Art Assets), PNG лежат в docs/discord/
 const SOURCES = {
   ym: { name: 'Яндекс Музыка', icon: 'ym' },
