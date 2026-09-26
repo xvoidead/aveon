@@ -4,7 +4,7 @@
 // tray.js, hotkeys.js, livewall.js. Общие глобальные: state, api, $, $$, esc, toast, saveCfg, IS_MOBILE.
 
 const DESK_DEFAULTS = {
-  island: { enabled: true, pos: 'top', onlyAway: true, overFullscreen: false, lyrics: true, friends: true, notify: true, pulse: true, rainbow: false },
+  island: { enabled: true, pos: 'top', onlyAway: true, overFullscreen: false, lyrics: true, friends: true, notify: true, pulse: true, rainbow: false, motion: 'music', bars: true, spin: true },
   mini: { onMinimize: false, top: true, opacity: 100, lyrics: true },
   tray: { enabled: true, closeToTray: false },
   livewall: { enabled: false, style: 'both', title: true, dim: 45 },
@@ -78,7 +78,13 @@ function deskSection() {
       ${dSw('island', 'lyrics', 'Строка текста песни, пока играет', i.lyrics)}
       ${dSw('island', 'friends', 'Друзья: кто слушает и кто в комнате', i.friends)}
       ${dSw('island', 'notify', 'Уведомления: заявки, друг включил трек, кто-то зашёл в комнату', i.notify)}
-      ${dSw('island', 'pulse', 'Пульсирует в такт басам', i.pulse)}
+      <div class="field"><label>Движение от музыки</label><div class="ctl">${dSeg('island', 'motion', [['music', 'Живой'], ['calm', 'Спокойный'], ['static', 'Статичный']], i.motion)}</div></div>
+      <p class="sec-desc">«Статичный» — остров не реагирует на звук: полоски замирают, обложка не крутится, ничего не пульсирует.</p>
+      <div class="sub-fields" ${i.motion === 'static' ? 'data-off' : ''}>
+        ${dSw('island', 'bars', 'Полоски спектра', i.bars)}
+        ${dSw('island', 'spin', 'Обложка крутится, пока играет', i.spin)}
+        ${i.motion === 'music' ? dSw('island', 'pulse', 'Пульсирует в такт басам', i.pulse) : ''}
+      </div>
       ${dSw('island', 'rainbow', 'Переливающаяся обводка цветами обложки', i.rainbow)}
     </div>
   </section>

@@ -4,7 +4,7 @@
 // Пока играет — ~15 раз в секунду (с живыми обоями — 30), на паузе — изредка.
 // Общие глобальные из app.js и соседей: state, api, audio, fx, duck, Friends, Together, parseLRC, …
 
-const ISLAND_OPTS = { lyrics: true, friends: true, notify: true, pulse: true, rainbow: false };
+const ISLAND_OPTS = { lyrics: true, friends: true, notify: true, pulse: true, rainbow: false, motion: 'music', bars: true, spin: true };
 const islandOpt = (k) => ({ ...ISLAND_OPTS, ...(state.cfg?.island || {}) })[k];
 
 // Уведомление в острове: заявка в друзья, друг включил трек, кто-то зашёл в комнату…
@@ -57,7 +57,7 @@ function islandNotify(text, kind = 'info') {
     try {
       const r = await api.lyrics(t);
       if (lyr.id !== t.id) return;
-      if (r.words?.length) lyr.lines = r.words.map((l) => ({ t: l.ts, text: l.words.map((w) => w.text).join(' ').replace(/- /g, '-') }));
+      if (r.words?.length) lyr.lines = r.words.map((l) => ({ t: l.ts, words: l.words, text: l.words.map((w) => w.text).join(' ').replace(/- /g, '-') }));
       else if (r.synced) lyr.lines = parseLRC(r.synced); // extras.js
     } catch {}
   }
@@ -74,7 +74,12 @@ function islandNotify(text, kind = 'info') {
     while (i + 1 < lyr.lines.length && lyr.lines[i + 1].t <= now) i++;
     const text = (k) => (lyr.lines[k]?.text || '').trim();
     const cur = text(i);
-    return { prev: i > 0 ? text(i - 1) : '', cur, next: text(i + 1), gap: !cur, has: true };
+    // richsync: время слов текущей строки — остров сам заливает буквы между сообщениями
+    const words = lyr.lines[i]?.words;
+    const letters = words && window.LOOK?.lyricsLetters !== false
+      ? words.map((w, k) => ({ s: w.t, e: Math.min(words[k + 1]?.t ?? lyr.lines[i + 1]?.t ?? w.t + 1, w.t + 1.2), n: w.text.length + (k ? 1 : 0) }))
+      : null;
+    return { prev: i > 0 ? text(i - 1) : '', cur, next: text(i + 1), gap: !cur, has: true, letters };
   }
 
   // ---- друзья: кто слушает прямо сейчас, и кто из них только что включил новый трек ----
@@ -126,7 +131,7 @@ function islandNotify(text, kind = 'info') {
       spec: full,
       ...(() => { const l = lyricNow(); return { line: l.cur, lyric: l }; })(),
       friends: friendsNow(),
-      opts: { pulse: islandOpt('pulse'), rainbow: islandOpt('rainbow'), lyrics: islandOpt('lyrics'), miniLyrics: state.cfg?.mini?.lyrics !== false },
+      opts: { motion: islandOpt('motion'), bars: islandOpt('bars'), spin: islandOpt('spin'), pulse: islandOpt('pulse'), rainbow: islandOpt('rainbow'), lyrics: islandOpt('lyrics'), miniLyrics: state.cfg?.mini?.lyrics !== false },
     };
   }
 

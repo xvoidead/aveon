@@ -31,6 +31,7 @@ const LOOK_DEFAULTS = {
   lyricsSize: 100,       // %
   lyricsAlign: 'left',   // left | center
   lyricsBlur: true,      // неактивные строки чуть размыты
+  lyricsLetters: true,   // richsync: текущее слово заливается по буквам
   sources: null,         // порядок вкладок библиотеки; null — как по умолчанию
   hidden: [],            // скрытые вкладки
   startView: 'last',     // last — где остановился; иначе id вкладки
@@ -388,6 +389,7 @@ function lookSection() {
     ${range('lyricsSize', 'Размер текста', 70, 160, 5, l.lyricsSize, '%')}
     <div class="field"><label>Выравнивание</label><div class="ctl">${seg('lyricsAlign', [['left', 'Слева'], ['center', 'По центру']], l.lyricsAlign)}</div></div>
     ${sw('lyricsBlur', 'Размывать неактивные строки', l.lyricsBlur)}
+    ${sw('lyricsLetters', 'Заливать по буквам, если у текста есть время слов', l.lyricsLetters)}
   </section>
 
   <section class="sec" data-sec="motion">
