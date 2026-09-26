@@ -112,7 +112,9 @@ function setTheme(p) {
   for (const [k, v] of Object.entries(vars)) {
     // look.js: свой акцент или цвет бочки важнее палитры обложки
     const own = (k === '--amber' && l.accentMode === 'fixed') || (k === '--voice' && l.voice);
-    if (own || (!tintBg() && BG_VARS.includes(k))) root.removeProperty(k);
+    // «Windows 11» (look.js): фон всегда серый Windows, акцент — системный, если он есть
+    const win = l.skin === 'win11';
+    if (own || ((!tintBg() || win) && BG_VARS.includes(k)) || (win && k === '--amber' && window.SYS_ACCENT)) root.removeProperty(k);
     else root.setProperty(k, v);
   }
 }
