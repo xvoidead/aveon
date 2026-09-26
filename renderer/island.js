@@ -249,6 +249,7 @@ function pointerIn() {
   pill.classList.add('open');
   renderLabel();
   fitWidth();
+  window.sendPillRect?.(); // сразу, не дожидаясь кадра
 }
 function pointerOut() {
   clearTimeout(leaveTimer);
@@ -287,6 +288,11 @@ pill.addEventListener('wheel', (e) => { e.preventDefault(); act('volume', { delt
     const key = JSON.stringify(rect);
     if (key !== last) { last = key; api.popup?.rect(rect); }
   };
-  setInterval(send, 150); // панель растёт и переезжает плавно — сверяем часто, шлём только перемены
+  // Капсула растёт ~0,4 с: пока меняется размер, шлём каждый кадр (ResizeObserver) — иначе кнопки
+  // раскрытой капсулы какое-то время были «за границей» и клики уходили насквозь.
+  // Раз в 150 мс — на случай, если капсула переехала, не меняя размера
+  window.sendPillRect = send;
+  new ResizeObserver(send).observe(document.querySelector('#pill'));
+  setInterval(send, 150);
   send();
 })();
