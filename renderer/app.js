@@ -2522,15 +2522,16 @@ document.addEventListener('keydown', (e) => {
     else if (typing) e.target.blur();
     return;
   }
-  if (e.ctrlKey && e.key.toLowerCase() === 'f') { e.preventDefault(); closeSettings(); searchInput.focus(); searchInput.select(); return; }
-  if (e.ctrlKey && e.key === ',') { e.preventDefault(); openSettings(); return; }
+  // клавиши — по месту на клавиатуре (e.code), а не по букве: работают на любой раскладке
+  if (e.ctrlKey && e.code === 'KeyF') { e.preventDefault(); closeSettings(); searchInput.focus(); searchInput.select(); return; }
+  if (e.ctrlKey && e.code === 'Comma') { e.preventDefault(); openSettings(); return; }
   if (typing) return;
   if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
   else if (e.ctrlKey && e.key === 'ArrowRight') next();
   else if (e.ctrlKey && e.key === 'ArrowLeft') prev();
   else if (e.key === 'ArrowRight') audio.currentTime = Math.min(audio.duration || 0, audio.currentTime + 5);
   else if (e.key === 'ArrowLeft') audio.currentTime = Math.max(0, audio.currentTime - 5);
-  else if (e.key.toLowerCase() === 'b' || e.key.toLowerCase() === 'и') toggleForcedBarrel();
+  else if (e.code === 'KeyB') toggleForcedBarrel();
   else if (e.key === 'ArrowUp') { e.preventDefault(); setVolume(Math.min(1, state.cfg.volume + 0.05), true); }
   else if (e.key === 'ArrowDown') { e.preventDefault(); setVolume(Math.max(0, state.cfg.volume - 0.05), true); }
   else if (e.code === 'KeyM') toggleMute();
