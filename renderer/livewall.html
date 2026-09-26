@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' https: data: blob: media:">
+  <title>живые обои</title>
+  <link rel="stylesheet" href="../node_modules/@fontsource/unbounded/700.css">
+  <link rel="stylesheet" href="../node_modules/@fontsource/onest/500.css">
+  <style>
+    :root { --amber: #f0a63a; --voice: #9aa8ff; --dim: .45; --m: 0; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #0b0807; color: #f4f1ec; cursor: default; }
+    .bg { position: fixed; inset: -8%; background: center / cover no-repeat; filter: blur(80px) saturate(1.5) brightness(.55); transform: scale(1.05); transition: background-image 1.2s ease; animation: drift 60s ease-in-out infinite alternate; }
+    @keyframes drift { to { transform: scale(1.18) translate(-2%, 1%); } }
+    .dim { position: fixed; inset: 0; background: radial-gradient(ellipse at center, rgb(0 0 0 / calc(var(--dim) * .4)), rgb(0 0 0 / var(--dim))); }
+    canvas { position: fixed; inset: 0; width: 100%; height: 100%; }
+    .disc { position: fixed; left: 50%; top: 46%; width: 26vmin; height: 26vmin; margin: -13vmin 0 0 -13vmin; border-radius: 50%; background: #1a1411 center / cover no-repeat; box-shadow: 0 30px 80px rgb(0 0 0 / .5); filter: blur(calc(var(--m) * 4px)) saturate(calc(1 - var(--m) * .5)); }
+    .title { position: fixed; left: 5vw; bottom: 8vh; max-width: 50vw; }
+    .title b { display: block; font: 700 clamp(28px, 3.4vw, 64px)/1.1 "Unbounded", sans-serif; letter-spacing: -0.02em; text-shadow: 0 4px 30px rgb(0 0 0 / .4); }
+    .title span { display: block; margin-top: 10px; font: 500 clamp(16px, 1.4vw, 26px) "Onest", sans-serif; opacity: .75; }
+    .title em { display: block; margin-top: 18px; font: 500 clamp(16px, 1.3vw, 24px) "Onest", sans-serif; font-style: normal; color: var(--amber); }
+    body.style-cover canvas, body.style-cover .disc { display: none; }
+    body.style-spectrum .bg { display: none; }
+    body.no-title .title { display: none; }
+  </style>
+</head>
+<!-- Живые обои за иконками рабочего стола (src/livewall.js): размытая обложка, спектр по кругу, название -->
+<body>
+  <div class="bg" id="bg"></div>
+  <div class="dim"></div>
+  <canvas id="c"></canvas>
+  <div class="disc" id="disc"></div>
+  <div class="title"><b id="t"></b><span id="a"></span><em id="l"></em></div>
+  <script src="livewall.js"></script>
+</body>
+</html>

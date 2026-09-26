@@ -20,6 +20,10 @@ const friends = require('./src/friends');
 const discord = require('./src/discord');
 const eqpop = require('./src/eqpop');
 const island = require('./src/island');
+const mini = require('./src/mini');
+const tray = require('./src/tray');
+const hotkeys = require('./src/hotkeys');
+const livewall = require('./src/livewall');
 const resolve = require('./src/resolve');
 const cache = require('./src/cache');
 const cacheFiles = require('./src/cache-files');
@@ -57,6 +61,7 @@ protocol.registerSchemesAsPrivileged([
 if (!app.requestSingleInstanceLock()) app.quit();
 
 let win = null;
+let quitting = false; // «Выйти» из трея: крестик больше не прячет окно в трей
 
 function createWindow() {
   win = new BrowserWindow({
@@ -86,7 +91,12 @@ function createWindow() {
   win.on('maximize', () => win.webContents.send('win:state', { maximized: true }));
   win.on('unmaximize', () => win.webContents.send('win:state', { maximized: false }));
   win.on('leave-full-screen', () => win.webContents.send('win:state', { fullscreen: false }));
-  win.on('closed', () => island.destroy()); // остров не держит приложение открытым
+  // Крестик при «закрывать в трей» только прячет окно — музыка играет дальше
+  win.on('close', (e) => {
+    if (!quitting && tray.closeToTray()) { e.preventDefault(); win.hide(); }
+  });
+  // остров, мини-плеер и обои не держат приложение открытым
+  win.on('closed', () => { island.destroy(); mini.destroy(); livewall.destroy(); });
   island.init(win);
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//.test(url)) shell.openExternal(url);
@@ -200,7 +210,11 @@ function registerIpc() {
     if (patch.discord) discord.settingsChanged();
     if (patch.friends) friends.settingsChanged();
     if (patch.cache) cache.settingsChanged();
-    if (patch.island) island.settingsChanged();
+    if (patch.island) { island.settingsChanged(); tray.refresh(true); }
+    if (patch.mini) mini.settingsChanged();
+    if (patch.tray) tray.settingsChanged();
+    if (patch.hotkeys) hotkeys.settingsChanged();
+    if (patch.livewall) livewall.settingsChanged();
     return config.publicView();
   });
   handle('cfg:secret', (key, value) => {
@@ -334,17 +348,22 @@ function registerIpc() {
   handle('cache:clear', (kind) => cache.clear(kind));
 
   // Остров поверх всех окон (src/island.js): состояние — из окна плеера, кнопки — обратно в него
-  ipcMain.on('island:state', (e, st) => island.state(st));
+  ipcMain.on('island:state', (e, st) => {
+    island.state(st);
+    mini.state(st);
+    livewall.state(st);
+    tray.state(st);
+  });
   ipcMain.on('island:hover', (e, on) => island.hover(!!on));
   ipcMain.on('island:action', (e, a) => {
-    if (a?.type === 'focus') {
-      if (win.isMinimized()) win.restore();
-      win.show();
-      win.focus();
-      return;
-    }
+    if (a?.type === 'focus') { showWindow(); return; }
+    if (a?.type === 'mini-close') { mini.close(); return; }
     send('island:action', a);
   });
+
+  // Остров, мини-плеер, трей, горячие клавиши, живые обои — для раздела «Остров и окна»
+  handle('desk:status', () => ({ hotkeys: hotkeys.status(), livewall: livewall.status(), mini: mini.isOpen() }));
+  handle('mini:toggle', () => { mini.toggle(); return mini.isOpen(); });
 
   // Discord: что сейчас играет
   ipcMain.on('discord:update', (e, p) => discord.update(p));
@@ -381,10 +400,45 @@ function registerIpc() {
   });
 }
 
+function showWindow() {
+  if (!win || win.isDestroyed()) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.focus();
+}
+
+function toggleWindow() {
+  if (!win || win.isDestroyed()) return;
+  if (win.isVisible() && !win.isMinimized() && win.isFocused()) win.hide();
+  else showWindow();
+}
+
+function toggleIsland() {
+  const on = config.get().island?.enabled !== false;
+  config.set({ island: { enabled: !on } });
+  island.settingsChanged();
+  tray.refresh(true);
+  send('desk:changed');
+}
+
+// Трей и глобальные клавиши зовут одни и те же действия
+const deskActions = {
+  thumb: (a) => send('thumb', a),
+  barrel: () => send('island:action', { type: 'barrel' }),
+  mini: () => { mini.toggle(); tray.refresh(true); send('desk:changed'); },
+  miniOpen: () => mini.isOpen(),
+  island: toggleIsland,
+  islandOn: () => config.get().island?.enabled !== false,
+  show: showWindow,
+  toggleWindow,
+  quit: () => { quitting = true; app.quit(); },
+};
+
+app.on('before-quit', () => { quitting = true; });
+
 app.on('second-instance', () => {
   if (!win) return;
-  if (win.isMinimized()) win.restore();
-  win.focus();
+  showWindow();
 });
 
 app.whenReady().then(() => {
@@ -405,6 +459,20 @@ app.whenReady().then(() => {
   eqpop.init((open) => send('eqpop:shown', open));
   discord.init();
   friends.init();
+  tray.init(deskActions);
+  mini.init(win, () => { tray.refresh(true); send('desk:changed'); });
+  livewall.init(() => send('desk:changed'));
+  hotkeys.init({
+    play: () => send('thumb', 'toggle'),
+    next: () => send('thumb', 'next'),
+    prev: () => send('thumb', 'prev'),
+    barrel: deskActions.barrel,
+    show: toggleWindow,
+    mini: deskActions.mini,
+    island: toggleIsland,
+    volUp: () => send('island:action', { type: 'volume', delta: 0.05 }),
+    volDown: () => send('island:action', { type: 'volume', delta: -0.05 }),
+  });
   account.init((ev) => {
     if (ev.changed?.albums) local.allowFiles(albums.localPaths());
     if (ev.changed?.settings) duck.setTargets(config.get().duck.targets);
@@ -414,6 +482,8 @@ app.whenReady().then(() => {
 
 app.on('window-all-closed', async () => {
   eqpop.destroy();
+  hotkeys.destroy();
+  tray.destroy();
   duck.stop();
   discord.stop();
   config.flush();

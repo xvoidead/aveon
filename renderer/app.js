@@ -1537,10 +1537,12 @@ const SET_TABS = [
   ['services', 'Сервисы', 'i-plug'],
   ['library', 'Папки', 'i-folder'],
   ['cache', 'Кэш', 'i-disk'],
+  ['desk', 'Остров и окна', 'i-device'],
   ['keys', 'Клавиши', 'i-keys'],
-].filter(([id]) => !(IS_MOBILE && id === 'keys')); // на телефоне клавиатуры нет
+].filter(([id]) => !(IS_MOBILE && (id === 'keys' || id === 'desk'))); // на телефоне нет клавиатуры и окон // на телефоне клавиатуры нет
 const SEC_TAB = {
-  dock: 'style', theme: 'style', colors: 'style', type: 'style', bg: 'style', barrel: 'style', list: 'style', lyricslook: 'style', motion: 'style', // look.js
+  island: 'desk', mini: 'desk', tray: 'desk', hotkeys: 'desk', livewall: 'desk', // desk.js
+  dock: 'style', theme: 'style', colors: 'style', type: 'style', bg: 'style', barrel: 'style', list: 'style', lyricslook: 'style', fsmode: 'style', motion: 'style', // look.js
   sound: 'look', duck: 'call', mic: 'call', ext: 'call', censor: 'censor', ym: 'services', sc: 'services', sp: 'services', discord: 'services', local: 'library', cache: 'cache', keys: 'keys' };
 let settingsTab = 'style';
 
@@ -1645,6 +1647,7 @@ async function renderSettings() {
   state.account = await api.account.status().catch(() => state.account);
   await refreshDiscordStatus();
   await refreshCacheInfo(); // cache.js
+  await refreshDesk(); // desk.js
 
   $('#settings-body').innerHTML = `
     <section class="sec" data-sec="sound">
@@ -1744,6 +1747,7 @@ ${censorSettingsHtml()}
     </section>
 
     ${cacheSection()}
+    ${deskSection()}
 
     <section class="sec desktop-only" data-sec="ext">
       <h3 class="sec-title">Приглушать другие программы</h3>
@@ -1876,6 +1880,7 @@ ${censorSettingsHtml()}
     };
   });
   bindCache(body); // cache.js
+  bindDesk(body); // desk.js
   $('#folder-add', body).onclick = addFolder;
   const rescan = $('#folder-rescan', body);
   if (rescan) rescan.onclick = () => scanLocal(true);

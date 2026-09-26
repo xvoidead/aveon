@@ -96,6 +96,13 @@ contextBridge.exposeInMainWorld('tishe', {
     hover: (h) => ipcRenderer.send('island:hover', h),
     onState: (cb) => on('island:state', cb),
     onConfig: (cb) => on('island:config', cb),
+    onWallConfig: (cb) => on('livewall:config', cb),
+  },
+  // Раздел «Остров и окна»: мини-плеер, горячие клавиши, живые обои
+  desk: {
+    status: () => call('desk:status'),
+    miniToggle: () => call('mini:toggle'),
+    onChange: (cb) => on('desk:changed', cb),
   },
   cache: {
     info: () => call('cache:info'),

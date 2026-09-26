@@ -3,13 +3,13 @@
 <head>
   <meta charset="utf-8">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' https: data: blob: media:">
-  <title>остров</title>
+  <title>мини-плеер</title>
   <link rel="stylesheet" href="../node_modules/@fontsource/onest/500.css">
   <link rel="stylesheet" href="../node_modules/@fontsource/onest/600.css">
-  <link rel="stylesheet" href="island.css">
+  <link rel="stylesheet" href="mini.css">
 </head>
-<!-- Остров поверх всех окон (src/island.js, renderer/island.js) -->
-<body class="hidden">
+<!-- Мини-плеер поверх всех окон (src/mini.js, renderer/mini.js). Тащится за любое пустое место -->
+<body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></symbol>
     <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="13.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></symbol>
@@ -17,34 +17,31 @@
     <symbol id="i-prev" viewBox="0 0 24 24"><path d="M18 6.8v10.4a.8.8 0 0 1-1.25.66l-7.6-5.2a.8.8 0 0 1 0-1.32l7.6-5.2A.8.8 0 0 1 18 6.8z" fill="currentColor"/><rect x="5.3" y="6" width="2.2" height="12" rx="1.1" fill="currentColor"/></symbol>
     <symbol id="i-barrel" viewBox="0 0 24 24"><path d="M7 3.5h10c1.3 2.4 2 5.3 2 8.5s-.7 6.1-2 8.5H7C5.7 18.1 5 15.2 5 12s.7-6.1 2-8.5zM5.4 8.5h13.2M5.4 15.5h13.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
     <symbol id="i-open" viewBox="0 0 24 24"><path d="M14 4.5h5.5V10M19.5 4.5 11 13M18 14v4a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 5 18V8a1.5 1.5 0 0 1 1.5-1.5h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6.5 6.5 11 11m0-11-11 11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
   </svg>
 
-  <div class="pill" id="pill">
-    <div class="glow"></div>
-    <div class="ring"></div>
-    <div class="row">
-      <div class="disc" id="disc"></div>
-      <i class="dot"></i>
-      <div class="label"><b id="p-title"></b><small id="p-sub"></small></div>
-      <div class="bars" id="bars"><i></i><i></i><i></i><i></i><i></i></div>
-    </div>
-    <div class="full">
-      <div class="seek">
-        <span id="t-cur">0:00</span>
-        <div class="bar" id="seek"><i id="seek-fill"></i></div>
-        <span id="t-dur">0:00</span>
+  <div class="card" id="card">
+    <div class="bg" id="bg"></div>
+    <div class="cover" id="cover">♪</div>
+    <div class="main">
+      <div class="text">
+        <b id="title">ничего не играет</b>
+        <small id="artist"></small>
+        <em id="line"></em>
       </div>
+      <div class="bar" id="seek"><i id="fill"></i></div>
       <div class="ctl">
         <button id="b-barrel" title="В бочку"><svg><use href="#i-barrel"/></svg></button>
         <button id="b-prev" title="Назад"><svg><use href="#i-prev"/></svg></button>
-        <button id="b-play" class="play" title="Пауза"><svg><use href="#i-pause"/></svg></button>
+        <button id="b-play" class="play" title="Играть"><svg><use href="#i-play"/></svg></button>
         <button id="b-next" title="Дальше"><svg><use href="#i-next"/></svg></button>
+        <span class="time" id="time">0:00</span>
         <button id="b-open" title="Открыть плеер"><svg><use href="#i-open"/></svg></button>
+        <button id="b-close" title="Закрыть мини-плеер"><svg><use href="#i-close"/></svg></button>
       </div>
-      <div class="friends" id="friends" hidden></div>
     </div>
   </div>
 
-  <script src="island.js"></script>
+  <script src="mini.js"></script>
 </body>
 </html>

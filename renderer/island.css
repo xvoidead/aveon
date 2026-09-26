@@ -66,3 +66,38 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 .ctl .play { width: 38px; height: 38px; background: #f4f1ec; color: #000; }
 .ctl .play:hover { background: #fff; color: #000; }
 #b-barrel.on { color: var(--voice); background: color-mix(in srgb, var(--voice) 18%, transparent); }
+
+/* ---- строка текста песни в свёрнутом острове ---- */
+.pill.lyric:not(.open):not(.peek):not(.notice) { width: 380px; }
+.pill.lyric:not(.open):not(.peek):not(.notice) .label b { font-size: 13px; color: #f4f1ec; }
+.pill.lyric:not(.open):not(.peek):not(.notice) .label small { display: none; }
+.label b.swap { animation: swap .35s ease; }
+@keyframes swap { from { opacity: 0; transform: translateY(6px); } }
+
+/* ---- уведомление: как peek, но со значком ---- */
+.pill.notice { width: 360px; height: 56px; border-radius: 28px; }
+.pill.notice .row { top: 8px; height: 40px; }
+.pill.notice .disc { width: 40px; height: 40px; border-radius: 50%; animation: none; }
+.pill.notice .label b { color: var(--voice); }
+
+/* ---- друзья в раскрытом острове ---- */
+.pill.open.has-friends { height: 176px; }
+.friends { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgb(255 255 255 / .08); font-size: 12px; color: rgb(244 241 236 / .65); }
+.friends i { width: 22px; height: 22px; margin-left: -6px; border-radius: 50%; display: grid; place-items: center; font: 600 11px "Onest", sans-serif; font-style: normal; color: #000; background: var(--voice); box-shadow: 0 0 0 2px #000; }
+.friends i:first-child { margin-left: 0; }
+.friends span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dot { position: absolute; left: 26px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--voice); box-shadow: 0 0 0 2px #000; display: none; }
+.pill.friend-live:not(.open) .dot { display: block; }
+
+/* ---- пульс в такт басам ---- */
+.pill.pulse.playing:not(.open) { transform: scale(calc(1 + var(--bass, 0) * .045)); transition: width .42s var(--ease), height .42s var(--ease), border-radius .42s var(--ease), box-shadow .3s ease, opacity .3s ease, transform .08s linear; }
+.pill.pulse.playing:not(.open) { box-shadow: 0 6px 22px rgb(0 0 0 / .35), 0 0 calc(var(--bass, 0) * 26px) calc(var(--bass, 0) * 2px) color-mix(in srgb, var(--amber) 55%, transparent); }
+
+/* ---- переливающаяся обводка цветами обложки ---- */
+@property --ang { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
+.ring { position: absolute; inset: 0; border-radius: inherit; pointer-events: none; padding: 1.5px; display: none;
+  background: conic-gradient(from var(--ang), var(--amber), var(--voice), color-mix(in srgb, var(--amber) 40%, #fff), var(--amber));
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude;
+  animation: ring 4s linear infinite; }
+.pill.rainbow .ring { display: block; }
+@keyframes ring { to { --ang: 360deg; } }

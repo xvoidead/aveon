@@ -65,7 +65,11 @@ const DEFAULTS = {
     custom: [], // свои пресеты: { id: 'u:…', name, gains, preamp }
   },
   // Остров поверх всех окон: pos — top | left | right | bottom; onlyAway — только когда плеер не в фокусе
-  island: { enabled: true, pos: 'top', onlyAway: true, overFullscreen: false },
+  island: { enabled: true, pos: 'top', onlyAway: true, overFullscreen: false, lyrics: true, friends: true, notify: true, pulse: true, rainbow: false },
+  mini: { open: false, onMinimize: false, top: true, opacity: 100, lyrics: true, x: null, y: null }, // мини-плеер (src/mini.js)
+  tray: { enabled: true, closeToTray: false }, // значок в трее (src/tray.js)
+  hotkeys: {}, // горячие клавиши на всю систему; по умолчанию — src/hotkeys.js
+  livewall: { enabled: false, style: 'both', title: true, dim: 45 }, // живые обои (src/livewall.js)
   look: {}, // оформление: тема, цвета, шрифты… (значения по умолчанию — renderer/look.js)
   cache: { keep: true, limitMb: 2048 }, // треки сохраняются сами, пока их слушаешь (src/cache.js)
   mxm: { token: '' }, // токен Musixmatch: выдаётся редко, поэтому храним

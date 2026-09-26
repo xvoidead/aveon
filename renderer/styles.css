@@ -1200,3 +1200,36 @@ html:is(.dock-bottom, .dock-top) .call .meters { display: none; }
 html:is(.dock-bottom, .dock-top) .call .call-head { margin: 0; }
 html:is(.dock-bottom, .dock-top) .call.off { display: none; }
 html:is(.dock-bottom, .dock-top) .brand { display: none; }
+
+/* ---------- во весь экран: вид, фон, часы (look.js) ---------- */
+.fs-clock { display: none; position: absolute; top: 22px; left: 28px; z-index: 2; font: 700 clamp(22px, 2vw, 34px) var(--display); color: var(--text); opacity: .8; }
+html.look-fs-clock .fs-clock { display: block; }
+html.look-fs-motion .fs-bg { animation: fs-drift 40s ease-in-out infinite alternate; }
+@keyframes fs-drift { from { transform: scale(1.1); } to { transform: scale(1.3) translate(-3%, 2%) rotate(2deg); } }
+html.look-fs-plain .fs-bg { background-image: none !important; background: var(--oak); filter: none; }
+html.look-fs-gradient .fs-bg {
+  background-image: none !important; filter: blur(60px);
+  background: radial-gradient(40% 50% at 25% 30%, var(--amber), transparent 70%), radial-gradient(45% 55% at 75% 70%, var(--voice), transparent 70%), radial-gradient(60% 60% at 60% 20%, var(--rivet-2), transparent 70%), var(--oak);
+  opacity: .55;
+}
+html.look-fs-no-lyrics .fs-lyrics { display: none; }
+html.look-fs-no-lyrics .fs-main { grid-template-columns: 1fr; justify-items: center; }
+html.look-fs-no-lyrics .fs-now { align-items: center; text-align: center; }
+/* «Кино»: обложка и название по центру сверху, под ними крупный текст по центру */
+html.look-fs-cinema .fs-main { grid-template-columns: 1fr; grid-template-rows: auto minmax(0, 1fr); justify-items: center; align-items: start; padding-top: 6vh; gap: 3vh; }
+html.look-fs-cinema .fs-now { display: grid; grid-template-columns: auto minmax(0, auto); grid-template-rows: auto auto auto auto; column-gap: 28px; align-items: center; max-width: min(90vw, 1100px); }
+html.look-fs-cinema .fs-cover { grid-row: 1 / 5; width: 20vh; margin: 0; border-radius: 12px; }
+html.look-fs-cinema .fs-title { font-size: clamp(22px, 2.4vw, 38px); }
+html.look-fs-cinema .fs-seek { width: min(46vw, 560px); margin-top: 6px; }
+html.look-fs-cinema .fs-lyrics { width: min(92vw, 1200px); justify-self: center; }
+html.look-fs-cinema .fs-lyrics .lyrics-body { padding: 16vh 0 40vh; mask-image: linear-gradient(transparent, #000 25%, #000 70%, transparent); }
+html.look-fs-cinema .fs-lyrics .lyric { max-width: none; text-align: center; margin: 0 auto; transform-origin: center; font-size: clamp(30px, 3.8vw, 64px); }
+html.look-fs-cinema.look-fs-no-lyrics .fs-main { align-items: center; grid-template-rows: 1fr; }
+html.look-fs-cinema.look-fs-no-lyrics .fs-cover { width: 38vh; }
+
+/* ---------- «Остров и окна»: запись горячих клавиш (desk.js) ---------- */
+.hk { min-width: 200px; height: 34px; padding: 0 12px; text-align: left; cursor: pointer; font-variant-numeric: tabular-nums; text-transform: none; }
+.hk.rec { border-color: var(--amber); color: var(--amber); }
+.hk.hk-fail { border-color: var(--danger); color: var(--danger); }
+.sec-desc.err { color: var(--danger); }
+html.look-fs-cinema .fs-lyrics .lyrics-empty { margin: 0 auto; text-align: center; }
