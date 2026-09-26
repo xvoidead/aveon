@@ -9,14 +9,13 @@
   <link rel="stylesheet" href="../node_modules/@fontsource/onest/400.css">
   <link rel="stylesheet" href="../node_modules/@fontsource/onest/500.css">
   <link rel="stylesheet" href="../node_modules/@fontsource/onest/600.css">
-  <link rel="stylesheet" href="../node_modules/@fontsource/playfair-display/500.css">
-  <link rel="stylesheet" href="../node_modules/@fontsource/playfair-display/500-italic.css">
-  <link rel="stylesheet" href="../node_modules/@fontsource/playfair-display/700.css">
-  <link rel="stylesheet" href="../node_modules/@fontsource/jetbrains-mono/400.css">
-  <link rel="stylesheet" href="../node_modules/@fontsource/jetbrains-mono/500.css">
+  <link rel="stylesheet" href="../node_modules/@fontsource/manrope/500.css">
+  <link rel="stylesheet" href="../node_modules/@fontsource/manrope/600.css">
+  <link rel="stylesheet" href="../node_modules/@fontsource/manrope/700.css">
+  <link rel="stylesheet" href="../node_modules/@fontsource/manrope/800.css">
   <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body class="paused"><!-- paused снимает updatePlayState (app.js), когда музыка пошла -->
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></symbol>
     <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="13.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></symbol>
@@ -83,7 +82,6 @@
         <circle cx="160" cy="160" r="138" class="hoop"/>
         <circle cx="160" cy="160" r="104" class="hoop hoop-inner"/>
       </svg>
-      <div class="disc" aria-hidden="true"></div>
       <div class="porthole" id="now-cover"><span class="porthole-empty">♪</span></div>
       <div class="in-barrel" id="in-barrel">в бочке</div>
     </div>

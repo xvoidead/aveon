@@ -877,7 +877,6 @@ function startViz() {
     if (viz.width !== w || viz.height !== h) { viz.width = w; viz.height = h; }
     fx.analyser.getByteFrequencyData(data);
     g.clearRect(0, 0, w, h);
-    if (document.documentElement.classList.contains('skin-sleeve')) { drawStrip(g, data, w, h); requestAnimationFrame(draw); return; }
     const cx = w / 2, cy = h / 2;
     const inner = w * 0.43;       // чуть снаружи внешнего обруча
     const reach = w * 0.065 * ((window.LOOK?.vizPower ?? 100) / 100); // look.js: длина лучей
@@ -914,33 +913,6 @@ function startViz() {
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !audio.paused) startViz(); });
 
-// «Конверт» (look.js → skin): спектр — строка тонких столбиков под конвертом, басы в середине
-function drawStrip(g, data, w, h) {
-  const bars = 72;
-  if (vizShown.length !== bars) vizShown = new Array(bars).fill(0);
-  const gain = reactGain();
-  const power = (window.LOOK?.vizPower ?? 100) / 100;
-  const step = w / bars;
-  g.lineCap = 'butt';
-  g.lineWidth = Math.max(1, step * 0.42);
-  g.strokeStyle = vizColor(duck.m > 0.5 ? 'voice' : 'amber');
-  for (let i = 0; i < bars; i++) {
-    const f = Math.abs(i - (bars - 1) / 2) / (bars / 2); // 0 в середине, 1 по краям
-    const lo = Math.floor(Math.pow(f, 1.8) * data.length * 0.7);
-    const hi = Math.max(lo + 1, Math.floor(Math.pow(f + 2 / bars, 1.8) * data.length * 0.7));
-    let v = 0;
-    for (let k = lo; k < hi; k++) v = Math.max(v, data[k]);
-    vizShown[i] = reactStep(vizShown[i], Math.min(1, (v / 255) * gain));
-    const len = Math.max(h * 0.06, Math.pow(vizShown[i], 1.4) * h * power);
-    const x = (i + 0.5) * step;
-    g.globalAlpha = 0.3 + vizShown[i] * 0.7;
-    g.beginPath();
-    g.moveTo(x, h);
-    g.lineTo(x, h - Math.min(h, len));
-    g.stroke();
-  }
-  g.globalAlpha = 1;
-}
 
 // ---------- твой микрофон: шумоподавление и детектор речи ----------
 // Сигнал Discord для микрофона — это «сырой» уровень, в нём шум, клавиатура и музыка из колонок.
@@ -1580,8 +1552,10 @@ function moveSourceInk(instant = false) {
   if (!b) { ink.style.opacity = '0'; return; }
   if (instant) ink.style.transition = 'none';
   ink.style.opacity = '1';
-  ink.style.transform = `translateX(${b.offsetLeft}px)`;
-  ink.style.width = `${b.offsetWidth}px`;
+  // координаты — переменными: сверху (обычный дизайн) едет по X, в «Форме» — по Y (styles.css)
+  ink.style.setProperty('--ink-x', `${b.offsetLeft}px`);
+  ink.style.setProperty('--ink-y', `${b.offsetTop}px`);
+  ink.style.setProperty('--ink-w', `${b.offsetWidth}px`);
   if (instant) { void ink.offsetWidth; ink.style.transition = ''; }
 }
 window.addEventListener('resize', () => moveSourceInk(true));
