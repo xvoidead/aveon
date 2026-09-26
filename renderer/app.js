@@ -813,6 +813,11 @@ function showNow(track, stream) {
   state.via = stream?.via || null;
   $('#now-title').textContent = track.title;
   $('#now-title').toggleAttribute('data-explicit', !!track.explicit); // значок 18+ (styles.css)
+  // новый трек: класс fresh на миг — по нему дизайны проигрывают свою анимацию (в «Дзене» энсо и печать)
+  const barrelEl = $('#barrel');
+  barrelEl.classList.remove('fresh');
+  void barrelEl.offsetWidth;
+  barrelEl.classList.add('fresh');
   $('#btn-now-album').disabled = false;
   $('#btn-now-sc').disabled = false;
   $('#btn-now-sc').hidden = track.source === 'sc'; // из SoundCloud и так — кнопку прячем
@@ -913,6 +918,7 @@ function startViz() {
   requestAnimationFrame(draw);
 }
 document.addEventListener('visibilitychange', () => { if (!document.hidden && !audio.paused) startViz(); });
+
 
 
 // ---------- твой микрофон: шумоподавление и детектор речи ----------

@@ -2067,47 +2067,69 @@ html:is(.dock-bottom, .dock-top) .call:has(> .together-chip:not(.idle)) > .toget
 .sm-row:nth-child(4) b { background: var(--amber); }
 .sm-h { margin-bottom: 2px; color: var(--text); white-space: nowrap; }
 /* Бочка */
-.skin-mock.barrel .sm-disc { display: none; }
-.skin-mock.barrel .sm-cover {
+.skin-mock.is-barrel .sm-disc { display: none; }
+.skin-mock.is-barrel .sm-cover {
   width: 50px; height: 50px; border-radius: 50%; background: linear-gradient(135deg, var(--amber), var(--voice));
   box-shadow: 0 0 0 5px var(--oak-2), 0 0 0 6px var(--hoop), 0 0 0 11px var(--oak-2), 0 0 0 12px var(--hoop-dim);
   margin: 6px 0 4px;
 }
-.skin-mock.barrel .sm-h::before { content: "Бочка"; font: 700 12px "Unbounded", sans-serif; letter-spacing: -0.02em; }
-.skin-mock.barrel .sm-row { padding: 0 3px; border-radius: calc(var(--u, 1px) * 4); }
-.skin-mock.barrel .sm-row:nth-child(4) { background: var(--rivet); }
-.skin-mock.barrel .sm-row i { border-radius: calc(var(--u, 1px) * 3); }
-.skin-mock.barrel :is(.sm-rail, .sm-play) { display: none; }
+.skin-mock.is-barrel .sm-h::before { content: "Бочка"; font: 700 12px "Unbounded", sans-serif; letter-spacing: -0.02em; }
+.skin-mock.is-barrel .sm-row { padding: 0 3px; border-radius: calc(var(--u, 1px) * 4); }
+.skin-mock.is-barrel .sm-row:nth-child(4) { background: var(--rivet); }
+.skin-mock.is-barrel .sm-row i { border-radius: calc(var(--u, 1px) * 3); }
+.skin-mock.is-barrel :is(.sm-rail, .sm-play) { display: none; }
 /* Форма: панель слева, библиотека и плеер — карточками, обложка-цветок, волна перемотки */
-.skin-mock.form {
+.skin-mock.is-form {
   grid-template-columns: 18px 1fr 40%; gap: 4px; padding: 5px 5px 5px 0;
   background: color-mix(in oklab, var(--oak) 92%, var(--amber));
 }
-.skin-mock.form .sm-rail { display: flex; flex-direction: column; align-items: center; gap: 7px; padding-top: 8px; }
-.skin-mock.form .sm-rail i { width: 10px; height: 6px; border-radius: 99px; background: var(--hoop-dim); }
-.skin-mock.form .sm-rail i:first-child { width: 12px; height: 12px; border-radius: calc(var(--u, 1px) * 4); background: var(--amber); margin-bottom: 4px; }
-.skin-mock.form .sm-rail i:nth-child(2) { width: 14px; background: color-mix(in oklab, var(--amber) 45%, var(--oak-2)); }
-.skin-mock.form .sm-lib { order: 2; padding: 9px 9px; gap: 5px; border-radius: calc(var(--u, 1px) * 10); background: color-mix(in oklab, var(--oak-2) 90%, var(--amber)); }
-.skin-mock.form .sm-h::before { content: "Форма"; font: 800 13px "Manrope", sans-serif; letter-spacing: -0.03em; }
-.skin-mock.form .sm-row { padding: 0 3px; border-radius: calc(var(--u, 1px) * 5); }
-.skin-mock.form .sm-row:nth-child(4) { background: color-mix(in oklab, var(--amber) 26%, var(--oak-2)); }
-.skin-mock.form .sm-row i { border-radius: calc(var(--u, 1px) * 4); }
-.skin-mock.form .sm-stage {
+.skin-mock.is-form .sm-rail { display: flex; flex-direction: column; align-items: center; gap: 7px; padding-top: 8px; }
+.skin-mock.is-form .sm-rail i { width: 10px; height: 6px; border-radius: 99px; background: var(--hoop-dim); }
+.skin-mock.is-form .sm-rail i:first-child { width: 12px; height: 12px; border-radius: calc(var(--u, 1px) * 4); background: var(--amber); margin-bottom: 4px; }
+.skin-mock.is-form .sm-rail i:nth-child(2) { width: 14px; background: color-mix(in oklab, var(--amber) 45%, var(--oak-2)); }
+.skin-mock.is-form .sm-lib { order: 2; padding: 9px 9px; gap: 5px; border-radius: calc(var(--u, 1px) * 10); background: color-mix(in oklab, var(--oak-2) 90%, var(--amber)); }
+.skin-mock.is-form .sm-h::before { content: "Форма"; font: 800 13px "Manrope", sans-serif; letter-spacing: -0.03em; }
+.skin-mock.is-form .sm-row { padding: 0 3px; border-radius: calc(var(--u, 1px) * 5); }
+.skin-mock.is-form .sm-row:nth-child(4) { background: color-mix(in oklab, var(--amber) 26%, var(--oak-2)); }
+.skin-mock.is-form .sm-row i { border-radius: calc(var(--u, 1px) * 4); }
+.skin-mock.is-form .sm-stage {
   order: 3; align-items: stretch; padding: 12px 8px 0; gap: 4px; border-radius: calc(var(--u, 1px) * 10);
   background: linear-gradient(180deg, color-mix(in oklab, var(--amber) 26%, var(--oak-2)), color-mix(in oklab, var(--oak-2) 90%, var(--amber)) 70%);
 }
-.skin-mock.form .sm-cover {
+.skin-mock.is-form .sm-cover {
   align-self: center; width: 44px; height: 44px; margin-bottom: 4px;
   background: linear-gradient(135deg, var(--amber), var(--voice));
   -webkit-mask: var(--cookie) center / 100% 100% no-repeat; mask: var(--cookie) center / 100% 100% no-repeat;
 }
-.skin-mock.form .sm-t { width: 70%; height: 5px; margin-top: 0; }
-.skin-mock.form .sm-a { width: 45%; }
-.skin-mock.form .sm-bar {
+.skin-mock.is-form .sm-t { width: 70%; height: 5px; margin-top: 0; }
+.skin-mock.is-form .sm-a { width: 45%; }
+.skin-mock.is-form .sm-bar {
   width: 100%; height: 6px; margin-top: 4px; border-radius: 0; background: linear-gradient(90deg, var(--amber) 60%, var(--rivet-2) 60%);
   -webkit-mask: var(--wave-mask) 0 50% / 8px 6px repeat-x; mask: var(--wave-mask) 0 50% / 8px 6px repeat-x;
 }
-.skin-mock.form .sm-play { align-self: center; width: 22px; height: 16px; margin-top: 3px; border-radius: calc(var(--u, 1px) * 6); background: var(--amber); }
+.skin-mock.is-form .sm-play { align-self: center; width: 22px; height: 16px; margin-top: 3px; border-radius: calc(var(--u, 1px) * 6); background: var(--amber); }
+/* Дзен: бумага, круг энсо вокруг обложки, красная печать, строки с воздухом */
+.skin-mock.is-zen { background: #f4f4f1; box-shadow: inset 0 0 0 1px #e2e1dc; }
+.skin-mock.is-zen .sm-rail { display: none; }
+.skin-mock.is-zen .sm-stage { background: #f4f4f1; position: relative; }
+.skin-mock.is-zen .sm-cover {
+  width: 42px; height: 42px; margin: 6px 0 6px; border-radius: 50%; background: linear-gradient(135deg, #b9b5ad, #8e8a82);
+  outline: 1px solid transparent;
+}
+.skin-mock.is-zen .sm-cover::before {
+  content: ""; position: absolute; left: 50%; top: 12px; width: 62px; height: 62px; margin-left: -31px; background: #1d1d1b;
+  mask: url("assets/enso.svg") center / 100% 100% no-repeat; rotate: -8deg;
+}
+.skin-mock.is-zen .sm-play { position: absolute; left: calc(50% + 18px); top: 54px; width: 11px; height: 11px; border-radius: 1px; background: #c43a31; rotate: -5deg; }
+.skin-mock.is-zen .sm-t { width: 50%; height: 3px; margin-top: 8px; background: #1d1d1b; }
+.skin-mock.is-zen .sm-a { width: 30%; height: 2px; background: #b0aea7; }
+.skin-mock.is-zen .sm-bar { height: 1px; border-radius: 0; background: linear-gradient(90deg, #1d1d1b 45%, #c9c7c0 45%); }
+.skin-mock.is-zen .sm-lib { gap: 7px; padding: 14px 12px; }
+.skin-mock.is-zen .sm-h::before { content: "Дзен"; font: 300 14px "Jost", sans-serif; letter-spacing: .06em; color: #1d1d1b; }
+.skin-mock.is-zen .sm-row i { background: #dedcd6; border-radius: 1px; }
+.skin-mock.is-zen .sm-row b { background: #c9c7c0; height: 2px; }
+.skin-mock.is-zen .sm-row:nth-child(4) b { background: #1d1d1b; }
+.skin-mock.is-zen .sm-row:nth-child(4) i { width: 5px; height: 5px; background: #c43a31; margin: 0 3px; }
 
 .skin-mock, .skin-mock * { text-transform: none; }
 
@@ -2363,3 +2385,162 @@ html.skin-form ::-webkit-scrollbar-thumb { border-radius: 99px; background-color
   html.skin-form body:not(.paused) .progress .slider-fill { animation: none; }
 }
 html.skin-form.look-still body:not(.paused) .progress .slider-fill { animation: none; }
+
+/* =====================================================================================
+   ДИЗАЙН «ДЗЕН» (look.js → skin: 'zen', класс html.skin-zen)
+   Светлая холодная бумага, тушь и много пустоты. Главное — энсо: круг кистью вокруг обложки
+   (assets/enso.svg маской). При новом треке (app.js → класс fresh на бочке) круг заново
+   прорисовывается кистью, а в конце ставится красная печать 音 — единственный цвет в дизайне,
+   кроме метки играющего трека. Текст — Jost светлым начертанием, иероглиф — Yu Mincho.
+   Разделителей почти нет: блоки отделены воздухом.
+   ===================================================================================== */
+@property --enso-a { syntax: "<angle>"; inherits: false; initial-value: 360deg; }
+html.skin-zen {
+  --u: 1px;
+  --seal: #c43a31;
+  --ink: var(--text);
+  --mincho: "Yu Mincho", "YuMincho", "Hiragino Mincho ProN", "MS Mincho", serif;
+  color-scheme: light;
+}
+html.skin-zen body { text-transform: none; font-weight: 400; letter-spacing: .01em; }
+html.skin-zen :is(.search input, .input)::placeholder { text-transform: none; }
+html.skin-zen :focus-visible { outline-color: var(--ink); }
+html.skin-zen ::selection { background: color-mix(in srgb, var(--seal) 22%, transparent); }
+
+/* ---- сцена ---- */
+html.skin-zen .stage { background: var(--oak); border-color: transparent; padding-top: 64px; gap: 16px; }
+html.skin-zen:not(.look-stage-cover):not(.look-stage-flat) .stage { background: var(--oak); }
+html.skin-zen :is(.hoops, .viz) { display: none; }
+html.skin-zen .barrel { width: min(100%, 290px); }
+/* энсо: мазок тушью, по классу fresh прорисовывается по кругу за 1.1 с */
+html.skin-zen .barrel::before {
+  content: ""; position: absolute; inset: 0; pointer-events: none; rotate: -8deg;
+  background: var(--ink); opacity: .88;
+  mask: url("assets/enso.svg") center / 100% 100% no-repeat, conic-gradient(from -58deg, #000 var(--enso-a), transparent 0);
+  mask-composite: intersect;
+}
+html.skin-zen .barrel.fresh::before { animation: zen-enso 1.1s cubic-bezier(.45, .05, .25, 1) both; }
+@keyframes zen-enso { from { --enso-a: 0deg; } to { --enso-a: 360deg; } }
+/* печать 音: встаёт под конец мазка, с лёгким «ударом» */
+html.skin-zen .barrel::after {
+  content: "音"; position: absolute; right: 6%; bottom: 7%; z-index: 2; width: 34px; height: 34px;
+  display: grid; place-items: center; border-radius: 3px; rotate: -5deg;
+  font: 600 21px/1 var(--mincho); color: var(--oak); background: var(--seal);
+  box-shadow: inset 0 0 0 2px var(--seal), inset 0 0 0 3px color-mix(in srgb, var(--oak) 55%, transparent);
+}
+html.skin-zen .barrel.fresh::after { animation: zen-seal .42s cubic-bezier(.2, 1.6, .4, 1) 1s both; }
+@keyframes zen-seal { from { opacity: 0; scale: 1.7; } 60% { opacity: 1; } }
+html.skin-zen .porthole { width: 64%; box-shadow: none; background: var(--rivet); }
+html.skin-zen .porthole::before { display: none; }
+html.skin-zen .porthole img { filter: saturate(.85) blur(calc(var(--m) * 5px)); }
+html.skin-zen .porthole::after { box-shadow: inset 0 0 calc(var(--m) * 40px) calc(var(--m) * 16px) var(--oak); }
+html.skin-zen .porthole-empty { font: 400 34px var(--mincho); color: var(--hoop-dim); }
+html.skin-zen .in-barrel { background: var(--ink); color: var(--oak); font: 400 11px var(--ui); letter-spacing: .08em; }
+
+html.skin-zen .now-title { font: 300 25px/1.3 var(--display); letter-spacing: .03em; }
+html.skin-zen .now-artist { margin-top: 8px; font-size: 13px; letter-spacing: .16em; color: var(--text-3); }
+html.skin-zen .now-title[data-explicit]::after { background: var(--rivet-2); color: var(--text-2); font-weight: 500; }
+
+html.skin-zen .time { font-size: 12px; letter-spacing: .06em; color: var(--text-3); }
+html.skin-zen .slider::before { height: 1px; border-radius: 0; background: var(--hoop-dim); }
+html.skin-zen :is(.slider-fill, .slider-buf) { height: 1px; border-radius: 0; }
+html.skin-zen .slider-fill { background: var(--ink); height: 2px; }
+html.skin-zen .slider-buf { background: var(--hoop); opacity: .5; }
+html.skin-zen .slider-knob { width: 9px; height: 9px; margin-left: -4.5px; background: var(--ink); }
+
+html.skin-zen .controls { gap: 22px; }
+html.skin-zen .icon-btn { color: var(--text-2); }
+html.skin-zen .icon-btn:hover { color: var(--ink); background: transparent; }
+html.skin-zen .icon-btn.on { color: var(--ink); }
+html.skin-zen .play-btn {
+  width: 58px; height: 58px; background: transparent; color: var(--ink); box-shadow: inset 0 0 0 1px var(--ink);
+  transition: background .3s ease, color .3s ease;
+}
+html.skin-zen .play-btn:hover { transform: none; background: var(--ink); color: var(--oak); }
+html.skin-zen .volume-tools { border-color: var(--rivet-2); }
+
+html.skin-zen .together-chip { background: transparent; color: var(--text-2); box-shadow: inset 0 0 0 1px var(--rivet-2); }
+html.skin-zen .together-chip .together-dot { background: var(--seal); }
+html.skin-zen .call { background: transparent; border-color: var(--rivet-2); }
+html.skin-zen :is(.meter, .meter-fill) { height: 2px; border-radius: 0; }
+html.skin-zen .meter { background: var(--rivet-2); }
+html.skin-zen .meter-fill { background: var(--ink); }
+html.skin-zen .me:hover, html.skin-zen .me[aria-expanded="true"] { background: var(--oak-2); }
+html.skin-zen .me-avatar { background: var(--ink); color: var(--oak); box-shadow: none; }
+
+html.skin-zen .switch span { background: var(--rivet-2); }
+html.skin-zen .switch span::after { background: var(--oak); box-shadow: 0 1px 2px rgb(0 0 0 / .2); }
+html.skin-zen .switch input:checked + span { background: var(--ink); }
+html.skin-zen .switch input:checked + span::after { background: var(--oak); }
+
+/* ---- библиотека ---- */
+html.skin-zen .library { padding: 52px 48px 0 52px; }
+html.skin-zen .sources { gap: 30px; }
+html.skin-zen .source { font: 400 14px var(--ui); letter-spacing: .06em; color: var(--text-3); }
+html.skin-zen .source:hover { color: var(--text-2); }
+html.skin-zen .source.active { color: var(--ink); }
+/* выбранная вкладка — маленький красный квадрат под ней, как оттиск печати */
+html.skin-zen .source-ink {
+  width: 5px; height: 5px; bottom: -3px; border-radius: 0; background: var(--seal);
+  transform: translateX(calc(var(--ink-x, 0px) + var(--ink-w, 0px) / 2 - 2.5px));
+}
+html.skin-zen .search { height: 50px; margin-top: 18px; padding: 0 2px; background: none; border: 0; border-bottom: 1px solid var(--rivet-2); border-radius: 0; }
+html.skin-zen .search:focus-within { border-color: var(--ink); }
+html.skin-zen .search input { font: 300 18px var(--ui); letter-spacing: .02em; }
+html.skin-zen .collections-wrap { margin-top: 18px; }
+html.skin-zen .chip { background: transparent; border-color: transparent; color: var(--text-3); padding: 0 10px; }
+html.skin-zen .chip:hover { color: var(--ink); border-color: transparent; }
+html.skin-zen .chip.active { background: transparent; color: var(--ink); border-color: var(--ink); }
+html.skin-zen .coll-arrow { background: var(--oak); box-shadow: 0 2px 10px rgb(0 0 0 / .08); }
+
+html.skin-zen .lib-head { margin: 40px 0 22px; }
+html.skin-zen .lib-head h1 { font: 300 40px/1.15 var(--display); letter-spacing: .02em; }
+html.skin-zen .lib-head p { margin-top: 10px; font-size: 13px; letter-spacing: .08em; color: var(--text-3); }
+html.skin-zen .btn { background: transparent; border-color: var(--rivet-2); color: var(--ink); }
+html.skin-zen .btn:hover { background: var(--oak-2); border-color: var(--hoop-dim); }
+html.skin-zen .btn.primary { background: var(--ink); color: var(--oak); border-color: transparent; font-weight: 400; }
+html.skin-zen .btn.primary:hover { filter: none; background: #000; }
+
+html.skin-zen .row { padding: 10px 12px; }
+html.skin-zen .row:hover { background: var(--oak-2); }
+html.skin-zen .row.playing { background: transparent; }
+html.skin-zen .row.playing .t-title { color: var(--ink); font-weight: 500; }
+/* играющий трек — красный квадрат-оттиск перед названием */
+html.skin-zen .row.playing .t-title::before {
+  content: ""; display: inline-block; width: 6px; height: 6px; margin-right: 10px; vertical-align: 2px; background: var(--seal);
+}
+html.skin-zen .row .play-hover { background: rgb(244 244 241 / .7); color: var(--ink); }
+html.skin-zen .t-title { font-weight: 400; }
+html.skin-zen :is(.t-artist, .t-album, .col-time) { color: var(--text-3); }
+html.skin-zen .tag.e18 { background: var(--rivet-2); color: var(--text-2); }
+
+/* главная */
+html.skin-zen .h-hello h1 { font-weight: 300; letter-spacing: .02em; }
+html.skin-zen .h-head h2 { font: 400 19px var(--display); letter-spacing: .04em; }
+html.skin-zen .h-wave { background: var(--oak-2); box-shadow: none; }
+html.skin-zen .h-wave-go { background: var(--ink); color: var(--oak); }
+html.skin-zen .h-tile { background: transparent; }
+html.skin-zen .h-tile:hover { background: var(--oak-2); }
+
+/* ---- окна ---- */
+html.skin-zen .modal { background: rgb(29 29 27 / .28); }
+html.skin-zen .sheet { background: var(--oak); border-color: var(--rivet); box-shadow: 0 30px 80px rgb(0 0 0 / .14); }
+html.skin-zen .sheet-head h2 { font: 300 26px var(--display); letter-spacing: .03em; }
+html.skin-zen .set-nav { background: var(--oak-2); border-color: var(--rivet); }
+html.skin-zen .set-tab.on { background: var(--rivet); }
+html.skin-zen .set-tab.on svg { color: var(--seal); }
+html.skin-zen .sec { border-color: var(--rivet); }
+html.skin-zen .sec-title { font: 400 17px var(--display); letter-spacing: .03em; }
+html.skin-zen .seg { background: var(--oak); }
+html.skin-zen .seg button.on { background: var(--ink); color: var(--oak); }
+html.skin-zen :is(.menu, .together) { background: var(--oak); border: 1px solid var(--rivet); box-shadow: 0 18px 50px rgb(0 0 0 / .12); }
+html.skin-zen .menu-item:hover { background: var(--oak-2); }
+html.skin-zen .toast { background: var(--ink); color: var(--oak); box-shadow: 0 12px 30px rgb(0 0 0 / .15); }
+html.skin-zen .pf-card { background: var(--oak-2); border-color: transparent; }
+html.skin-zen ::-webkit-scrollbar-thumb { background-color: var(--rivet-2); }
+html.skin-zen .win-buttons button:hover { background: var(--rivet); }
+
+@media (prefers-reduced-motion: reduce) { html.skin-zen .barrel.fresh::before, html.skin-zen .barrel.fresh::after { animation: none; } }
+html.skin-zen.look-still .barrel.fresh::before, html.skin-zen.look-still .barrel.fresh::after { animation: none; }
+/* размытая обложка за сценой на бумаге выглядит грязью — в «Дзене» фон всегда чистый */
+html.skin-zen.look-stage-cover .stage::before { display: none; }

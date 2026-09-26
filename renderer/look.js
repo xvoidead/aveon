@@ -5,7 +5,7 @@
 // Общие глобальные из app.js: state, api, $, $$, esc, toast, ask, saveCfg, VIEWS, NAMES, IS_MOBILE, openView.
 
 const LOOK_DEFAULTS = {
-  skin: 'barrel',        // дизайн: barrel — «Бочка»; form — «Форма» (см. SKINS)
+  skin: 'barrel',        // дизайн целиком, см. SKINS
   theme: 'oak',          // см. THEMES; custom — свой оттенок фона
   hue: 25,               // custom: оттенок фона 0…360
   sat: 30,               // custom: насыщенность фона, %
@@ -69,9 +69,19 @@ const THEMES = {
 // с иконками, библиотека и плеер — отдельные большие карточки, обложка — волнистый «цветок», который
 // крутится, перемотка — бегущая волна, кнопка «играть» меняет форму. Цвета поверхностей подмешивают
 // акцент из обложки. Весь вид — в styles.css (html.skin-form)
+// У дизайна может быть: display/text — шрифты по умолчанию (ключи FONTS; свой выбор в настройках главнее),
+// radius — множитель скруглений, palette — свои цвета вместо темы (тогда и «фон в цвет обложки» выключен),
+// accent — свой акцент вместо цвета обложки.
+// Сам вид — в styles.css под html.skin-<id>
 const SKINS = {
   barrel: { name: 'Бочка', desc: 'Круглая обложка в обручах, вкладки сверху' },
-  form: { name: 'Форма', desc: 'Панель навигации слева, карточки, живые формы и волны' },
+  form: { name: 'Форма', desc: 'Панель навигации слева, карточки, живые формы и волны', display: 'manrope', text: 'manrope', radius: 1.5 },
+  // Дзен: светлая бумага, тушь, энсо вокруг обложки и красная печать — единственный цвет
+  zen: {
+    name: 'Дзен', desc: 'Светлая бумага, тушь, круг энсо и красная печать', display: 'jost', text: 'jost', radius: 0.3,
+    palette: { '--oak': '#f4f4f1', '--oak-2': '#efeeea', '--rivet': '#e6e5e0', '--rivet-2': '#dad8d2', '--hoop-dim': '#c2c0b9', '--hoop': '#8f8d86', '--text': '#1d1d1b', '--text-2': '#55534e', '--text-3': '#85837c' },
+    accent: '#c43a31',
+  },
 };
 
 const ACCENTS = ['#f0a63a', '#ff7b6b', '#f5d547', '#7ed49a', '#5cc8e8', '#9aa8ff', '#c792ea', '#ff8ac6', '#e8e1d5'];
@@ -79,6 +89,7 @@ const ACCENTS = ['#f0a63a', '#ff7b6b', '#f5d547', '#7ed49a', '#5cc8e8', '#9aa8ff
 const FONTS = {
   unbounded: { name: 'Unbounded', css: '"Unbounded", "Segoe UI", sans-serif' },
   manrope: { name: 'Manrope', css: '"Manrope", "Segoe UI", sans-serif' },
+  jost: { name: 'Jost', css: '"Jost", "Segoe UI", sans-serif' },
   onest: { name: 'Onest', css: '"Onest", "Segoe UI", sans-serif' },
   system: { name: 'Системный', css: 'system-ui, "Segoe UI", Roboto, sans-serif' },
   serif: { name: 'С засечками', css: 'Georgia, "Times New Roman", "Noto Serif", serif' },
@@ -115,13 +126,16 @@ function applyLook() {
   look = lookCfg();
   window.LOOK = look;
   const root = document.documentElement;
-  const vars = themeVars(look);
+  const skin = SKINS[look.skin] || SKINS.barrel;
+  const vars = skin.palette ? { ...skin.palette } : themeVars(look);
   if (look.accentMode === 'fixed') vars['--amber'] = look.accent;
+  else if (skin.accent) vars['--amber'] = skin.accent;
   if (look.voice) vars['--voice'] = look.voice;
-  const form = look.skin === 'form';
-  // в «Форме» по умолчанию везде Manrope; свой шрифт из настроек всё равно главнее
-  const display = form && look.display === LOOK_DEFAULTS.display ? 'manrope' : look.display;
-  const text = form && look.text === LOOK_DEFAULTS.text ? 'manrope' : look.text;
+  // extras.js → setTheme: палитра обложки не перекрашивает фон и акцент дизайнов со своими цветами
+  window.SKIN_FIXED = !!skin.palette;
+  window.SKIN_ACCENT = !!skin.accent;
+  const display = skin.display && look.display === LOOK_DEFAULTS.display ? skin.display : look.display;
+  const text = skin.text && look.text === LOOK_DEFAULTS.text ? skin.text : look.text;
   vars['--display'] = (FONTS[display] || FONTS.unbounded).css;
   vars['--ui'] = (FONTS[text] || FONTS.onest).css;
   vars['--lyrics-scale'] = String(look.lyricsSize / 100);
@@ -132,7 +146,7 @@ function applyLook() {
   // Размер интерфейса: CSS zoom масштабирует всё сразу, и раскладка остаётся живой
   root.style.zoom = look.scale === 100 ? '' : String(look.scale / 100);
   const cls = {
-    'skin-form': form,
+    ...Object.fromEntries(Object.keys(SKINS).filter((id) => id !== 'barrel').map((id) => [`skin-${id}`, look.skin === id])),
     'look-compact': look.density === 'compact', 'look-cozy': look.density === 'cozy',
     'look-no-covers': !look.covers, 'look-no-album': !look.albumCol, 'look-no-time': !look.timeCol,
     'look-calm': look.motion === 'calm', 'look-still': look.motion === 'off',
@@ -148,7 +162,7 @@ function applyLook() {
     'dock-right': !IS_MOBILE && look.dock === 'right', 'dock-bottom': !IS_MOBILE && look.dock === 'bottom', 'dock-top': !IS_MOBILE && look.dock === 'top',
   };
   for (const [k, on] of Object.entries(cls)) root.classList.toggle(k, on);
-  applyRadius((look.radius / 100) * (form ? 1.5 : 1)); // «Форма» круглее
+  applyRadius((look.radius / 100) * (skin.radius || 1));
   requestAnimationFrame(() => moveSourceInk?.(true)); // app.js: вкладки то сверху, то слева
   applySources();
   reapplyTheme?.(); // extras.js: палитра из обложки знает, трогать ли акцент
@@ -303,7 +317,7 @@ function dockSection(l) {
 
 // Выбор дизайна: две карточки с маленьким макетом каждого
 function skinSection(l) {
-  const mock = (id) => `<span class="skin-mock ${id}" aria-hidden="true">
+  const mock = (id) => `<span class="skin-mock is-${id}" aria-hidden="true">
     <span class="sm-rail"><i></i><i></i><i></i><i></i></span>
     <span class="sm-stage"><span class="sm-cover"></span><span class="sm-t"></span><span class="sm-a"></span><span class="sm-bar"></span><span class="sm-play"></span></span>
     <span class="sm-lib"><span class="sm-h"></span>${'<span class="sm-row"><i></i><b></b></span>'.repeat(5)}</span>
