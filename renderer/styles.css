@@ -490,6 +490,8 @@ body.keep-titles :is(.t-title, .t-artist, .t-album, .artist-card-name, .album-me
 /* караоке (Musixmatch): в активной строке спетые слова светятся, остальные ждут */
 .lyric.active.karaoke .w { color: var(--text-3); transition: color .18s ease, text-shadow .18s ease; }
 .lyric.active.karaoke .w.sung { color: var(--text); text-shadow: 0 0 18px color-mix(in srgb, var(--amber) 35%, transparent); }
+/* допетое после заливки по буквам — цвет уже полный, не переливаем его заново (было мигание); свечение — плавно */
+.lyric.active.karaoke .w.filled { transition: text-shadow .35s ease; }
 .lyrics-plain .lyric { cursor: default; opacity: .9; filter: none; color: var(--text-2); font-size: 22px; transform: none; }
 .lyrics-note { margin: 0 0 18px; color: var(--text-3); font-size: 13px; }
 .lyrics-empty { display: flex; flex-direction: column; gap: 10px; padding-top: 12vh; max-width: 420px; }
@@ -1254,7 +1256,8 @@ html.look-react-hoops .hoops { transform: scale(calc(1 - var(--m) * 0.07 + var(-
 /* ---------- текст по буквам (richsync): текущее слово заливается слева направо ---------- */
 .lyric.active.karaoke .w.now {
   color: transparent; text-shadow: none;
-  background: linear-gradient(90deg, var(--text) calc(var(--p, 0) * 100% - 6%), var(--text-3) calc(var(--p, 0) * 100% + 6%));
+  /* мягкая граница 12 %: при --p = 0 слово ещё не тронуто, при --p = 1 залито целиком — без скачков на краях */
+  background: linear-gradient(90deg, var(--text) calc(var(--p, 0) * 112% - 12%), var(--text-3) calc(var(--p, 0) * 112%));
   -webkit-background-clip: text; background-clip: text; transition: none;
 }
 

@@ -668,6 +668,7 @@ function syncWords(force) {
   const cur = n - 1;
   nodes.forEach((w, i) => {
     const on = letters && i === cur && t < wordEnd(ly.lines, ly.active, cur);
+    if (!on && w.classList.contains('now')) w.classList.add('filled'); // залито — дальше без перехода цвета
     w.classList.toggle('now', on);
     if (on) {
       const s = l.words[cur].t;
