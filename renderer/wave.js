@@ -260,24 +260,38 @@ function stopDj() {
   else window.speechSynthesis?.cancel();
 }
 
-// ---------- экран «Волна»: эфир и шкала приёмника ----------
+// ---------- экран «Волна»: эфир и фраза-настройка ----------
 // Сверху — эфир: тонкие линии, которые качаются под музыку, и слово «волна», чьи буквы плывут
-// на средней линии. Ниже — настройки как шкала радиоприёмника: клик по делению переводит стрелку.
+// на средней линии. Ниже — настройки одной фразой, слова в ней меняются по клику.
 
-// Диджей на шкале: от «молчит» до «каждый трек» — одна шкала вместо двух рядов кнопок
-const DJ_STOPS = [['off', 'Молчит'], ['4', 'Изредка'], ['2', 'Через один'], ['1', 'Каждый трек']];
+// Настройки волны — одной фразой: «Хочу спокойное, незнакомое, на русском. Диджей говорит через трек».
+// Слова с волнистым подчёркиванием меняются по клику — меню с вариантами прямо под словом.
+const PHRASE = {
+  mood: [['all', 'что угодно'], ['active', 'бодрое'], ['fun', 'весёлое'], ['calm', 'спокойное'], ['sad', 'грустное']],
+  diversity: [['default', 'как обычно'], ['favorite', 'из любимого'], ['discover', 'незнакомое'], ['popular', 'популярное']],
+  language: [['any', 'на любом языке'], ['russian', 'на русском'], ['not-russian', 'на иностранном'], ['without-words', 'без слов']],
+  dj: [['off', 'молчит'], ['4', 'говорит изредка'], ['2', 'говорит через трек'], ['1', 'говорит перед каждым треком']],
+};
 const djStop = (cfg) => (cfg.dj ? String(cfg.djEvery) : 'off');
+const voiceShort = (name) => String(name || '').replace(/^Microsoft\s+/i, '').replace(/\s*[-–(].*$/, '').trim() || name;
 
-function tunerHtml(key, label, opts, cur) {
-  const i = Math.max(0, opts.findIndex(([v]) => v === cur));
-  const n = opts.length;
-  return `<div class="tuner" data-wave="${key}" style="--n:${n};--at:${i}">
-    <span class="tuner-name">${label}</span>
-    <div class="tuner-band" role="radiogroup" aria-label="${label}">
-      <i class="tuner-needle" aria-hidden="true"></i>
-      ${opts.map(([v, t], k) => `<button role="radio" aria-checked="${k === i}" data-v="${v}" class="${k === i ? 'on' : ''}">${t}</button>`).join('')}
-    </div>
-  </div>`;
+// Слово-кнопка вместе со знаком после него — чтобы запятая или точка не уезжала на новую строку
+function word(key, cur, punct = '') {
+  const opt = PHRASE[key].find(([v]) => v === cur) || PHRASE[key][0];
+  return `<span class="nobr"><button class="wave-word-opt" data-key="${key}" aria-haspopup="menu" aria-label="${esc(opt[1])} — изменить">${esc(opt[1])}</button>${punct}</span>`;
+}
+
+function phraseHtml(cfg, ym) {
+  const dj = djStop(cfg);
+  const voices = cfg.dj && !IS_MOBILE && djVoices.length > 1;
+  const voice = djVoices.find((v) => v.name === cfg.djVoice) || djVoices[0];
+  const want = ym
+    ? `Хочу ${word('mood', cfg.mood, ',')} ${word('diversity', cfg.diversity, ',')} ${word('language', cfg.language, '.')}`
+    : `Хочу ${word('diversity', cfg.diversity, '.')}`;
+  const djText = voices
+    ? `Диджей ${word('dj', dj)} голосом <span class="nobr"><button class="wave-word-opt" data-key="voice" aria-haspopup="menu">${esc(voiceShort(voice?.name))}</button>.</span>`
+    : `Диджей ${word('dj', dj, '.')}`;
+  return `<p class="wave-phrase"><span>${want}</span><span>${djText}</span></p>`;
 }
 
 function renderWaveHero() {
@@ -296,40 +310,37 @@ function renderWaveHero() {
     ? `<b>${esc(state.track.title)}</b><span>${esc(state.track.artist || '')}</span>`
     : `<b>${ym ? 'Моя волна' : 'Своя волна'}</b><span>${ym ? 'Из твоей Яндекс Музыки. Лайки и пропуски её направляют.' : 'Из того, что ты слушаешь, и похожего в подключённых сервисах.'}</span>`;
   box.querySelector('.wave-rate').hidden = !Wave.active;
-
   const tuner = $('#wave-tuner');
-  tuner.innerHTML = `
-    ${ym ? tunerHtml('mood', 'Настроение', MOODS, cfg.mood) : ''}
-    ${tunerHtml('diversity', 'Характер', DIVERSITY, cfg.diversity)}
-    ${ym ? tunerHtml('language', 'Язык', LANGS, cfg.language) : ''}
-    ${tunerHtml('djStop', 'Диджей', DJ_STOPS, djStop(cfg))}
-    ${cfg.dj && !IS_MOBILE && djVoices.length > 1 ? `<label class="tuner-voice"><span class="tuner-name">Голос</span><select class="input wave-voice">${djVoices.map((v) => `<option ${v.name === cfg.djVoice ? 'selected' : ''}>${esc(v.name)}</option>`).join('')}</select></label>` : ''}`;
+  tuner.innerHTML = phraseHtml(cfg, ym);
   bindWaveOpts(tuner);
 }
 
+async function setWave(key, v) {
+  if (key === 'dj') {
+    const dj = v !== 'off';
+    await saveCfg({ wave: dj ? { dj, djEvery: +v } : { dj } });
+    if (dj && Wave.active && state.track) { Wave.sinceDj = 99; maybeDj(state.track); }
+    if (!dj) stopDj();
+  } else if (key === 'voice') {
+    await saveCfg({ wave: { djVoice: v } });
+    speak('Привет! Теперь говорю я.');
+  } else {
+    await saveCfg({ wave: { [key]: v } });
+    if (Wave.active) waveStart(); // новое настроение, характер или язык — волна перестраивается
+  }
+  renderWaveHero();
+}
+
 function bindWaveOpts(box) {
-  box.querySelectorAll('.tuner').forEach((t) => {
-    const key = t.dataset.wave;
-    t.querySelectorAll('button').forEach((b, i) => {
-      b.onclick = async () => {
-        t.style.setProperty('--at', i); // стрелка переезжает сразу, сохранение — следом
-        t.querySelectorAll('button').forEach((x, k) => { x.classList.toggle('on', k === i); x.setAttribute('aria-checked', String(k === i)); });
-        const v = b.dataset.v;
-        if (key === 'djStop') {
-          const dj = v !== 'off';
-          await saveCfg({ wave: dj ? { dj, djEvery: +v } : { dj } });
-          if (dj && Wave.active && state.track) { Wave.sinceDj = 99; maybeDj(state.track); }
-          if (!dj) stopDj();
-        } else {
-          await saveCfg({ wave: { [key]: v } });
-          if (Wave.active) waveStart(); // новое настроение, характер или язык — волна перестраивается
-        }
-        renderWaveHero();
-      };
-    });
+  box.querySelectorAll('.wave-word-opt').forEach((b) => {
+    b.onclick = () => {
+      const key = b.dataset.key;
+      const cfg = waveCfg();
+      const cur = key === 'dj' ? djStop(cfg) : key === 'voice' ? (cfg.djVoice || djVoices[0]?.name) : cfg[key];
+      const opts = key === 'voice' ? djVoices.map((v) => [v.name, voiceShort(v.name)]) : PHRASE[key];
+      showMenu(opts.map(([v, t]) => ({ label: t, icon: v === cur ? 'i-check' : 'i-blank', onClick: () => setWave(key, v) })), { anchor: b });
+    };
   });
-  const voice = box.querySelector('.wave-voice');
-  if (voice) voice.onchange = () => saveCfg({ wave: { djVoice: voice.value } });
 }
 
 function ensureWaveHero() {
