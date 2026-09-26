@@ -1133,10 +1133,26 @@ function openTrackMenu(i, pos) {
   if (state.view === 'albums' && state.album) {
     items.push({ sep: true }, { label: 'Убрать из альбома', icon: 'i-trash', danger: true, onClick: () => removeFromAlbum([t]) });
   }
-  if (t.link) {
-    items.push({ sep: true }, { label: `Открыть в ${NAMES[t.source] || 'браузере'}`, icon: 'i-search', onClick: () => api.openExternal(t.link) });
-  }
+  // найти этот же трек в SoundCloud и открыть там, где он есть
+  const out = [];
+  if (t.source !== 'sc') out.push({ label: 'Найти в SoundCloud', icon: 'i-search', onClick: () => searchIn('sc', trackQuery(t)) });
+  if (t.link) out.push({ label: `Открыть в ${NAMES[t.source] || 'браузере'}`, icon: 'i-search', onClick: () => api.openExternal(t.link) });
+  if (out.length) items.push({ sep: true }, ...out);
   showMenu(items, pos);
+}
+
+// «исполнитель название» без приписок вроде (feat. …) и [Remastered] — так сервис находит точнее
+function trackQuery(t) {
+  const clean = (x) => String(x || '').replace(/\s*[([][^)\]]*[)\]]/g, '').trim();
+  return `${clean(String(t.artist || '').split(',')[0])} ${clean(t.title)}`.trim();
+}
+
+// Открыть вкладку сервиса и сразу искать там q
+async function searchIn(view, q) {
+  state.queries[view] = q;
+  await openView(view);
+  searchInput.value = q;
+  $('#search-form').requestSubmit();
 }
 
 async function removeFromAlbum(tracks) {
