@@ -52,8 +52,9 @@ function connect() {
         reject(new Error(u.searchParams.get('error') || 'Вход в Spotify отменён'));
         return;
       }
+      let tokens;
       try {
-        const tokens = await request('https://accounts.spotify.com/api/token', {
+        tokens = await request('https://accounts.spotify.com/api/token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({
@@ -64,15 +65,17 @@ function connect() {
             code_verifier: verifier,
           }).toString(),
         });
-        saveTokens(tokens);
-        res.writeHead(200, html).end(page('Spotify подключён — возвращайся в «авеон»'));
-        finish();
-        resolve(await profile());
       } catch (e) {
         res.writeHead(500, html).end(page('Ошибка: ' + e.message));
         finish();
         reject(e);
+        return;
       }
+      // Ответ браузеру уходит один раз; профиль грузим уже после — его ошибка идёт в плеер, а не второй ответ
+      saveTokens(tokens);
+      res.writeHead(200, html).end(page('Spotify подключён — возвращайся в «авеон»'));
+      finish();
+      profile().then(resolve, reject);
     });
     loginServer.on('error', (e) => { finish(); reject(e); });
     loginServer.listen(PORT, '127.0.0.1', () => {
@@ -135,7 +138,17 @@ function mapTrack(t) {
 }
 
 async function profile() {
-  const me = await api('/me');
+  let me;
+  try {
+    me = await api('/me');
+  } catch (e) {
+    // Приложение Spotify в режиме разработки пускает только добавленных в него людей — остальным 403 на всё
+    if (e.status === 403) {
+      disconnect();
+      throw new Error('Spotify не пускает этот аккаунт: добавь его на developer.spotify.com → твоё приложение → User Management (имя и почта от Spotify)');
+    }
+    throw e;
+  }
   return { name: me.display_name || me.id };
 }
 
