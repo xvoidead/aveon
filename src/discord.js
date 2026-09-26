@@ -16,10 +16,10 @@ const MIN_GAP = 4200; // Discord пропускает не больше 5 обн
 // «Где слушаю»: подпись к значку сервиса и кнопка. Ключи картинок — ассеты приложения в Discord
 // (Rich Presence → Art Assets), PNG лежат в docs/discord/
 const SOURCES = {
-  ym: { name: 'Яндекс Музыка', open: 'Открыть в Яндекс Музыке', icon: 'ym' },
-  sc: { name: 'SoundCloud', open: 'Открыть в SoundCloud', icon: 'sc' },
-  sp: { name: 'Spotify', open: 'Открыть в Spotify', icon: 'sp' },
-  local: { name: 'Свой файл', open: '', icon: '' }, // своего значка нет — только обложка
+  ym: { name: 'Яндекс Музыка', icon: 'ym' },
+  sc: { name: 'SoundCloud', icon: 'sc' },
+  sp: { name: 'Spotify', icon: 'sp' },
+  local: { name: 'Свой файл', icon: '' }, // своего значка нет — только обложка
 };
 
 let sock = null;
@@ -167,7 +167,8 @@ async function activity(p) {
     const start = now - Math.max(0, p.pos) * 1000;
     a.timestamps = { start: Math.round(start), end: Math.round(start + p.duration * 1000) };
   }
-  if (link && src.open) a.buttons = [{ label: src.open, url: link }];
+  // Кнопок у «Слушает» нет: с ними Discord показывает статус только тебе, друзьям — нет.
+  // Ссылка на трек — на названии (details_url)
   if (p.party) a.party = { id: p.party.id, size: [p.party.size, 10] }; // «слушать вместе»: (2 из 10)
   return a;
 }
