@@ -169,3 +169,26 @@ document.addEventListener('paste', (e) => {
   e.preventDefault();
   importShare(text);
 });
+
+
+// Поделиться альбомом: кодом (как раньше) или сразу другу в сообщения — карточкой с кнопкой «добавить»
+function albumShareMenu(album, anchor) {
+  if (!album) return;
+  const friends = state.account.loggedIn ? (Friends.data?.friends || []) : []; // friends.js
+  showMenu([
+    { label: 'Скопировать код', icon: 'i-copy', onClick: () => shareAlbum(album) },
+    ...(friends.length ? [{ sep: true }, { note: 'Отправить другу' },
+      ...friends.slice(0, 30).map((f) => ({ label: f.name, icon: 'i-user', onClick: () => sendAlbumToFriend(album, f) }))] : []),
+  ], { anchor });
+}
+
+async function sendAlbumToFriend(album, f) {
+  if (!album.tracks.length) { toast('Альбом пустой — делиться пока нечем'); return; }
+  try {
+    const code = await api.share.put('album', albumSnapshot(album));
+    const cover = album.tracks.find((t) => /^https:/i.test(t.cover || ''))?.cover || '';
+    await api.friends.send(f.id, { album: { code, title: album.title, count: album.tracks.length, cover } });
+    toast(`Альбом «${album.title}» отправлен ${firstName(f.name)}`);
+    if (Chat.id === f.id) loadChat(); // открыт чат с ним — пусть карточка появится сразу
+  } catch (e) { toast(e.message, 'err'); }
+}

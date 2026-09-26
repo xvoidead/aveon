@@ -135,7 +135,7 @@ function connectionsHtml() {
     <div class="pf-conn">${list.map((x) => `
       <button class="pf-service${x.on ? ' on' : ''}" data-conn="${x.id}" style="--brand:${x.brand}">
         <span class="pf-dot"></span>
-        <span class="pf-service-main"><b>${esc(x.name)}</b><small>${esc(x.detail)}</small></span>
+        <span class="pf-service-main"><b>${emo(x.name)}</b><small>${emo(x.detail)}</small></span>
         <span class="pf-service-go">${x.on ? 'настроить' : 'подключить'}</span>
       </button>`).join('')}
     </div>`;
@@ -154,7 +154,7 @@ function devicesHtml() {
   else {
     body = `<ul class="pf-devices">${pf.devices.map((s) => `
       <li><svg><use href="#i-device"/></svg>
-        <span class="pf-device-main"><b>${esc(s.device || 'без имени')}</b><small>${s.current ? 'это устройство' : `был в сети ${esc(deviceAgo(s.last_used))}`}</small></span>
+        <span class="pf-device-main"><b>${emo(s.device || 'без имени')}</b><small>${s.current ? 'это устройство' : `был в сети ${esc(deviceAgo(s.last_used))}`}</small></span>
         ${s.current ? '<span class="pf-here">здесь</span>' : ''}</li>`).join('')}</ul>`;
   }
   const others = pf.devices ? pf.devices.filter((s) => !s.current).length : 0;
@@ -185,10 +185,10 @@ function profileHeroHtml() {
   return `
     <button class="pf-avatar" id="pf-avatar" aria-label="Сменить аватар" title="Сменить аватар" aria-haspopup="menu"></button>
     <div class="pf-who">
-      <div class="pf-name"><h1>${esc(name)}</h1>
+      <div class="pf-name"><h1>${emo(name)}</h1>
         <button class="icon-btn small" id="pf-rename" aria-label="Изменить имя" title="Изменить имя"><svg><use href="#i-pencil"/></svg></button></div>
       <p class="pf-login">@${esc(a.login || '')}${host ? ` · ${esc(host)}` : ''}</p>
-      <p class="pf-sync${a.error ? ' err' : ''}">${esc(syncLine())}${a.error ? `: ${esc(a.error)}` : ''}</p>
+      <p class="pf-sync${a.error ? ' err' : ''}">${emo(syncLine())}${a.error ? `: ${esc(a.error)}` : ''}</p>
     </div>
     <div class="pf-hero-actions">
       <button class="btn primary" id="pf-sync"${a.syncing ? ' disabled' : ''}><svg><use href="#i-refresh"/></svg>Синхронизировать</button>

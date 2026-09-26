@@ -50,7 +50,7 @@ function admBars(values, label) {
   const max = Math.max(1, ...values);
   const day = (i) => new Date(Date.now() - (values.length - 1 - i) * 86400000).toLocaleDateString('ru', { day: 'numeric', month: 'short' });
   return `<div class="adm-chart">
-    <div class="adm-chart-head"><b>${values.reduce((a, b) => a + b, 0)}</b><small>${esc(label)} за 30 дней</small></div>
+    <div class="adm-chart-head"><b>${values.reduce((a, b) => a + b, 0)}</b><small>${emo(label)} за 30 дней</small></div>
     <div class="adm-bars">${values.map((v, i) => `<i style="--h:${Math.max(3, (v / max) * 100)}%" class="${v ? '' : 'zero'}" title="${esc(day(i))}: ${v}"></i>`).join('')}</div>
   </div>`;
 }
@@ -65,9 +65,9 @@ function admPos(x) {
 
 function admOverviewHtml() {
   const o = ADM.overview;
-  if (!o) return ADM.error ? `<p class="together-note warn">${esc(ADM.error)}</p>` : '<div class="spinner small"></div>';
+  if (!o) return ADM.error ? `<p class="together-note warn">${emo(ADM.error)}</p>` : '<div class="spinner small"></div>';
   const u = o.users, s = o.stats, top = o.top || { tracks: [], artists: [], leaders: [], total: 0 };
-  const kpi = (big, label, sub = '', cls = '') => `<div class="adm-kpi ${cls}"><b>${big}</b><span>${esc(label)}</span>${sub ? `<small>${sub}</small>` : ''}</div>`;
+  const kpi = (big, label, sub = '', cls = '') => `<div class="adm-kpi ${cls}"><b>${big}</b><span>${emo(label)}</span>${sub ? `<small>${sub}</small>` : ''}</div>`;
   const live = o.online.filter((x) => x.playing);
   const maxArtist = Math.max(1, ...top.artists.map((a) => a.sec));
   const medal = ['🥇', '🥈', '🥉'];
@@ -87,9 +87,9 @@ function admOverviewHtml() {
       <div class="adm-air-card${x.playing ? ' playing' : ''}">
         <div class="adm-air-art">${admCover(x.track, 'adm-air-cover')}${admFace(x, 'adm-face adm-air-face')}</div>
         <div class="adm-air-text">
-          <small>${esc(x.name)} · ${x.playing ? 'слушает' : 'на паузе'}</small>
-          <b>${esc(x.track?.title || '')}</b>
-          <span>${esc(x.track?.artist || '')}</span>
+          <small>${emo(x.name)} · ${x.playing ? 'слушает' : 'на паузе'}</small>
+          <b>${emo(x.track?.title || '')}</b>
+          <span>${emo(x.track?.artist || '')}</span>
           ${x.track?.duration ? `<span class="fr-bar"><i data-adm-bar="${i}" style="width:${Math.min(100, (admPos(x) / x.track.duration) * 100).toFixed(1)}%"></i></span>` : ''}
         </div>
         <button class="icon-btn small" data-adm-air="${i}" title="Включить у себя"><svg><use href="#i-play"/></svg></button>
@@ -98,7 +98,7 @@ function admOverviewHtml() {
     ${o.rooms.length ? `<h3 class="adm-h">Румы <span>${o.rooms.length}</span></h3>
       <div class="adm-rooms">${o.rooms.map((r) => `<div class="adm-room">
         <div class="adm-room-faces">${r.members.slice(0, 5).map((m) => admFace(m)).join('')}</div>
-        <div class="adm-room-text"><b>${esc(r.code)}</b><small>${r.track ? `${r.playing ? '▶' : '❚❚'} ${esc(r.track.title || '')}` : 'ничего не играет'} · ${r.members.length} ${plural(r.members.length, 'человек', 'человека', 'человек')}</small></div>
+        <div class="adm-room-text"><b>${emo(r.code)}</b><small>${r.track ? `${r.playing ? '▶' : '❚❚'} ${esc(r.track.title || '')}` : 'ничего не играет'} · ${r.members.length} ${plural(r.members.length, 'человек', 'человека', 'человек')}</small></div>
         <button class="btn fr-btn" data-adm-join="${esc(r.code)}"${Together.room?.code === r.code ? ' disabled' : ''}>${Together.room?.code === r.code ? 'Ты здесь' : 'Зайти'}</button>
       </div>`).join('')}</div>` : ''}
 
@@ -112,31 +112,31 @@ function admOverviewHtml() {
         <h3 class="adm-h">Слушатели месяца</h3>
         ${top.leaders.length ? `<ol class="adm-leaders">${top.leaders.map((l, i) => `<li>
           <span class="adm-place">${medal[i] || i + 1}</span>${admFace(l)}
-          <span class="adm-leader-text"><b>${esc(l.name)}</b><span class="adm-leader-bar"><i style="width:${((l.sec / maxLeader) * 100).toFixed(1)}%"></i></span></span>
-          <small>${esc(admHours(l.sec))}</small></li>`).join('')}</ol>` : '<p class="together-desc">Пока пусто</p>'}
+          <span class="adm-leader-text"><b>${emo(l.name)}</b><span class="adm-leader-bar"><i style="width:${((l.sec / maxLeader) * 100).toFixed(1)}%"></i></span></span>
+          <small>${emo(admHours(l.sec))}</small></li>`).join('')}</ol>` : '<p class="together-desc">Пока пусто</p>'}
       </div>
       <div>
         <h3 class="adm-h">Топ сервера</h3>
         ${top.tracks.length ? `<div class="adm-top">${top.tracks.map((x, i) => `<button class="fr-track" data-adm-top="${i}" title="Включить у себя">
           <span class="adm-rank">${i + 1}</span>${admCover(x.track, 'fr-track-cover')}
-          <span class="fr-track-text"><b>${esc(x.track.title)}</b><small>${esc(x.track.artist || '')} · ${x.users} ${plural(x.users, 'слушатель', 'слушателя', 'слушателей')} · ${esc(admHours(x.sec))}</small></span>
+          <span class="fr-track-text"><b>${emo(x.track.title)}</b><small>${emo(x.track.artist || '')} · ${x.users} ${plural(x.users, 'слушатель', 'слушателя', 'слушателей')} · ${esc(admHours(x.sec))}</small></span>
           <svg><use href="#i-play"/></svg></button>`).join('')}</div>` : '<p class="together-desc">Пока пусто</p>'}
       </div>
     </div>
 
     ${top.artists.length ? `<h3 class="adm-h">Артисты сервера</h3>
-      <div class="adm-cloud">${top.artists.map((a) => `<span style="--w:${(0.35 + 0.65 * (a.sec / maxArtist)).toFixed(2)}" title="${esc(admHours(a.sec))}">${esc(a.name)}</span>`).join('')}</div>` : ''}
+      <div class="adm-cloud">${top.artists.map((a) => `<span style="--w:${(0.35 + 0.65 * (a.sec / maxArtist)).toFixed(2)}" title="${esc(admHours(a.sec))}">${emo(a.name)}</span>`).join('')}</div>` : ''}
 
     <p class="together-note adm-foot">сервер работает ${esc(admUptime(o.uptime || 0))} · сессий ${s.sessions} · поделились ${s.shares} раз${u.banned ? ` · заблокировано ${u.banned}` : ''} · обновлено ${esc(new Date(o.now * 1000).toLocaleTimeString('ru'))}</p>`;
 }
 
 function admUsersHtml() {
   const list = ADM.users;
-  const body = !list ? (ADM.error ? `<p class="together-note warn">${esc(ADM.error)}</p>` : '<div class="spinner small"></div>')
+  const body = !list ? (ADM.error ? `<p class="together-note warn">${emo(ADM.error)}</p>` : '<div class="spinner small"></div>')
     : !list.length ? '<p class="together-desc">Никого не нашлось</p>'
     : `<ul class="adm-list adm-users">${list.map((x) => `<li class="${x.banned ? 'banned' : ''}">
       ${admFace({ id: x.id, avatar: x.avatar_at, name: x.name })}
-      <div class="adm-user-main"><b>${esc(x.name)}${x.admin ? ' <em class="fr-tag">админ</em>' : ''}${x.banned ? ' <em class="fr-tag adm-ban-tag">заблокирован</em>' : ''}</b>
+      <div class="adm-user-main"><b>${emo(x.name)}${x.admin ? ' <em class="fr-tag">админ</em>' : ''}${x.banned ? ' <em class="fr-tag adm-ban-tag">заблокирован</em>' : ''}</b>
         <small>@${esc(x.login)} · с ${esc(new Date(x.created * 1000).toLocaleDateString('ru'))} · был ${esc(admAgo(x.last_seen))} · ${x.sessions} ${plural(x.sessions, 'сессия', 'сессии', 'сессий')} · ${x.friends} ${plural(x.friends, 'друг', 'друга', 'друзей')}</small></div>
       <button class="icon-btn small" data-adm-more="${x.id}" aria-label="Действия" aria-haspopup="menu"><svg><use href="#i-more"/></svg></button>
     </li>`).join('')}</ul>`;
@@ -309,8 +309,8 @@ function showBanner(kind, a) {
   el.className = `announce${kind === 'notice' ? ' notice' : ''}`;
   const t = a.track;
   el.innerHTML = `<svg><use href="#i-${kind === 'notice' ? 'chat' : 'shield'}"/></svg>
-    <span>${kind === 'notice' && a.by ? `<b>${esc(a.by)}:</b> ` : ''}${esc(a.text)}</span>
-    ${t?.title ? `<button class="announce-track" title="Включить">${admCover(t, 'fr-track-cover')}<span><b>${esc(t.title)}</b><small>${esc(t.artist || '')}</small></span><svg><use href="#i-play"/></svg></button>` : ''}
+    <span>${kind === 'notice' && a.by ? `<b>${emo(a.by)}:</b> ` : ''}${emo(a.text)}</span>
+    ${t?.title ? `<button class="announce-track" title="Включить">${admCover(t, 'fr-track-cover')}<span><b>${emo(t.title)}</b><small>${emo(t.artist || '')}</small></span><svg><use href="#i-play"/></svg></button>` : ''}
     <button class="icon-btn small announce-close" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button>`;
   el.querySelector('.announce-close').onclick = () => {
     try { localStorage.setItem(seenKey(kind), String(a.id)); } catch {}

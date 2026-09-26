@@ -523,7 +523,7 @@ def test_message_edit_react_album(client):
     assert e["text"] == "привет" and e["edited"] > 0
 
     r = client.post(f"/api/messages/{id1}/{m['id']}/react", json={"e": "🔥"}, headers=h(t2)).json()["message"]
-    assert r["reactions"] == [{"e": "🔥", "users": [id2]}]
+    assert r["reactions"] == [{"e": "🔥", "users": [id2]}] and r["my"] == "🔥"
     client.post(f"/api/messages/{id2}/{m['id']}/react", json={"e": "🔥"}, headers=h(t1))
     got = client.get(f"/api/messages/{id1}", headers=h(t2)).json()["messages"][0]
     assert got["reactions"] == [{"e": "🔥", "users": [id2, id1]}] and got["text"] == "привет"

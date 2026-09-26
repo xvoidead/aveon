@@ -368,6 +368,8 @@ function registerIpc() {
   handle('adm:notify', (id, text) => account.adminApi.notify(id, text));
   handle('acc:announcement', () => account.announcement());
   handle('fr:send', (id, body) => friends.send(id, body));
+  handle('fr:edit', (id, msg, text) => friends.edit(id, msg, text));
+  handle('fr:react', (id, msg, e) => friends.react(id, msg, e));
   handle('fr:unknock', (id) => friends.unknock(id));
   handle('fr:avatar', (userId, at) => account.avatarOf(userId, at));
   ipcMain.on('fr:now', (e, p) => friends.now(p));

@@ -237,12 +237,12 @@ function renderTogether() {
   togetherEl.innerHTML = `
     <h2 class="together-title">Рума</h2>
     <button class="together-code" id="tg-copy" title="Скопировать код">
-      <span>${esc(r.code)}</span><svg><use href="#i-copy"/></svg>
+      <span>${emo(r.code)}</span><svg><use href="#i-copy"/></svg>
     </button>
     <p class="together-desc">${r.members.length > 1 ? 'Слушаете вместе. Любой может сменить трек, поставить паузу или перемотать.' : 'Отправь этот код другу — пусть введёт его у себя в «Слушать вместе».'}</p>
     <ul class="together-members">
       ${r.members.map((m) => `<li>${avatarHtml(m)}
-        <span class="together-name">${esc(m.name)}${m.id === r.you ? ' <em>ты</em>' : ''}</span>
+        <span class="together-name">${emo(m.name)}${m.id === r.you ? ' <em>ты</em>' : ''}</span>
         ${m.id === lead && r.members.length > 1 ? '<span class="together-lead">ведёт</span>' : ''}</li>`).join('')}
     </ul>
     ${r.connected ? '' : '<p class="together-note warn">Связь пропала, переподключаюсь…</p>'}

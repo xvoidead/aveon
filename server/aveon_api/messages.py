@@ -69,6 +69,7 @@ def message_view(r, me: int, reactions: dict | None = None) -> dict:
         "album": json.loads(r["album"]) if r["album"] else None,
         "created": r["created"], "read": bool(r["read"]), "edited": r["edited"],
         "reactions": (reactions or {}).get(r["id"], []),
+        "my": next((x["e"] for x in (reactions or {}).get(r["id"], []) if me in x["users"]), None),  # моя реакция
     }
 
 

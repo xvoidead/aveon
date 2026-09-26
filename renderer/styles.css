@@ -1827,3 +1827,49 @@ html:is(.dock-bottom, .dock-top) .call > .together-chip.idle { width: 28px; heig
 html:is(.dock-bottom, .dock-top) .call > .together-chip.idle:hover { background: var(--rivet-2); }
 /* тонкий разделитель между румой и звонком */
 html:is(.dock-bottom, .dock-top) .call > .together-chip + .call-head { margin-left: 8px; padding-left: 12px; border-left: 1px solid var(--rivet-2); }
+
+/* ---------- эмодзи как на iPhone (app.js → emo) ---------- */
+img.emoji { display: inline-block; width: 1.2em; height: 1.2em; margin: 0 .04em; vertical-align: -0.24em; object-fit: contain; user-select: text; }
+
+/* ---------- сообщения: реакции, изменение, альбом ---------- */
+.fr-msg { position: relative; }
+.msg-more {
+  position: absolute; top: 50%; right: calc(100% + 4px); width: 26px; height: 26px; margin-top: -13px; border-radius: 50%;
+  display: grid; place-items: center; color: var(--text-3); opacity: 0; transition: opacity .12s ease, background .12s ease;
+}
+.fr-msg:not(.mine) .msg-more { right: auto; left: calc(100% + 4px); }
+.fr-msg:hover .msg-more, .msg-more:focus-visible { opacity: 1; }
+.msg-more:hover { background: var(--rivet); color: var(--text); }
+.msg-more svg { width: 15px; height: 15px; }
+.msg-foot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-top: 2px; }
+.msg-react {
+  display: inline-flex; align-items: center; gap: 3px; height: 22px; padding: 0 7px; border-radius: 99px;
+  background: rgb(0 0 0 / .22); font-size: 13px; line-height: 1; transition: transform .12s ease, background .12s ease;
+}
+.msg-react b { font: 600 11px var(--ui); color: var(--text-2); }
+.msg-react.mine { background: color-mix(in srgb, var(--amber) 28%, transparent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amber) 55%, transparent); }
+.msg-react:hover { transform: scale(1.06); }
+.msg-react .emoji { width: 15px; height: 15px; margin: 0; vertical-align: 0; }
+.msg-edited { margin-left: auto; color: var(--text-3); font-size: 10.5px; }
+.fr-msg.editing { box-shadow: 0 0 0 1.5px var(--amber); }
+.fr-album-add { flex: none; padding: 3px 9px; border-radius: 99px; background: var(--amber); color: var(--oak); font-size: 11px; font-weight: 600; }
+.fr-editbar {
+  display: flex; align-items: center; gap: 8px; margin: 4px 0 -6px; padding: 6px 4px 6px 10px; border-radius: 10px;
+  background: color-mix(in srgb, var(--amber) 10%, var(--rivet)); color: var(--amber); font-size: 12px; font-weight: 600;
+}
+.fr-editbar span { flex: 1; }
+.fr-editbar > svg { width: 14px; height: 14px; }
+
+/* меню сообщения: ряд реакций и действия */
+@keyframes msg-menu-in { from { opacity: 0; transform: scale(.94) translateY(-4px); } }
+.msg-menu {
+  position: fixed; z-index: 42; min-width: 220px; padding: 6px; border-radius: 14px; background: var(--rivet-2);
+  box-shadow: 0 18px 44px rgb(0 0 0 / .5); animation: msg-menu-in .14s cubic-bezier(.2, .9, .3, 1.1); transform-origin: top left;
+}
+.msg-menu-reacts { display: flex; gap: 2px; padding: 2px 2px 6px; margin-bottom: 4px; border-bottom: 1px solid rgb(255 255 255 / .06); }
+.msg-menu-reacts button { width: 32px; height: 32px; border-radius: 50%; display: grid; place-items: center; transition: transform .12s ease, background .12s ease; }
+.msg-menu-reacts button:hover { background: rgb(255 255 255 / .08); transform: scale(1.18); }
+.msg-menu-reacts button.on { background: color-mix(in srgb, var(--amber) 30%, transparent); }
+.msg-menu-reacts .emoji { width: 22px; height: 22px; margin: 0; vertical-align: 0; }
+.msg-menu .menu-item { width: 100%; }
+@media (prefers-reduced-motion: reduce) { .msg-menu { animation: none; } }
