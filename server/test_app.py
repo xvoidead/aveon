@@ -197,3 +197,30 @@ def test_share_album_and_eq(client):
     assert client.post("/api/share", json={"kind": "settings", "data": {}}, headers=h(token)).status_code == 400
     r = client.post("/api/share", json={"kind": "eq", "data": {"name": "бас", "gains": [1] * 10, "preamp": -1}}, headers=h(token))
     assert r.status_code == 200
+
+
+def test_avatar(client):
+    import base64
+    token, _ = register(client)
+    other, _ = register(client)
+    me = client.get("/api/me", headers=h(token)).json()["user"]
+    assert me["avatar_at"] == 0
+    assert client.get(f"/api/avatar/{me['id']}", headers=h(other)).status_code == 404
+
+    png = base64.b64encode(b"\x89PNG\r\n\x1a\n" + b"0" * 100).decode()
+    r = client.put("/api/me/avatar", json={"avatar": f"data:image/png;base64,{png}"}, headers=h(token))
+    assert r.status_code == 200, r.text
+    assert r.json()["user"]["avatar_at"] > 0
+    r = client.get(f"/api/avatar/{me['id']}", headers=h(other))
+    assert r.status_code == 200 and r.headers["content-type"] == "image/png"
+    assert r.content.startswith(b"\x89PNG")
+    assert client.get(f"/api/avatar/{me['id']}").status_code == 401
+
+    bad = client.put("/api/me/avatar", json={"avatar": "data:text/html;base64,PGI+"}, headers=h(token))
+    assert bad.status_code == 400
+    big = base64.b64encode(b"0" * (300 * 1024)).decode()
+    assert client.put("/api/me/avatar", json={"avatar": f"data:image/png;base64,{big}"}, headers=h(token)).status_code in (413, 422)
+
+    assert client.put("/api/me/avatar", json={"avatar": ""}, headers=h(token)).status_code == 200
+    assert client.get(f"/api/avatar/{me['id']}", headers=h(other)).status_code == 404
+

@@ -5,6 +5,7 @@
 """
 from __future__ import annotations
 
+import base64
 import json
 import re
 import time
@@ -13,7 +14,7 @@ from typing import Annotated, Any
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel, Field
 
 from . import db, security
@@ -74,6 +75,10 @@ class PasswordChange(BaseModel):
     new: str = Field(max_length=256)
 
 
+class Avatar(BaseModel):
+    avatar: str = Field(default="", max_length=400_000)  # пустая строка — убрать
+
+
 class Confirm(BaseModel):
     password: str = Field(max_length=256)
 
@@ -119,7 +124,8 @@ app.include_router(share_router)
 
 
 def user_view(row) -> dict:
-    return {"id": row["id"], "login": row["login"], "name": row["name"], "created": row["created"]}
+    return {"id": row["id"], "login": row["login"], "name": row["name"], "created": row["created"],
+            "avatar_at": row["avatar_at"]}
 
 
 def get_user(conn, user_id: int):
@@ -228,6 +234,42 @@ def me_update(body: Profile, me: Me):
         conn.execute("UPDATE users SET name = ? WHERE id = ?", (name, me.user_id))
         user = get_user(conn, me.user_id)
     return {"user": user_view(user)}
+
+
+AVATAR_RE = re.compile(r"^data:image/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$")
+MAX_AVATAR = 256 * 1024  # байт картинки после декодирования
+
+
+@app.put("/api/me/avatar")
+def me_avatar(body: Avatar, me: Me):
+    """Аватар профиля: data:image/jpeg|png|webp;base64,… или пустая строка, чтобы убрать."""
+    data = body.avatar.strip()
+    if data:
+        m = AVATAR_RE.match(data)
+        if not m:
+            raise HTTPException(400, "Аватар должен быть картинкой JPEG, PNG или WEBP")
+        try:
+            raw = base64.b64decode(m.group(2), validate=True)
+        except ValueError:
+            raise HTTPException(400, "Картинка повреждена")
+        if len(raw) > MAX_AVATAR:
+            raise HTTPException(413, "Аватар больше 256 КБ")
+    with db.tx() as conn:
+        conn.execute("UPDATE users SET avatar = ?, avatar_at = ? WHERE id = ?", (data, now(), me.user_id))
+        user = get_user(conn, me.user_id)
+    return {"user": user_view(user)}
+
+
+@app.get("/api/avatar/{user_id}")
+def avatar_get(user_id: int, me: Me):
+    """Аватар любого пользователя — для «Слушать вместе». Только для вошедших."""
+    with db.tx() as conn:
+        row = conn.execute("SELECT avatar FROM users WHERE id = ?", (user_id,)).fetchone()
+    m = AVATAR_RE.match(row["avatar"]) if row and row["avatar"] else None
+    if not m:
+        raise HTTPException(404, "Аватара нет")
+    return Response(base64.b64decode(m.group(2)), media_type=f"image/{m.group(1)}",
+                    headers={"Cache-Control": "private, max-age=86400"})
 
 
 @app.post("/api/me/password")

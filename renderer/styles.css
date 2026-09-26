@@ -984,4 +984,16 @@ kbd {
 }
 .pf-avatar:hover::after, .pf-avatar[aria-expanded="true"]::after, .pf-avatar:focus-visible::after { opacity: 1; }
 
+/* ---------- аватары в «Слушать вместе» ---------- */
+.together-avatar { overflow: hidden; }
+.together-avatar.pic, .together-face.pic { background: var(--rivet-2); }
+.together-avatar img, .together-face img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.together-faces { display: inline-flex; flex: none; }
+.together-faces:empty { display: none; }
+.together-face {
+  width: 18px; height: 18px; border-radius: 50%; overflow: hidden; display: grid; place-items: center; flex: none;
+  margin-left: -5px; box-shadow: 0 0 0 2px var(--oak-2);
+  background: var(--rivet-2); color: var(--text); font: 600 9px var(--display); text-transform: none;
+}
+.together-face:first-child { margin-left: 0; }
 

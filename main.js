@@ -376,6 +376,7 @@ function registerIpc() {
   handle('tg:leave', () => together.leave());
   handle('tg:status', () => together.status());
   handle('tg:stream', (track) => sharedStream(track));
+  handle('tg:avatar', (userId, at) => account.avatarOf(userId, at));
   ipcMain.on('tg:send', (e, state, beat) => together.send(state, beat));
 
   // Discord: что сейчас играет

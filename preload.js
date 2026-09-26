@@ -75,6 +75,7 @@ contextBridge.exposeInMainWorld('tishe', {
     leave: () => call('tg:leave'),
     status: () => call('tg:status'),
     stream: (track) => call('tg:stream', track),
+    avatar: (userId, at) => call('tg:avatar', userId, at),
     send: (state, beat) => ipcRenderer.send('tg:send', state, beat),
     onEvent: (cb) => on('together:event', cb),
   },

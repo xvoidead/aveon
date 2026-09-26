@@ -19,7 +19,9 @@ CREATE TABLE IF NOT EXISTS users (
     login      TEXT NOT NULL UNIQUE COLLATE NOCASE,
     name       TEXT NOT NULL,
     pw_hash    TEXT NOT NULL,
-    created    INTEGER NOT NULL
+    created    INTEGER NOT NULL,
+    avatar     TEXT NOT NULL DEFAULT '',   -- data:image/…;base64, квадрат 256×256
+    avatar_at  INTEGER NOT NULL DEFAULT 0  -- когда меняли: по нему плеер понимает, что кэш устарел
 );
 
 CREATE TABLE IF NOT EXISTS sessions (
@@ -78,3 +80,9 @@ def init() -> None:
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     with tx() as conn:
         conn.executescript(SCHEMA)
+        # база, созданная до аватаров: добавляем колонки
+        cols = {r["name"] for r in conn.execute("PRAGMA table_info(users)")}
+        if "avatar" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN avatar TEXT NOT NULL DEFAULT ''")
+        if "avatar_at" not in cols:
+            conn.execute("ALTER TABLE users ADD COLUMN avatar_at INTEGER NOT NULL DEFAULT 0")

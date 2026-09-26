@@ -112,6 +112,35 @@ setInterval(() => {
 
 const firstName = (name) => String(name || '').split(/\s+/)[0];
 
+// Аватары участников: свой — из настроек, чужие — с сервера (через главный процесс, с кэшем)
+const tgAvatars = new Map(); // `${user}:${avatar}` → data:… или '' (нет / не загрузился)
+
+function memberAvatar(m) {
+  const r = Together.room;
+  if (r && m.id === r.you) return state.cfg.ui?.avatar || '';
+  return tgAvatars.get(`${m.user}:${m.avatar}`) || '';
+}
+
+function loadAvatars() {
+  const r = Together.room;
+  if (!r) return;
+  for (const m of r.members) {
+    if (!m.avatar || !m.user || m.id === r.you) continue;
+    const key = `${m.user}:${m.avatar}`;
+    if (tgAvatars.has(key)) continue;
+    tgAvatars.set(key, '');
+    api.together.avatar(m.user, m.avatar).then((url) => {
+      tgAvatars.set(key, url || '');
+      if (url) { renderTogether(); renderTogetherChip(); }
+    }).catch(() => {});
+  }
+}
+
+function avatarHtml(m, cls = 'together-avatar') {
+  const url = memberAvatar(m);
+  return `<span class="${cls}${url ? ' pic' : ''}">${url ? `<img src="${esc(url)}" alt="">` : esc(firstName(m.name).slice(0, 1).toUpperCase())}</span>`;
+}
+
 api.together.onEvent((ev) => {
   const T = Together;
   const was = T.room;
@@ -162,7 +191,10 @@ function renderTogetherChip() {
   togetherBtn.classList.toggle('on', !!r);
   if (!r) { chip.hidden = true; return; }
   const others = memberNames();
+  loadAvatars();
   chip.hidden = false;
+  const faces = r.members.filter((m) => m.id !== r.you).slice(0, 3);
+  $('#together-chip-faces').innerHTML = faces.map((m) => avatarHtml(m, 'together-face')).join('');
   chip.classList.toggle('offline', !r.connected);
   $('#together-chip-text').textContent = !r.connected ? 'связь с комнатой…'
     : others.length ? `слушаете вместе · ${others.join(', ')}` : `комната ${r.code} · ждём друга`;
@@ -200,7 +232,7 @@ function renderTogether() {
     </button>
     <p class="together-desc">${r.members.length > 1 ? 'Слушаете вместе. Любой может сменить трек, поставить паузу или перемотать.' : 'Отправь этот код другу — пусть введёт его у себя в «Слушать вместе».'}</p>
     <ul class="together-members">
-      ${r.members.map((m) => `<li><span class="together-avatar">${esc(firstName(m.name).slice(0, 1).toUpperCase())}</span>
+      ${r.members.map((m) => `<li>${avatarHtml(m)}
         <span class="together-name">${esc(m.name)}${m.id === r.you ? ' <em>ты</em>' : ''}</span>
         ${m.id === lead && r.members.length > 1 ? '<span class="together-lead">ведёт</span>' : ''}</li>`).join('')}
     </ul>

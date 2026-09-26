@@ -95,7 +95,7 @@ async function enter(route, server, fields) {
   ensureDevice();
   const r = await api('POST', route, { ...fields, device: os.hostname().slice(0, 64) }, { server, token: '' });
   config.setSecret('acc.token', r.token);
-  config.set({ account: { server, login: r.user.login, name: r.user.name } });
+  config.set({ account: { server, login: r.user.login, name: r.user.name, avatarSig: '' } });
   lastStatsPushed = '';
   start();
   const changed = await sync().catch(() => null);
@@ -154,6 +154,48 @@ async function shareGet(code) {
     if (e.status === 404 && !e.body?.error) throw new Error('Сервер аккаунтов ещё не умеет открывать коды — обнови его');
     throw e;
   }
+}
+
+// ---- аватар ----
+// Свой аватар хранится в настройках вида (синхронизируется между своими компьютерами), а на сервер
+// отправляется отдельно — чтобы его видели друзья в «Слушать вместе». Отправляем, только если изменился.
+
+const avatarSig = (s) => crypto.createHash('sha1').update(s || '').digest('hex').slice(0, 16);
+
+async function pushAvatar() {
+  const avatar = config.get().ui?.avatar || '';
+  const sig = avatarSig(avatar);
+  if (acc().avatarSig === sig) return;
+  try {
+    await api('PUT', '/api/me/avatar', { avatar });
+  } catch (e) {
+    if (e.status === 404 || e.status === 405) return; // сервер ещё без аватаров — не мешаем синхронизации
+    throw e;
+  }
+  config.set({ account: { avatarSig: sig } });
+}
+
+// Аватар участника комнаты: at — когда он его менял, по нему же и кэш
+const avatars = new Map();
+
+async function avatarOf(userId, at) {
+  if (!userId || !at) return '';
+  const key = `${userId}:${at}`;
+  if (avatars.has(key)) return avatars.get(key);
+  let url = '';
+  try {
+    const res = await fetch(`${acc().server}/api/avatar/${encodeURIComponent(userId)}`, {
+      headers: { Authorization: `Bearer ${config.getSecret('acc.token')}` },
+      signal: AbortSignal.timeout(15000),
+    });
+    const type = res.headers.get('content-type') || '';
+    if (res.ok && /^image\/(jpeg|png|webp)$/.test(type)) {
+      url = `data:${type};base64,${Buffer.from(await res.arrayBuffer()).toString('base64')}`;
+    }
+  } catch {}
+  if (avatars.size > 200) avatars.clear();
+  avatars.set(key, url);
+  return url;
 }
 
 // ---- синхронизация ----
@@ -239,6 +281,7 @@ async function runSync() {
   await syncAlbums(doc('albums', 'main'), changed);
   await syncSettings(doc('settings', 'main'), changed);
   await syncStats(docs, changed);
+  await pushAvatar(); // после настроек: аватар мог прийти с другого компьютера
   config.set({ account: { lastSync: Date.now() } });
   return changed;
 }
@@ -292,5 +335,5 @@ function init(onEvent) {
 
 module.exports = {
   init, status, register, login, logout, logoutAll, me, rename, changePassword, remove, sync, settingsChanged,
-  sharePut, shareGet,
+  sharePut, shareGet, avatarOf,
 };
