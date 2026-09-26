@@ -101,7 +101,11 @@ Aveon.addListener('media', ({ action, pos }) => {
 // ---- Spotify: вход через ссылку aveon://spotify (её надо добавить в Redirect URIs приложения Spotify) ----
 const SP_REDIRECT = 'aveon://spotify';
 let spPending = null;
+// ссылки на треки aveon://track/КОД — плееру (renderer/share.js)
+let pendingLink = null;
+App.getLaunchUrl().then((r) => { if (r?.url?.startsWith('aveon://track/')) pendingLink = r.url; }).catch(() => {});
 App.addListener('appUrlOpen', ({ url }) => {
+  if (url?.startsWith('aveon://track/')) { pendingLink = url; send('deeplink', url); return; }
   if (!url?.startsWith(SP_REDIRECT) || !spPending) return;
   const u = new URL(url.replace(/^aveon:/, 'https:'));
   spPending(u.searchParams);
@@ -212,7 +216,11 @@ const api = {
   share: {
     put: call((kind, data) => account.sharePut(kind, data)),
     get: call((code) => account.shareGet(code)),
+    public: call((code) => account.sharePublic(code)),
+    takeLink: call(() => { const l = pendingLink; pendingLink = null; return l; }),
+    onLink: (cb) => on('deeplink', cb),
   },
+  collab: call((op, code, body) => account.collab(op, code, clone(body))),
   meta: {
     edit: call((p, fields, cover) => local.editMeta(p, fields, cover)),
     reset: call((p) => local.resetMeta(p)),

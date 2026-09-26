@@ -63,6 +63,14 @@
       ],
       "icon": "build/icon.ico"
     },
+    "protocols": [
+      {
+        "name": "авеон",
+        "schemes": [
+          "aveon"
+        ]
+      }
+    ],
     "nsis": {
       "oneClick": false,
       "perMachine": false,

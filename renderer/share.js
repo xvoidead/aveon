@@ -9,6 +9,8 @@
 const SHARE_KINDS = { album: 'альбом', eq: 'пресет эквалайзера' };
 const SHORT_CODE = /(?:^|[^A-Za-z0-9])(?:aveon:)?([A-HJ-NP-Z2-9]{4})-?([A-HJ-NP-Z2-9]{4})(?![A-Za-z0-9])/i;
 const INLINE_CODE = /aveon:(album|eq):([A-Za-z0-9_-]+)/;
+// ссылка на трек: https://сервер/t/КОД или aveon://track/КОД
+const TRACK_LINK = /(?:\/t\/|aveon:\/\/track\/)([A-HJ-NP-Z2-9]{4})-?([A-HJ-NP-Z2-9]{4})(?![A-Za-z0-9])/i;
 const MAX_IMPORT_TRACKS = 5000;
 
 // ---- упаковка ----
@@ -40,6 +42,9 @@ function findShareCode(text, { loose = false } = {}) {
   text = String(text || '').trim();
   const inline = INLINE_CODE.exec(text);
   if (inline) return { kind: inline[1], inline: inline[2] };
+  if (/aveon:collab:/i.test(text)) return { collab: text };
+  const link = TRACK_LINK.exec(text);
+  if (link) return { code: (link[1] + link[2]).toUpperCase(), track: true };
   const short = SHORT_CODE.exec(text);
   if (short && (loose || /aveon:/i.test(text) || text.replace(/[\s-]/g, '').length === 8)) return { code: (short[1] + short[2]).toUpperCase() };
   return null;
@@ -111,12 +116,14 @@ function cleanEq(d) {
 
 async function readShare(found) {
   if (found.inline) return { kind: found.kind, data: await unpackInline(found.inline) };
+  if (found.track) return api.share.public(found.code); // трек открывается и без аккаунта
   return api.share.get(found.code);
 }
 
 async function importShare(text) {
   const found = findShareCode(text, { loose: true });
   if (!found) { toast('Это не похоже на код альбома или пресета', 'err'); return; }
+  if (found.collab) { joinCollab(found.collab); return; } // collab.js
   let share;
   try { share = await readShare(found); } catch (e) { toast(e.message || 'Код не открылся', 'err'); return; }
   const from = share.by ? ` от ${share.by}` : '';
@@ -153,8 +160,42 @@ async function importShare(text) {
     } catch (e) { toast(e.message, 'err'); }
     return;
   }
+  if (share.kind === 'track') {
+    const t = cleanTrack(share.data?.track);
+    if (!t) { toast('Ссылка на трек повреждена', 'err'); return; }
+    playFrom([t], 0);
+    toast(`«${t.title}»${from}`);
+    // человек слушал в руме — предлагаем зайти к нему
+    const room = String(share.data?.room || '').toUpperCase();
+    if (room && Together.room?.code !== room && state.account.loggedIn) {
+      const ok = await ask({ title: `${share.by || 'Друг'} слушает в руме`, text: 'Зайти к нему и слушать вместе?', ok: 'Зайти', input: false });
+      if (ok) { openTogether(); enterRoom(() => api.together.join(room)); } // together.js
+    }
+    return;
+  }
   toast('Этот код не для авеона', 'err');
 }
+
+// ---- ссылка на трек для Discord ----
+// Сервер отдаёт по /t/КОД страницу с превью (обложка, название) и кнопкой «Открыть в авеоне».
+// Если слушаешь в руме, по ссылке друг сразу зайдёт к тебе.
+
+async function shareTrackLink(t) {
+  if (!t) return;
+  if (!state.account.loggedIn) { toast('Ссылки на треки — для тех, кто вошёл в аккаунт', 'err'); return; }
+  try {
+    const code = await api.share.put('track', { track: shareable(t), ...(Together.room ? { room: Together.room.code } : {}) });
+    const url = `${state.account.server}/t/${code}`;
+    toast(await copyText(url) ? 'Ссылка скопирована — вставляй в Discord' : url);
+  } catch (e) {
+    toast(e.message, 'err');
+  }
+}
+
+// aveon://track/КОД: при запуске по ссылке и когда плеер уже открыт
+function openLink(url) { if (url && findShareCode(url)) importShare(url); }
+api.share.onLink(openLink);
+setTimeout(() => api.share.takeLink().then(openLink).catch(() => {}), 1500); // плеер успевает загрузиться
 
 async function openShareCode() {
   const text = await ask({ title: 'Открыть по коду', text: 'Вставь код альбома или пресета эквалайзера, который прислал друг.', ok: 'Открыть', value: '' });

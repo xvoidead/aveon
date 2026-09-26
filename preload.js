@@ -39,7 +39,11 @@ contextBridge.exposeInMainWorld('tishe', {
   share: {
     put: (kind, data) => call('share:put', kind, data),
     get: (code) => call('share:get', code),
+    public: (code) => call('share:public', code),
+    takeLink: () => call('link:take'),
+    onLink: (cb) => on('deeplink', cb),
   },
+  collab: (op, code, body) => call('collab', op, code, body), // совместные плейлисты (src/account.js)
   meta: {
     edit: (filePath, fields, cover) => call('meta:edit', filePath, fields, cover),
     reset: (filePath) => call('meta:reset', filePath),

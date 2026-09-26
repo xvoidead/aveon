@@ -1999,6 +1999,8 @@ img.emoji { display: inline-block; width: 1.25em; height: 1.25em; margin: 0 .05e
 .together-reacts button { font-size: 20px; line-height: 1; padding: 6px 0; border-radius: 8px; transition: transform .12s ease; }
 .together-reacts button:hover { background: var(--rivet); transform: scale(1.15); }
 .together-reacts button:active { transform: scale(.9); }
+.together-reacts .emoji { display: block; width: 22px; height: 22px; margin: 0 auto; }
+.react-fly .emoji { display: block; width: 44px; height: 44px; margin: 0; }
 .react-fly {
   position: fixed; z-index: 60; pointer-events: none; display: grid; justify-items: center; gap: 2px;
   transform: translate(-50%, 0); animation: react-fly 2.5s cubic-bezier(.2, .7, .3, 1) forwards;

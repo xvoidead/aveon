@@ -269,6 +269,9 @@ function registerIpc() {
   // Поделиться: короткий код на сервере аккаунтов
   handle('share:put', (kind, data) => account.sharePut(kind, data));
   handle('share:get', (code) => account.shareGet(code));
+  handle('share:public', (code) => account.sharePublic(code));
+  handle('collab', (op, code, body) => account.collab(op, code, body));
+  handle('link:take', () => { const l = pendingLink; pendingLink = null; return l; });
 
   handle('sc:discover', () => sc.discoverClientId());
   handle('sp:connect', async () => { const r = await sp.connect(); account.keysChanged(); return r; });
@@ -497,7 +500,18 @@ const deskActions = {
 
 app.on('before-quit', () => { quitting = true; });
 
-app.on('second-instance', () => {
+// Ссылки aveon://track/КОД — «Открыть в авеоне» со страницы трека (сервер: /t/КОД, Discord)
+let pendingLink = process.argv.find((a) => a.startsWith('aveon://')) || null;
+if (process.defaultApp) app.setAsDefaultProtocolClient('aveon', process.execPath, [path.resolve(process.argv[1] || '.')]);
+else app.setAsDefaultProtocolClient('aveon');
+function openLink(url) {
+  if (!url?.startsWith('aveon://')) return;
+  pendingLink = url;
+  send('deeplink', url);
+}
+
+app.on('second-instance', (e, argv) => {
+  openLink(argv.find((a) => a.startsWith('aveon://')));
   if (!win) return;
   showWindow();
 });

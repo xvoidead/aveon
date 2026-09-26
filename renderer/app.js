@@ -1169,6 +1169,8 @@ function albumMenuItems(tracks) {
     const a = await createAlbum(tracks);
     if (a && state.view === 'albums') openView('albums', a.id);
   } });
+  const co = collabMenuItems(tracks); // collab.js
+  if (co.length) items.push({ sep: true }, ...co);
   return items;
 }
 
@@ -1183,10 +1185,15 @@ function openTrackMenu(i, pos) {
   if (t.source === 'local' && !t.shared) items.unshift({ label: 'Изменить теги и обложку', icon: 'i-pencil', onClick: () => openEditor(t) }, { sep: true });
   const dl = dlMenuItems(t); // downloads.js
   if (dl.length) items.push({ sep: true }, ...dl);
-  if (state.account.loggedIn) items.push({ sep: true }, { label: 'Отправить другу', icon: 'i-chat', onClick: () => sendTrackMenu(t, pos) }); // friends.js
+  if (state.account.loggedIn) {
+    items.push({ sep: true }, { label: 'Отправить другу', icon: 'i-chat', onClick: () => sendTrackMenu(t, pos) }); // friends.js
+    if (t.source !== 'local' || t.shared) items.push({ label: 'Ссылка для Discord', icon: 'i-share', onClick: () => shareTrackLink(t) }); // share.js
+  }
   if (state.view === 'albums' && state.album) {
     items.push({ sep: true }, { label: 'Убрать из альбома', icon: 'i-trash', danger: true, onClick: () => removeFromAlbum([t]) });
   }
+  const rmCollab = collabRemoveItem(t); // collab.js
+  if (rmCollab) items.push({ sep: true }, rmCollab);
   // найти этот же трек в SoundCloud и открыть там, где он есть
   const out = [];
   if (t.source !== 'sc') out.push({ label: 'Найти в SoundCloud', icon: 'i-search', onClick: () => searchIn('sc', trackQuery(t)) });
@@ -1418,6 +1425,7 @@ function renderActions() {
     });
   }
   dlActions(add); // downloads.js: «Скачать всё» / «Удалить все скачанные»
+  collabActions(add); // collab.js
   if (state.view === 'albums' && state.album) {
     const iconBtn = (icon, fn, label) => { const b = add('', icon, fn); b.setAttribute('aria-label', label); b.title = label; };
     iconBtn('i-share', (e) => albumShareMenu(state.album, e.currentTarget), 'Поделиться альбомом'); // share.js
@@ -1459,6 +1467,7 @@ function renderCollections() {
     }
     chip('Новый альбом', { icon: 'i-plus', onClick: async () => { const a = await createAlbum(); if (a) openView('albums', a.id); } });
     box.lastElementChild.classList.add('new');
+    collabChips(chip); // collab.js: совместные плейлисты
     chip('По коду', { icon: 'i-code', onClick: openShareCode }); // share.js: альбом, которым поделился друг
     box.lastElementChild.classList.add('new');
     return;
@@ -1600,6 +1609,7 @@ async function openView(view, sub = null) {
 
   if (view === 'albums') {
     if (sub === 'downloads') { await openDownloads(seq); return; } // downloads.js
+    if (sub?.startsWith('collab:')) { await openCollab(sub.slice(7), seq); return; } // collab.js
     if (!sub) {
       if (!state.albums.length && DL.done.size) { openView('albums', 'downloads'); return; }
       if (!state.albums.length) {
@@ -2514,7 +2524,7 @@ $('#auth-form').onsubmit = async (e) => {
 };
 
 api.account.onEvent((ev) => {
-  if (ev.status) state.account = ev.status;
+  if (ev.status) { state.account = ev.status; Collab.loaded = false; } // collab.js: список совместных — заново для нового аккаунта
   if (ev.status && !ev.status.loggedIn) {
     if (!locked()) showAuth(ev.error || '');
     return;

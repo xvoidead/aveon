@@ -31,6 +31,14 @@
                 <data android:scheme="aveon" android:host="spotify" />
             </intent-filter>
 
+            <!-- Трек по ссылке: «Открыть в авеоне» на странице /t/КОД -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="aveon" android:host="track" />
+            </intent-filter>
+
         </activity>
 
         <service

@@ -167,6 +167,37 @@ async function shareGet(code) {
   }
 }
 
+// Трек по ссылке (kind "track") открывается и без аккаунта
+async function sharePublic(code) {
+  try {
+    return await api('GET', `/api/share/${encodeURIComponent(code)}/public`, undefined, { token: '' });
+  } catch (e) {
+    if (e.status === 404 && !e.body?.error) throw new Error('Сервер аккаунтов ещё не умеет открывать ссылки на треки — обнови его');
+    throw e;
+  }
+}
+
+// ---- совместные плейлисты: живой список по коду, правки видны всем (server/aveon_api/collab.py) ----
+
+const COLLAB_OPS = {
+  list: ['GET', ''], get: ['GET', ''], create: ['POST', ''], join: ['POST', '/join'], add: ['POST', '/tracks'],
+  remove: ['POST', '/remove'], move: ['POST', '/move'], rename: ['PATCH', ''], leave: ['POST', '/leave'],
+};
+
+async function collab(op, code, body) {
+  if (!COLLAB_OPS[op]) throw new Error('unknown collab op ' + op);
+  if (!config.getSecret('acc.token')) throw new ApiError(401, 'Нужно войти в аккаунт');
+  const [method, tail] = COLLAB_OPS[op];
+  const route = code ? `/api/collab/${encodeURIComponent(code)}${tail}` : '/api/collab';
+  try {
+    return await api(method, route, body);
+  } catch (e) {
+    if (e.status === 404 && !e.body?.error) throw new Error('Сервер аккаунтов ещё не умеет совместные плейлисты — обнови его');
+    if (e.status === 405) throw new Error('Сервер аккаунтов ещё не умеет совместные плейлисты — обнови его');
+    throw e;
+  }
+}
+
 // ---- аватар ----
 // Аватар хранится на сервере: смена сразу уходит туда, другие компьютеры и друзья в «Слушать вместе»
 // берут его оттуда. Здесь лежит только копия (account.avatar), чтобы он был виден и без сети.
@@ -480,5 +511,5 @@ async function announcement() {
 
 module.exports = {
   init, status, register, login, logout, logoutAll, me, rename, changePassword, remove, sync, settingsChanged,
-  sharePut, shareGet, avatarOf, setAvatar, api, adminApi, announcement, keysChanged,
+  sharePut, shareGet, sharePublic, collab, avatarOf, setAvatar, api, adminApi, announcement, keysChanged,
 };
