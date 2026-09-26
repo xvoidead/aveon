@@ -1321,3 +1321,20 @@ html.look-react-hoops .hoops { transform: scale(calc(1 - var(--m) * 0.07 + var(-
 .tag.dl.wait { color: var(--text-3); animation: dl-wait 1.2s ease-in-out infinite; }
 @keyframes dl-wait { 50% { opacity: .35; } }
 .head-actions .btn.done { color: var(--amber); }
+
+/* ---------- плеер снизу/сверху: правый ряд кнопок одной высоты и с ровными отступами ---------- */
+html:is(.dock-bottom, .dock-top) .stage { column-gap: 12px; }
+html:is(.dock-bottom, .dock-top) .volume-row { gap: 6px; }
+html:is(.dock-bottom, .dock-top) .volume-tools { gap: 2px; margin-left: 4px; padding-left: 10px; }
+html:is(.dock-bottom, .dock-top) :is(.volume-row, .stage-account) .icon-btn { width: 34px; height: 34px; }
+html:is(.dock-bottom, .dock-top) :is(.volume-row, .stage-account) .icon-btn svg { width: 18px; height: 18px; }
+/* «слушать вместе» без румы — такая же круглая кнопка, как соседние */
+html:is(.dock-bottom, .dock-top) .together-chip.idle {
+  width: 34px; height: 34px; padding: 0; justify-content: center; border-radius: 50%; box-shadow: none;
+}
+html:is(.dock-bottom, .dock-top) .together-chip.idle .together-chip-icon { width: 18px; height: 18px; }
+html:is(.dock-bottom, .dock-top) .stage-foot { gap: 6px; }
+html:is(.dock-bottom, .dock-top) .call { height: 34px; display: flex; align-items: center; padding: 0 5px 0 14px; }
+html:is(.dock-bottom, .dock-top) .call-head { gap: 10px; }
+html:is(.dock-bottom, .dock-top) .me { padding: 0; }
+html:is(.dock-bottom, .dock-top) .me-avatar { width: 34px; height: 34px; }
