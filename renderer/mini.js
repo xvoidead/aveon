@@ -96,3 +96,14 @@ $('#seek').onclick = (e) => {
   act('seek', { pos: ((e.clientX - r.left) / r.width) * st.duration });
 };
 card.addEventListener('wheel', (e) => act('volume', { delta: e.deltaY < 0 ? 0.05 : -0.05 }), { passive: true });
+
+// Окно больше панели (поля под тень). Мышь окно ловит, только пока курсор над панелью или меню —
+// иначе клики уходят насквозь в плеер. Пока кнопка зажата (тянут ползунок), не отпускаем
+let overPanel = false;
+function trackHover(e) {
+  if (e.buttons) return;
+  const on = !!e.target.closest?.('#card');
+  if (on !== overPanel) { overPanel = on; api.island.miniHover(on); }
+}
+document.addEventListener('mousemove', trackHover);
+document.addEventListener('mouseleave', () => { if (overPanel) { overPanel = false; api.island.miniHover(false); } });

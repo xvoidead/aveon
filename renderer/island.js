@@ -249,6 +249,8 @@ pill.addEventListener('mouseenter', () => {
   renderLabel();
   fitWidth();
 });
+// курсор ушёл за окно острова целиком — тоже «ушёл с капсулы»
+document.addEventListener('mouseleave', () => pill.dispatchEvent(new Event('mouseleave')));
 pill.addEventListener('mouseleave', () => {
   clearTimeout(leaveTimer);
   leaveTimer = setTimeout(() => {

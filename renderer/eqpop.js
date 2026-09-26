@@ -295,3 +295,14 @@ document.addEventListener('keydown', (e) => {
   if (e.code === 'KeyE') close();
 });
 window.addEventListener('resize', () => { if (pop.eq) draw(); });
+
+// Окно больше панели (поля под тень). Мышь окно ловит, только пока курсор над панелью или меню —
+// иначе клики уходят насквозь в плеер. Пока кнопка зажата (тянут ползунок), не отпускаем
+let overPanel = false;
+function trackHover(e) {
+  if (e.buttons) return;
+  const on = !!e.target.closest?.('.eq-sheet, #menu:not([hidden])');
+  if (on !== overPanel) { overPanel = on; api.eqpop.hover(on); }
+}
+document.addEventListener('mousemove', trackHover);
+document.addEventListener('mouseleave', () => { if (overPanel) { overPanel = false; api.eqpop.hover(false); } });

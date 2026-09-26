@@ -326,6 +326,7 @@ const api = {
   eqpop: {
     toggle: (rect, payload) => { popToggle(rect, payload); },
     close: () => popHide(),
+    hover: () => {}, // на телефоне шторка — прозрачных полей нет
     refresh: () => { if (pop.open) popEmit('eqpop:refresh'); },
     live: (eq) => send('eqpop:live', eq), // из шторки — в звук плеера
     action: (a) => { popHide(); send('eqpop:action', a); },

@@ -106,6 +106,7 @@ contextBridge.exposeInMainWorld('tishe', {
     onPreview: (cb) => on('island:preview', cb),
     screen: () => call('island:screen'),
     preview: () => ipcRenderer.send('island:preview'),
+    miniHover: (on) => ipcRenderer.send('mini:hover', on),
   },
   // Раздел «Остров и окна»: мини-плеер, горячие клавиши, живые обои
   desk: {
@@ -156,6 +157,7 @@ contextBridge.exposeInMainWorld('tishe', {
   eqpop: {
     toggle: (rect, payload) => ipcRenderer.send('eqpop:toggle', rect, payload),
     close: () => ipcRenderer.send('eqpop:close'),
+    hover: (on) => ipcRenderer.send('eqpop:hover', on),
     refresh: () => ipcRenderer.send('eqpop:refresh'),
     live: (eq) => ipcRenderer.send('eqpop:live', eq),
     action: (a) => ipcRenderer.send('eqpop:action', a),

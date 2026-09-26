@@ -349,6 +349,7 @@ function registerIpc() {
   // пересылает их для звука; «поделиться» и «вставить код» делает окно плеера
   ipcMain.on('eqpop:toggle', (e, rect, payload) => eqpop.toggle(win, rect, payload));
   ipcMain.on('eqpop:close', () => eqpop.hide());
+  ipcMain.on('eqpop:hover', (e, on) => eqpop.hover(!!on));
   ipcMain.on('eqpop:refresh', () => eqpop.refresh());
   ipcMain.on('eqpop:live', (e, eq) => send('eqpop:live', eq));
   ipcMain.on('eqpop:action', (e, action) => { eqpop.hide(); send('eqpop:action', action); });
@@ -365,6 +366,7 @@ function registerIpc() {
     tray.state(st);
   });
   ipcMain.on('island:hover', (e, on) => island.hover(!!on));
+  ipcMain.on('mini:hover', (e, on) => mini.hover(!!on));
   ipcMain.on('island:action', (e, a) => {
     if (a?.type === 'focus') { showWindow(); return; }
     if (a?.type === 'mini-close') { mini.close(); return; }

@@ -138,7 +138,10 @@ function wanted() {
 
 function update() {
   if (!wanted()) {
-    if (win && !win.isDestroyed() && win.isVisible()) win.hide();
+    if (win && !win.isDestroyed() && win.isVisible()) {
+      win.setIgnoreMouseEvents(true, { forward: true }); // спрятали под курсором — mouseleave не придёт
+      win.hide();
+    }
     return;
   }
   ensure();

@@ -48,6 +48,7 @@ function open() {
       backgroundThrottling: false,
     },
   });
+  win.setIgnoreMouseEvents(true, { forward: true }); // поля вокруг карточки пропускают клики (renderer/mini.js)
   apply();
   win.loadFile(path.join(__dirname, '..', 'renderer', 'mini.html'));
   win.webContents.once('did-finish-load', () => {
@@ -75,6 +76,10 @@ function close() {
 
 function toggle() {
   if (win && !win.isDestroyed()) close(); else open();
+}
+
+function hover(on) {
+  if (win && !win.isDestroyed()) win.setIgnoreMouseEvents(!on, { forward: true });
 }
 
 function isOpen() { return !!(win && !win.isDestroyed()); }
@@ -105,4 +110,4 @@ function destroy() {
   if (win && !win.isDestroyed()) win.destroy();
 }
 
-module.exports = { init, open, close, toggle, isOpen, state, settingsChanged, destroy };
+module.exports = { init, open, close, toggle, isOpen, hover, state, settingsChanged, destroy };

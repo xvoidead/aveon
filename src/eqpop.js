@@ -39,6 +39,9 @@ function ensure(main) {
   });
   pop.loadFile(path.join(__dirname, '..', 'renderer', 'eqpop.html'));
   ready = new Promise((r) => pop.webContents.once('did-finish-load', r));
+  // Прозрачные поля под тень пропускают клики к окну плеера: мышь окно ловит, только пока курсор
+  // над самой панелью (renderer/eqpop.js → hover). Иначе у края панели была «мёртвая зона»
+  pop.setIgnoreMouseEvents(true, { forward: true });
   pop.on('blur', () => hide()); // клик мимо — закрыть
   pop.on('closed', () => { pop = null; });
   if (!main.eqpopHooked) {
@@ -72,6 +75,7 @@ async function open(main, rect, payload) {
 function hide() {
   if (!pop || pop.isDestroyed() || !pop.isVisible()) return;
   closedAt = Date.now();
+  pop.setIgnoreMouseEvents(true, { forward: true });
   pop.hide();
   notify(false);
 }
@@ -89,10 +93,14 @@ function refresh() {
   if (pop && !pop.isDestroyed() && pop.isVisible()) pop.webContents.send('eqpop:refresh');
 }
 
+function hover(on) {
+  if (pop && !pop.isDestroyed()) pop.setIgnoreMouseEvents(!on, { forward: true });
+}
+
 function init(cb) { notify = cb; }
 
 function destroy() {
   if (pop && !pop.isDestroyed()) pop.destroy();
 }
 
-module.exports = { toggle, hide, refresh, init, destroy };
+module.exports = { toggle, hide, refresh, hover, init, destroy };
