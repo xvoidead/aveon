@@ -111,4 +111,5 @@ contextBridge.exposeInMainWorld('tishe', {
     onThumb: (cb) => on('thumb', cb),
   },
   openExternal: (url) => ipcRenderer.send('open:external', url),
+  copy: (text) => call('clipboard:write', text),
 });

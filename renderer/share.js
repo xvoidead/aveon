@@ -48,7 +48,7 @@ function findShareCode(text, { loose = false } = {}) {
 const prettyCode = (code) => `${code.slice(0, 4)}-${code.slice(4)}`;
 
 async function copyText(text) {
-  try { await navigator.clipboard.writeText(text); return true; } catch { return false; }
+  try { await api.copy(text); return true; } catch { return false; } // navigator.clipboard в окне запрещён — см. main.js
 }
 
 // ---- отправить ----

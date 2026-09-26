@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, shell, session, protocol, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, shell, session, protocol, Menu, clipboard } = require('electron');
 const fs = require('fs');
 const path = require('path');
 const { Readable } = require('stream');
@@ -401,6 +401,8 @@ function registerIpc() {
   }));
   ipcMain.on('duck:level', (e, level) => duck.setDuck(level));
   ipcMain.on('open:external', (e, url) => { if (/^https?:\/\//.test(url)) shell.openExternal(url); });
+  // Буфер обмена — через главный процесс: navigator.clipboard в окне упирается в запрет разрешений (allowMicOnly)
+  handle('clipboard:write', (text) => { clipboard.writeText(String(text ?? '').slice(0, 1024 * 1024)); return true; });
   ipcMain.on('win', (e, action) => {
     if (!win) return;
     if (action === 'min') win.minimize();

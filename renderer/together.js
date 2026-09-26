@@ -207,7 +207,7 @@ function renderTogether() {
     ${r.connected ? '' : '<p class="together-note warn">Связь пропала, переподключаюсь…</p>'}
     <button class="btn danger together-wide" id="tg-leave">Выйти из комнаты</button>`;
   $('#tg-copy').onclick = async () => {
-    try { await navigator.clipboard.writeText(r.code); toast('Код скопирован'); } catch { toast(`Код комнаты: ${r.code}`); }
+    if (await copyText(r.code)) toast('Код скопирован'); else toast(`Код комнаты: ${r.code}`); // share.js
   };
   $('#tg-leave').onclick = async () => {
     await api.together.leave();
