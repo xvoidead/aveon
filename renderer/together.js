@@ -312,3 +312,21 @@ document.addEventListener('keydown', (e) => {
 // после перезапуска окна (dev) — вернуть состояние румы
 renderTogetherChip();
 api.together.status().then((r) => { Together.room = r; renderTogetherChip(); }).catch(() => {});
+
+// ---- плеер снизу или сверху: плашка румы — внутри плашки звонка, одной капсулой ----
+// Экономит место: слева рума (лица или значок), справа — звонок. Не в звонке — только рума.
+// Плашку звонка убрали в настройках (#discord скрыт) — рума остаётся на своём месте.
+const chipHome = { parent: togetherBtn.parentElement, next: togetherBtn.nextElementSibling };
+function placeTogetherChip() {
+  const call = $('#discord');
+  const html = document.documentElement.classList;
+  const dock = html.contains('dock-bottom') || html.contains('dock-top');
+  const inside = togetherBtn.parentElement === call;
+  if (dock && call && !call.hidden) {
+    if (!inside) call.prepend(togetherBtn);
+  } else if (inside) {
+    chipHome.parent.insertBefore(togetherBtn, chipHome.next);
+  }
+}
+new MutationObserver(placeTogetherChip).observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+placeTogetherChip();

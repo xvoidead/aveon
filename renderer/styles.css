@@ -1815,3 +1815,15 @@ html:is(.dock-bottom, .dock-top) .call-head { min-width: 0; }
 .tab-in-r { animation: tab-in-r .3s cubic-bezier(.2, .8, .2, 1) both; }
 .tab-in-l { animation: tab-in-l .3s cubic-bezier(.2, .8, .2, 1) both; }
 @media (prefers-reduced-motion: reduce) { .source-ink { transition: none; } .tab-in-r, .tab-in-l { animation: none; } }
+
+/* ---------- плеер снизу/сверху: рума и звонок — одна капсула (together.js → placeTogetherChip) ---------- */
+html:is(.dock-bottom, .dock-top) .call:has(> .together-chip) { display: flex; gap: 0; padding: 0 5px 0 3px; }
+html:is(.dock-bottom, .dock-top) .call.off:has(> .together-chip) { display: flex; padding: 0 3px; }
+html:is(.dock-bottom, .dock-top) .call.off > .call-head { display: none; }
+html:is(.dock-bottom, .dock-top) .call > .together-chip {
+  flex: none; height: 28px; margin: 0; max-width: 200px; padding: 0 12px 0 8px; border-radius: 99px;
+}
+html:is(.dock-bottom, .dock-top) .call > .together-chip.idle { width: 28px; height: 28px; padding: 0; background: transparent; }
+html:is(.dock-bottom, .dock-top) .call > .together-chip.idle:hover { background: var(--rivet-2); }
+/* тонкий разделитель между румой и звонком */
+html:is(.dock-bottom, .dock-top) .call > .together-chip + .call-head { margin-left: 8px; padding-left: 12px; border-left: 1px solid var(--rivet-2); }

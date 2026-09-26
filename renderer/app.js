@@ -1023,6 +1023,7 @@ function renderCall(talking) {
   el.className = `call-state ${cls}`;
   el.title = broken ? duck.error : '';
   $('#discord').title = broken ? duck.error : text; // в узком окне надпись спрятана — видна при наведении
+  if (typeof placeTogetherChip === 'function') placeTogetherChip(); // together.js: плашку звонка могли скрыть или показать
 
   if (!inCall || IS_MOBILE) return; // шкалы скрыты — считать их незачем
 
