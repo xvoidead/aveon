@@ -267,6 +267,7 @@ const api = {
     dismiss: call((id) => friends.dismiss(id)),
     knock: call((id) => friends.knock(id)),
     messages: call((id, before) => friends.messages(id, before)),
+    profile: call((id) => friends.profile(id)),
     send: call((id, body) => friends.send(id, body)),
     unknock: call((id) => friends.unknock(id)),
     avatar: call((userId, at) => account.avatarOf(userId, at)),

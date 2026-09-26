@@ -343,3 +343,20 @@ def test_messages(client):
     assert client.get("/api/friends", headers=h(t2)).json()["friends"][0]["unread"] == 0
     assert client.get(f"/api/messages/{id1}?before={msgs[1]['id']}", headers=h(t2)).json()["messages"][0]["text"] == "послушай"
     assert client.get(f"/api/messages/{id1}", headers=h(t3)).status_code == 403
+
+
+def test_friend_profile(client):
+    t1, l1 = register(client)
+    t2, l2 = register(client)
+    id1, id2 = uid(client, t1), uid(client, t2)
+    assert client.get(f"/api/friends/{id2}/profile", headers=h(t1)).status_code == 403
+    client.post("/api/friends", json={"login": l2}, headers=h(t1))
+    client.post("/api/friends", json={"login": l1}, headers=h(t2))
+    tr = lambda i, a: {"t": {"id": f"ym:{i}", "title": f"t{i}", "artist": a, "ref": {}}, "sec": i * 100, "plays": i, "m": {}}
+    for dev, data in (("pc", {"v": 1, "days": {"2026-01-01": 300}, "tracks": {"ym:1": tr(1, "A, B"), "ym:2": tr(2, "B")}}),
+                      ("laptop", {"v": 1, "days": {"2026-01-02": 200}, "tracks": {"ym:2": tr(2, "B")}})):
+        client.put(f"/api/sync/stats/{dev}", json={"data": data, "base_rev": None}, headers=h(t2))
+    p = client.get(f"/api/friends/{id2}/profile", headers=h(t1)).json()
+    assert p["user"]["login"] == l2 and p["stats"]["total"] == 500 and p["stats"]["days"] == 2
+    assert p["stats"]["tracks"][0]["track"]["id"] == "ym:2" and p["stats"]["tracks"][0]["sec"] == 400
+    assert p["stats"]["artists"][0] == {"name": "B", "sec": 500}

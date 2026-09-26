@@ -352,6 +352,7 @@ function registerIpc() {
   handle('fr:dismiss', (id) => friends.dismiss(id));
   handle('fr:knock', (id) => friends.knock(id));
   handle('fr:messages', (id, before) => friends.messages(id, before));
+  handle('fr:profile', (id) => friends.profile(id));
   handle('fr:send', (id, body) => friends.send(id, body));
   handle('fr:unknock', (id) => friends.unknock(id));
   handle('fr:avatar', (userId, at) => account.avatarOf(userId, at));

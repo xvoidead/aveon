@@ -1379,3 +1379,38 @@ html.mobile .wave-hero { margin: 4px 0 14px; padding: 18px 16px 16px; }
 html.mobile .wave-now b { font-size: 20px; }
 html.mobile .wave-go { width: 64px; height: 64px; }
 html.mobile .wave-row > span { width: 100%; }
+
+/* ---------- профиль друга ---------- */
+.fp-body { gap: 14px; max-height: min(560px, calc(100vh - 220px)); }
+.fp-hero { display: flex; align-items: center; gap: 14px; }
+.fp-avatar { width: 64px; height: 64px; font-size: 24px; }
+.fp-avatar .fr-live { width: 14px; height: 14px; right: 2px; bottom: 2px; }
+.fp-who { min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.fp-who h2 { margin: 0; font: 700 20px var(--display); letter-spacing: -0.02em; text-transform: none; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fp-who small { color: var(--text-3); font-size: 12px; }
+.fp-actions { display: flex; align-items: center; gap: 8px; }
+.fp-actions .btn { height: 34px; padding: 0 13px; font-size: 13px; }
+.fp-actions .btn svg { width: 16px; height: 16px; }
+.fp-actions .icon-btn { margin-left: auto; }
+.fr-unread.static { position: static; margin-left: 2px; }
+.fp-now { display: grid; grid-template-columns: 56px 1fr; gap: 6px 12px; padding: 12px; border-radius: 14px; background: var(--rivet); }
+.fp-now.live { background: color-mix(in srgb, var(--voice) 12%, var(--rivet)); }
+.fp-now-cover { width: 56px; height: 56px; border-radius: 10px; overflow: hidden; display: grid; place-items: center; background: var(--rivet-2); color: var(--text-3); }
+.fp-now-cover img { width: 100%; height: 100%; object-fit: cover; }
+.fp-now-text { min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.fp-now-text small { color: var(--text-3); font-size: 11px; }
+.fp-now.live .fp-now-text small { color: var(--voice); }
+.fp-now-text b, .fp-now-text span:not(.fr-bar) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-transform: none; }
+.fp-now-text b { font-weight: 600; }
+.fp-now-text span:not(.fr-bar) { color: var(--text-2); font-size: 12px; }
+.fp-now-actions { grid-column: 1 / -1; display: flex; gap: 6px; }
+.fp-quiet { margin: 0; }
+.fp-nums { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.fp-nums div { display: flex; flex-direction: column; gap: 2px; padding: 10px; border-radius: 12px; background: var(--rivet); }
+.fp-nums b { font: 700 15px var(--display); }
+.fp-nums small { color: var(--text-3); font-size: 11px; }
+.fp-artists { display: flex; flex-wrap: wrap; gap: 6px; }
+.fp-artists span { padding: 4px 10px; border-radius: 99px; background: var(--rivet); font-size: 12px; text-transform: none; }
+.fp-tracks { display: flex; flex-direction: column; gap: 2px; }
+.fp-tracks .fr-track { margin: 0 -4px; }
+.fr-main { cursor: pointer; }

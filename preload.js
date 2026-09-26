@@ -89,6 +89,7 @@ contextBridge.exposeInMainWorld('tishe', {
     dismiss: (id) => call('fr:dismiss', id),
     knock: (id) => call('fr:knock', id),
     messages: (id, before) => call('fr:messages', id, before),
+    profile: (id) => call('fr:profile', id),
     send: (id, body) => call('fr:send', id, body),
     unknock: (id) => call('fr:unknock', id),
     avatar: (userId, at) => call('fr:avatar', userId, at),

@@ -102,9 +102,8 @@ function friendStatus(f) {
 
 function friendItem(f) {
   const n = f.now;
-  const canPlay = !!n?.track;
   return `<li class="fr-item">
-    <button class="fr-main" data-fr-play="${f.id}" ${canPlay ? `title="Включить у себя: ${esc(trackLine(n.track))}"` : 'tabindex="-1"'}${canPlay ? '' : ' disabled'}>
+    <button class="fr-main" data-fr-open="${f.id}" title="Профиль ${esc(f.name)}">
       ${frAvatarHtml(f, !!n?.playing)}
       <span class="fr-text"><b>${esc(f.name)}${f.in_room ? ' <em class="fr-tag">в руме</em>' : ''}</b>${friendStatus(f)}</span>
     </button>
@@ -170,6 +169,7 @@ function renderFriends() {
   if (friendsEl.hidden) return;
   requestAnimationFrame(placeFriends);
   if (Chat.id) { renderChat(); return; }
+  if (FP.id) { renderFriendProfile(); return; }
   const d = Friends.data;
   const login = state.account.login || '';
   const typed = $('#fr-login', friendsEl)?.value || '';
@@ -244,12 +244,7 @@ function bindFriends() {
   };
   $$('[data-fr-accept]', friendsEl).forEach((b) => { b.onclick = () => friendAction(+b.dataset.frAccept, 'accept'); });
   $$('[data-fr-remove]', friendsEl).forEach((b) => { b.onclick = () => friendAction(+b.dataset.frRemove, 'remove'); });
-  $$('[data-fr-play]', friendsEl).forEach((b) => {
-    b.onclick = () => {
-      const f = friendById(+b.dataset.frPlay);
-      if (f?.now) playFriend(f, !f.now.playing);
-    };
-  });
+  $$('[data-fr-open]', friendsEl).forEach((b) => { b.onclick = () => openFriendProfile(+b.dataset.frOpen); });
   $$('[data-fr-chat]', friendsEl).forEach((b) => { b.onclick = () => openChat(+b.dataset.frChat); });
   $$('[data-fr-room]', friendsEl).forEach((b) => {
     b.onclick = () => {
@@ -287,7 +282,10 @@ async function friendAction(id, action) {
 function friendMenu(f, anchor) {
   if (!f) return;
   const n = f.now;
-  const items = [{ label: 'Написать', icon: 'i-chat', onClick: () => openChat(f.id) }, { sep: true }];
+  const items = [
+    ...(FP.id === f.id ? [] : [{ label: 'Профиль', icon: 'i-user', onClick: () => openFriendProfile(f.id) }]),
+    { label: 'Написать', icon: 'i-chat', onClick: () => openChat(f.id) }, { sep: true },
+  ];
   if (n?.track) {
     if (n.playing) items.push({ label: 'Включить с того же места', icon: 'i-play', onClick: () => playFriend(f, false) });
     items.push({ label: n.playing ? 'Включить с начала' : `Включить «${n.track.title}»`, icon: n.playing ? 'i-prev' : 'i-play', onClick: () => playFriend(f, true) });
@@ -515,6 +513,7 @@ api.account.onEvent(() => {
   Friends.seenMsg.clear();
   Friends.msgPrimed = false;
   Chat.id = null;
+  FP.id = null;
   frAvatars.clear();
   if (login) { sendNow(); loadFriends(); } else { closeFriends(); renderFriendsBadge(); }
 });
@@ -694,3 +693,140 @@ function sendTrackMenu(t, pos) {
 setInterval(() => {
   if (Chat.id && !friendsEl.hidden && !document.hidden) loadChat();
 }, CHAT_POLL);
+
+// ---------- профиль друга ----------
+// Открывается кликом по другу, в той же панели. Что слушает сейчас, кнопки «написать» и «рума»,
+// сводка его статистики с сервера: сколько слушал, любимые треки и артисты (треки включаются у себя)
+
+const FP = { id: null, data: null, error: '', loading: false };
+
+function openFriendProfile(id) {
+  if (!friendById(id)) return;
+  FP.id = id;
+  FP.data = null;
+  FP.error = '';
+  renderFriends();
+  loadFriendProfile();
+}
+
+function closeFriendProfile() {
+  FP.id = null;
+  renderFriends();
+}
+
+async function loadFriendProfile() {
+  const id = FP.id;
+  if (!id || FP.loading) return;
+  FP.loading = true;
+  try {
+    const d = await api.friends.profile(id);
+    if (FP.id !== id) return;
+    FP.data = d;
+    FP.fetchedAt = performance.now();
+    FP.error = '';
+  } catch (e) {
+    if (FP.id === id) FP.error = e.message;
+  } finally {
+    FP.loading = false;
+  }
+  renderFriends();
+}
+
+function fpDuration(sec) {
+  const h = Math.floor(sec / 3600), m = Math.round((sec % 3600) / 60);
+  if (!h) return `${m} мин`;
+  return m ? `${h} ч ${m} мин` : `${h} ч`;
+}
+
+function fpDate(sec) {
+  return new Date(sec * 1000).toLocaleDateString('ru', { day: 'numeric', month: 'long', year: 'numeric' });
+}
+
+function fpCover(t, cls = 'fr-track-cover') {
+  const img = t?.cover && /^https?:/i.test(t.cover) ? `<img src="${esc(t.cover)}" alt="">` : '<span>♪</span>';
+  return `<span class="${cls}">${img}</span>`;
+}
+
+function renderFriendProfile() {
+  const f = friendById(FP.id);
+  if (!f) { FP.id = null; renderFriends(); return; }
+  const d = FP.data;
+  const n = f.now; // свежее из списка друзей (опрашивается чаще профиля)
+  const scroll = $('.fr-scroll', friendsEl)?.scrollTop || 0;
+  const act = roomAction(f);
+  const roomLabel = act === 'knock' ? (Friends.knocked.has(f.id) ? 'Просьба отправлена' : 'Попроситься в руму')
+    : Together.room ? 'Позвать в руму' : 'Создать руму и позвать';
+
+  let nowHtml = '';
+  if (n?.track) {
+    const state = n.playing ? 'слушает сейчас' : n.live ? 'на паузе' : `последний трек · ${friendAgo(n)}`;
+    nowHtml = `<div class="fp-now${n.playing ? ' live' : ''}">
+      ${fpCover(n.track, 'fp-now-cover')}
+      <div class="fp-now-text"><small>${esc(state)}</small><b>${esc(n.track.title)}</b><span>${esc(n.track.artist || '')}</span>
+        ${n.playing && n.track.duration ? `<span class="fr-bar"><i data-fr-bar="${f.id}" style="width:${Math.min(100, (friendPos(n) / n.track.duration) * 100).toFixed(1)}%"></i></span>` : ''}
+      </div>
+      <div class="fp-now-actions">
+        ${n.playing ? '<button class="btn primary fr-btn" id="fp-sync">С того же места</button>' : ''}
+        <button class="btn fr-btn" id="fp-start">${n.playing ? 'С начала' : 'Включить'}</button>
+      </div>
+    </div>`;
+  } else {
+    nowHtml = '<p class="together-desc fp-quiet">Сейчас ничего не слушает</p>';
+  }
+
+  let statsHtml;
+  if (!d) {
+    statsHtml = FP.error ? `<p class="together-note warn">${esc(FP.error)}</p>` : '<div class="spinner small"></div>';
+  } else {
+    const s = d.stats;
+    statsHtml = !s.total ? '<p class="together-desc">Статистики пока нет — или слушает без аккаунта на этом сервере.</p>' : `
+      <div class="fp-nums">
+        <div><b>${esc(fpDuration(s.month))}</b><small>в этом месяце</small></div>
+        <div><b>${esc(fpDuration(s.total))}</b><small>всего</small></div>
+        <div><b>${s.days}</b><small>${plural(s.days, 'день', 'дня', 'дней')} с музыкой</small></div>
+      </div>
+      ${s.artists.length ? `<h3 class="fr-sub">Любимые артисты</h3>
+        <div class="fp-artists">${s.artists.map((a) => `<span title="${esc(fpDuration(a.sec))}">${esc(a.name)}</span>`).join('')}</div>` : ''}
+      ${s.tracks.length ? `<h3 class="fr-sub">Любимые треки</h3>
+        <div class="fp-tracks">${s.tracks.map((x, i) => `<button class="fr-track" data-fp-play="${i}" title="Включить у себя">
+          ${fpCover(x.track)}
+          <span class="fr-track-text"><b>${esc(x.track.title)}</b><small>${esc(x.track.artist || '')} · ${x.plays} ${plural(x.plays, 'раз', 'раза', 'раз')}</small></span>
+          <svg><use href="#i-play"/></svg></button>`).join('')}</div>` : ''}`;
+  }
+
+  friendsEl.innerHTML = `
+    <div class="fr-chat-head">
+      <button class="icon-btn small" id="fp-back" aria-label="К друзьям" title="К друзьям"><svg><use href="#i-chevron-l"/></svg></button>
+      <span class="fr-text"><b>Профиль</b></span>
+    </div>
+    <div class="fr-scroll fp-body">
+      <div class="fp-hero">
+        ${frAvatarHtml(f, !!n?.playing).replace('fr-avatar', 'fr-avatar fp-avatar')}
+        <div class="fp-who">
+          <h2>${esc(f.name)}${f.in_room ? ' <em class="fr-tag">в руме</em>' : ''}</h2>
+          <small>@${esc(f.login)}${f.since ? ` · друзья с ${esc(fpDate(f.since))}` : ''}</small>
+        </div>
+      </div>
+      <div class="fp-actions">
+        <button class="btn primary" id="fp-chat"><svg><use href="#i-chat"/></svg>Написать${f.unread ? ` <i class="fr-unread static">${f.unread}</i>` : ''}</button>
+        <button class="btn" id="fp-room"${act === 'knock' && Friends.knocked.has(f.id) ? ' disabled' : ''}><svg><use href="#i-${act === 'knock' ? 'enter' : 'together'}"/></svg>${esc(roomLabel)}</button>
+        <button class="icon-btn small" id="fp-more" aria-label="Ещё" aria-haspopup="menu"><svg><use href="#i-more"/></svg></button>
+      </div>
+      ${nowHtml}
+      ${statsHtml}
+    </div>`;
+  $('.fr-scroll', friendsEl).scrollTop = scroll;
+  const on = (sel, fn) => { const el = $(sel, friendsEl); if (el) el.onclick = fn; };
+  on('#fp-back', closeFriendProfile);
+  on('#fp-chat', () => openChat(f.id));
+  on('#fp-room', () => (act === 'knock' ? knockFriend(f) : inviteFriend(f)));
+  on('#fp-more', (e) => friendMenu(f, e.currentTarget));
+  on('#fp-sync', () => playFriend(f, false));
+  on('#fp-start', () => playFriend(f, true));
+  $$('[data-fp-play]', friendsEl).forEach((b) => {
+    b.onclick = () => {
+      const x = FP.data?.stats.tracks[+b.dataset.fpPlay];
+      if (x) { playShared(x.track); toast(`Включаю «${x.track.title}»`); }
+    };
+  });
+}

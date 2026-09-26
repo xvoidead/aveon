@@ -271,3 +271,75 @@ def now_put(body: NowPlaying, me: Me):
             (me.user_id, track, int(body.playing), body.pos, now_ms()),
         )
     return {"ok": True}
+
+
+# ---------- профиль друга ----------
+# Сводка по статистике прослушивания, которую плееры и так синхронизируют (docs kind=stats, по компьютеру).
+# Отдаётся только друзьям и только сводка: сколько слушал и что чаще всего
+
+TOP = 8
+
+
+@router.get("/api/friends/{user_id}/profile")
+def friends_profile(user_id: int, me: Me):
+    month = time.strftime("%Y-%m")
+    with db.tx() as conn:
+        if not are_friends(conn, me.user_id, user_id):
+            raise HTTPException(403, "Профиль виден только друзьям")
+        u = conn.execute(
+            "SELECT u.id, u.login, u.name, u.avatar_at, u.created, f.since FROM users u "
+            "JOIN friends f ON f.friend_id = u.id AND f.user_id = ? WHERE u.id = ?",
+            (me.user_id, user_id),
+        ).fetchone()
+        docs = conn.execute("SELECT data FROM docs WHERE user_id = ? AND kind = 'stats'", (user_id,)).fetchall()
+        np = conn.execute("SELECT track, playing, pos, at FROM nowplaying WHERE user_id = ?", (user_id,)).fetchone()
+
+    total = month_sec = 0.0
+    days: set[str] = set()
+    tracks: dict[str, dict] = {}
+    for d in docs:
+        try:
+            data = json.loads(d["data"])
+        except ValueError:
+            continue
+        for day, sec in (data.get("days") or {}).items():
+            if isinstance(sec, (int, float)) and sec > 0:
+                total += sec
+                days.add(day)
+                if day.startswith(month):
+                    month_sec += sec
+        for key, t in (data.get("tracks") or {}).items():
+            if not isinstance(t, dict) or not isinstance(t.get("t"), dict):
+                continue
+            cur = tracks.setdefault(key, {"track": t["t"], "sec": 0.0, "plays": 0})
+            cur["sec"] += float(t.get("sec") or 0)
+            cur["plays"] += int(t.get("plays") or 0)
+
+    artists: dict[str, float] = {}
+    for t in tracks.values():
+        for name in str(t["track"].get("artist") or "").split(","):
+            name = name.strip()
+            if name:
+                artists[name] = artists.get(name, 0) + t["sec"]
+
+    def slim(t: dict) -> dict:
+        keep = ("id", "source", "title", "artist", "album", "duration", "cover", "link", "ref")
+        return {k: t[k] for k in keep if k in t}
+
+    top = sorted(tracks.values(), key=lambda x: -x["sec"])[:TOP]
+    t = now_ms()
+    now = None
+    if np:
+        live = t - np["at"] < LIVE_FOR * 1000
+        now = {"track": json.loads(np["track"]), "playing": bool(np["playing"]) and live, "pos": np["pos"], "at": np["at"], "live": live}
+    return {
+        "user": person(u) | {"since": u["since"], "created": u["created"]},
+        "now": now,
+        "in_room": user_id in in_rooms(),
+        "stats": {
+            "total": round(total), "month": round(month_sec), "days": len(days),
+            "tracks": [{"track": slim(x["track"]), "sec": round(x["sec"]), "plays": x["plays"]} for x in top],
+            "artists": [{"name": n, "sec": round(s)} for n, s in sorted(artists.items(), key=lambda x: -x[1])[:TOP]],
+        },
+        "server_now": t,
+    }
