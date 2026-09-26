@@ -641,17 +641,39 @@ async function loadLyrics(track) {
   }
 }
 
+// Когда слово допето: начало следующего слова, иначе начало следующей строки. Долгую паузу после
+// слова не растягиваем — буквы заливаются не дольше 1,2 с
+function wordEnd(lines, li, wi) {
+  const l = lines[li];
+  const next = l.words[wi + 1]?.t ?? lines[li + 1]?.t ?? l.words[wi].t + 1;
+  return Math.min(next, l.words[wi].t + 1.2);
+}
+
 // Подсветка текущей строки и плавная прокрутка к ней
-// Слова активной строки: спетые подсвечиваются. Меняем DOM, только когда спето новое слово
+// Слова активной строки: спетые подсвечиваются. Если у текста есть время слов (richsync Musixmatch),
+// текущее слово заливается по буквам (--p от 0 до 1) — каждый кадр, остальное меняем только по событию
 function syncWords(force) {
   const l = ly.lines[ly.active];
   if (!l?.words) return;
   const t = audio.currentTime + 0.05;
   let n = 0;
   while (n < l.words.length && l.words[n].t <= t) n++;
-  if (n === ly.sung && !force) return;
-  ly.sung = n;
-  $$('.w', $(`.lyric[data-l="${ly.active}"]`, $('#lyrics-body'))).forEach((w, i) => w.classList.toggle('sung', i < n));
+  const letters = window.LOOK?.lyricsLetters !== false; // look.js
+  const nodes = $$('.w', $(`.lyric[data-l="${ly.active}"]`, $('#lyrics-body')));
+  if (n !== ly.sung || force) {
+    ly.sung = n;
+    nodes.forEach((w, i) => w.classList.toggle('sung', i < n));
+  }
+  // текущее слово — последнее начатое, пока не допето
+  const cur = n - 1;
+  nodes.forEach((w, i) => {
+    const on = letters && i === cur && t < wordEnd(ly.lines, ly.active, cur);
+    w.classList.toggle('now', on);
+    if (on) {
+      const s = l.words[cur].t;
+      w.style.setProperty('--p', Math.min(1, Math.max(0, (t - s) / Math.max(0.05, wordEnd(ly.lines, ly.active, cur) - s))).toFixed(3));
+    }
+  });
 }
 
 function syncLyrics(force = false) {
