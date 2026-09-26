@@ -22,7 +22,7 @@ from . import db, security
 
 SESSION_TTL = 90 * 24 * 3600  # сессия живёт 90 дней с последнего запроса
 MAX_DOC = 5 * 1024 * 1024  # один синхронизируемый документ — до 5 МБ
-KINDS = {"albums", "settings", "stats"}
+KINDS = {"albums", "settings", "stats", "keys"}  # keys — ключи сервисов, зашифрованные на клиенте
 LOGIN_RE = re.compile(r"^[a-z0-9_.-]{3,32}$")
 KEY_RE = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
 

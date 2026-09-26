@@ -198,9 +198,18 @@ function profileHeroHtml() {
     </div>`;
 }
 
+// Ключи сервисов шифруются паролем от авеона (src/account.js) — без повторного входа ключа шифрования нет
+function keysNote() {
+  const k = state.account.keys;
+  if (k === 'nokey') return '<p class="pf-note pf-keys warn">Чтобы ключи сервисов синхронизировались, выйди и войди снова — один раз: они шифруются твоим паролем.</p>';
+  if (k === 'badkey') return '<p class="pf-note pf-keys warn">Ключи сервисов на сервере зашифрованы другим паролем — его меняли на другом компьютере. Выйди и войди с новым паролем.</p>';
+  return '<p class="pf-note pf-keys">Ключи сервисов хранятся на сервере зашифрованными твоим паролем — сервер их не видит.</p>';
+}
+
 function accountHtml() {
   return `<h2 class="pf-h">Аккаунт</h2>
-    <p class="muted pf-note">Альбомы, эквалайзер, настройки бочки и статистика одинаковые на всех твоих компьютерах. Токены сервисов, папки с музыкой и микрофон остаются только здесь.</p>
+    <p class="muted pf-note">Альбомы, эквалайзер, настройки бочки, статистика и ключи сервисов (Яндекс Музыка, SoundCloud, Spotify) одинаковые на всех твоих компьютерах. Папки с музыкой и микрофон остаются только здесь.</p>
+    ${keysNote()}
     <div class="row-actions">
       <button class="btn" id="pf-password">Сменить пароль</button>
       <button class="btn" id="pf-logout">Выйти</button>

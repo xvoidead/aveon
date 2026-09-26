@@ -1873,3 +1873,5 @@ img.emoji { display: inline-block; width: 1.2em; height: 1.2em; margin: 0 .04em;
 .msg-menu-reacts .emoji { width: 22px; height: 22px; margin: 0; vertical-align: 0; }
 .msg-menu .menu-item { width: 100%; }
 @media (prefers-reduced-motion: reduce) { .msg-menu { animation: none; } }
+.pf-keys { margin-top: -4px; font-size: 12px; color: var(--text-3); }
+.pf-keys.warn { color: var(--amber); }

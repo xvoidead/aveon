@@ -225,6 +225,7 @@ function registerIpc() {
     config.set(patch);
     if (patch.duck?.targets) duck.setTargets(config.get().duck.targets);
     account.settingsChanged(patch);
+    if (patch.sc || patch.sp) account.keysChanged(); // client_id сервисов — тоже ключи
     if (patch.discord) discord.settingsChanged();
     if (patch.friends) friends.settingsChanged();
     if (patch.cache) cache.settingsChanged();
@@ -239,6 +240,7 @@ function registerIpc() {
     config.setSecret(key, value);
     if (key === 'ym.token') ym.reset();
     matchCache.clear();
+    account.keysChanged(); // ключи сервисов синхронизируются между компьютерами
     return config.publicView();
   });
 
@@ -269,8 +271,8 @@ function registerIpc() {
   handle('share:get', (code) => account.shareGet(code));
 
   handle('sc:discover', () => sc.discoverClientId());
-  handle('sp:connect', () => sp.connect());
-  handle('sp:disconnect', () => sp.disconnect());
+  handle('sp:connect', async () => { const r = await sp.connect(); account.keysChanged(); return r; });
+  handle('sp:disconnect', () => { const r = sp.disconnect(); account.keysChanged(); return r; });
   handle('sp:status', () => sp.status());
   handle('sp:redirect', () => sp.REDIRECT);
 
@@ -534,6 +536,7 @@ app.whenReady().then(() => {
   account.init((ev) => {
     if (ev.changed?.albums) local.allowFiles(albums.localPaths());
     if (ev.changed?.settings) duck.setTargets(config.get().duck.targets);
+    if (ev.changed?.keys) { ym.reset(); matchCache.clear(); } // пришли ключи сервисов с другого компьютера
     send('account:event', ev);
   });
 });
