@@ -711,7 +711,7 @@ function buildChat(f) {
     if (!m || m.pending || e.target.closest('button')) return;
     window.getSelection()?.removeAllRanges(); // двойной клик выделяет слово — не нужно
     if (m.mine) { if (!m.album) startEdit(m); return; }
-    heartBurst(e.target.closest('[data-mid]'));
+    if (m.my !== '❤️') heartBurst(e.target.closest('[data-mid]')); // снимаем — без вспышки
     reactMsg(m, '❤️');
   };
   list.oncontextmenu = (e) => {
@@ -1087,11 +1087,18 @@ async function saveEdit(text) {
 }
 
 // большое сердечко над сообщением на миг — как в Instagram
+// Сердечко кладём в ленту поверх сообщения, а не внутрь него: ответ сервера перерисовывает
+// сообщение (реакция появилась) — и вспышка обрывалась на середине
 function heartBurst(node) {
-  if (!node) return;
+  const list = node?.closest('.fr-msgs');
+  if (!list) return;
+  list.querySelectorAll('.msg-heart').forEach((x) => x.remove());
   const h = document.createElement('span');
   h.className = 'msg-heart';
   h.innerHTML = emo('❤️');
-  node.append(h);
-  setTimeout(() => h.remove(), 700);
+  h.style.left = `${node.offsetLeft + node.offsetWidth / 2}px`;
+  h.style.top = `${node.offsetTop + node.offsetHeight / 2}px`;
+  list.append(h);
+  h.addEventListener('animationend', () => h.remove(), { once: true });
+  setTimeout(() => h.remove(), 900);
 }

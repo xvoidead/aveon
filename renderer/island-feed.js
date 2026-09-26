@@ -84,7 +84,7 @@ function islandNotify(text, kind = 'info', person = null) {
   }
 
   // ---- друзья: кто слушает прямо сейчас, и кто из них только что включил новый трек ----
-  const heard = new Map(); // id друга → id его трека
+  const heard = new Map(); // id друга → { playing, said }: слушает ли и когда о нём последний раз сказали
 
   // Состояние уходит в остров до 30 раз в секунду — картинки туда не гоняем. Остров получает
   // аватарку один раз (avatars: {ключ: data:…}), дальше — только ключ. Раз в полминуты шлём заново:
@@ -102,11 +102,21 @@ function islandNotify(text, kind = 'info', person = null) {
   function friendsNow() {
     if (!islandOpt('friends')) return null;
     const list = (Friends.data?.friends || []).filter((f) => f.now?.playing);
+    // «друг слушает» — только когда начал после тишины, не чаще раза в 10 минут на друга и не про тех,
+    // кто с тобой в руме (раньше — на каждую смену трека у каждого друга)
+    const t = Date.now();
+    const inRoom = new Set((Together.room?.members || []).map((m) => m.user));
     for (const f of list) {
-      const key = f.now.track.id || `${f.now.track.title}|${f.now.track.artist}`;
-      if (heard.has(f.id) && heard.get(f.id) !== key) islandNotify(`${firstName(f.name)} слушает «${f.now.track.title}»`, 'friend', f);
-      heard.set(f.id, key);
+      const was = heard.get(f.id);
+      if (was && !was.playing && t - was.said > 10 * 60 * 1000 && !inRoom.has(f.id)) {
+        islandNotify(`${firstName(f.name)} слушает «${f.now.track.title}»`, 'friend', f);
+        was.said = t;
+      }
+      heard.set(f.id, { playing: true, said: was ? was.said : t }); // уже слушал, когда плеер открыли — без уведомления
     }
+    for (const [id, h] of heard) if (!list.some((f) => f.id === id)) h.playing = false;
+    // кто сейчас молчит — тоже запоминаем: когда включит, это «начал после тишины»
+    for (const f of Friends.data?.friends || []) if (!heard.has(f.id)) heard.set(f.id, { playing: false, said: 0 });
     const room = Together.room;
     return {
       live: list.slice(0, 4).map((f) => ({ name: f.name, letter: (f.name || '?').trim()[0]?.toUpperCase() || '?', title: f.now.track.title || '', av: avatarKey(f) })),
@@ -175,7 +185,9 @@ function islandNotify(text, kind = 'info', person = null) {
 
   // «Слушать вместе»: кто-то зашёл или вышел
   api.together.onEvent((ev) => {
-    if (ev.type === 'members' && ev.joined?.length) islandNotify(`${ev.joined.map((m) => firstName(m.name || 'друг')).join(', ')} — в руме`, 'together');
+    // сервер присылает имя строкой (together.py: joined / left) — раньше тут был .map и падало
+    if (ev.type === 'members' && ev.joined) islandNotify(`${firstName(ev.joined)} — в руме`, 'together');
+    if (ev.type === 'members' && ev.left) islandNotify(`${firstName(ev.left)} вышел из румы`, 'together');
   });
 
   api.island.onAction((a) => {
