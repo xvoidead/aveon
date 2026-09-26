@@ -4,7 +4,7 @@
 // tray.js, hotkeys.js, livewall.js. Общие глобальные: state, api, $, $$, esc, toast, saveCfg, IS_MOBILE.
 
 const DESK_DEFAULTS = {
-  island: { enabled: true, pos: 'top', onlyAway: true, overFullscreen: false, hideInGames: false, lyrics: true, friends: true, notify: true, pulse: true, rainbow: false, motion: 'music', bars: true, spin: true },
+  island: { enabled: true, pos: 'top', onlyAway: true, hideInGames: false, lyrics: true, friends: true, notify: true, pulse: true, rainbow: false, motion: 'music', bars: true, spin: true },
   mini: { onMinimize: false, top: true, opacity: 100, lyrics: true },
   tray: { enabled: true, closeToTray: false },
   livewall: { enabled: false, style: 'both', title: true, dim: 45 },
@@ -77,7 +77,6 @@ function deskSection() {
       <div class="field"><label>Где</label><div class="ctl">${dSeg('island', 'pos', [['top', 'Сверху'], ['left', 'Слева сверху'], ['right', 'Справа сверху'], ['bottom', 'Снизу']], i.pos)}</div></div>
       ${islPlaceHtml(i)}
       ${dSw('island', 'onlyAway', 'Только когда плеер свёрнут или не в фокусе', i.onlyAway)}
-      ${dSw('island', 'overFullscreen', 'Поверх игр и полноэкранных окон', i.overFullscreen)}
       ${dSw('island', 'hideInGames', 'Прятать, пока запущена игра', i.hideInGames)}
       ${dSw('island', 'lyrics', 'Строка текста песни, пока играет', i.lyrics)}
       ${dSw('island', 'friends', 'Друзья: кто слушает и кто в комнате', i.friends)}
