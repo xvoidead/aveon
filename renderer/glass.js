@@ -22,20 +22,14 @@ const glass = {
   strength: 1,
 };
 
-// Что делаем стеклянным и насколько: blur — матовость, scale — сила преломления (px),
+// Стеклянные только всплывающие панели: окна, меню, «Слушать вместе», уведомления. Остальной
+// интерфейс и фон не меняются. Что делаем стеклянным и насколько: blur — матовость, scale — сила преломления (px),
 // bevel — ширина выпуклой кромки (px)
 const GLASS_TARGETS = [
   ['.sheet', { blur: 14, scale: 54, bevel: 30 }],
   ['.menu', { blur: 12, scale: 36, bevel: 16 }],
   ['.together', { blur: 12, scale: 44, bevel: 22 }],
   ['.toast', { blur: 10, scale: 36, bevel: 14 }],
-  ['.search', { blur: 3, scale: 44, bevel: 20 }],
-  ['.call', { blur: 6, scale: 40, bevel: 16 }],
-  ['.pf-hero, .pf-card', { blur: 8, scale: 40, bevel: 22 }],
-  ['.me', { blur: 3, scale: 26, bevel: 12 }],
-  ['.fs-controls', { blur: 4, scale: 40, bevel: 22 }],
-  ['.head-actions .btn:not(.primary)', { blur: 3, scale: 24, bevel: 10 }],
-  ['.collections .chip:not(.active)', { blur: 3, scale: 22, bevel: 10 }],
 ];
 
 // ---- карта смещений ----
@@ -178,7 +172,6 @@ function glassEnable() {
   });
   glass.mo.observe(document.body, { childList: true, subtree: true });
   glassScan();
-  glassBackdrop(state.track?.cover);
 }
 
 function glassForget(root) {
@@ -206,13 +199,4 @@ function applyGlass() {
     for (const el of glass.els.keys()) glassApply(el);
   }
   if (ui.glass) glassEnable(); else glassDisable();
-}
-
-// ---- фон под стеклом ----
-// Стеклу нужно, что преломлять: позади всего окна — размытая обложка трека и пятна цвета палитры
-
-function glassBackdrop(cover) {
-  const bg = $('#glass-bg');
-  if (!bg) return;
-  bg.style.setProperty('--cover', cover ? `url("${String(cover).replace(/"/g, '%22')}")` : 'none');
 }

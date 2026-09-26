@@ -951,78 +951,15 @@ kbd {
 }
 
 /* ---------- liquid glass (glass.js) ---------- */
-/* Позади окна — размытая обложка и пятна палитры; панели с классом .lg преломляют то, что под ними */
-.glass-bg { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; background: var(--oak); --cover: none; }
-body:not(.liquid-glass) .glass-bg { display: none; }
-.glass-bg::before {
-  content: ""; position: absolute; inset: -15%; background: var(--cover) center / cover no-repeat;
-  filter: blur(70px) saturate(1.6) brightness(.5); opacity: .9;
-}
-.glass-bg::after {
-  content: ""; position: absolute; inset: 0;
-  background:
-    radial-gradient(38% 46% at 18% 24%, color-mix(in srgb, var(--amber) 30%, transparent), transparent 70%),
-    radial-gradient(34% 42% at 82% 78%, color-mix(in srgb, var(--voice) 20%, transparent), transparent 70%),
-    radial-gradient(30% 40% at 70% 12%, color-mix(in srgb, var(--amber) 14%, transparent), transparent 70%);
-}
-body.liquid-glass { background: transparent; }
-body.liquid-glass .stage {
-  background: radial-gradient(120% 60% at 50% 34%, color-mix(in srgb, var(--amber) calc(12% - var(--m) * 8%), transparent), transparent 70%),
-    color-mix(in srgb, var(--oak-2) 45%, transparent);
-  border-right-color: rgb(255 255 255 / .06);
-}
-body.liquid-glass .lyrics { background: color-mix(in srgb, var(--oak) 55%, transparent); backdrop-filter: blur(28px) saturate(1.3); }
-body.liquid-glass .profile { background: color-mix(in srgb, var(--oak) 50%, transparent); backdrop-filter: blur(30px) saturate(1.3); }
-body.liquid-glass .modal { background: rgb(10 7 5 / .28); }
-body.liquid-glass .row:hover { background: rgb(255 255 255 / .05); }
-body.liquid-glass .row.playing { background: rgb(255 255 255 / .08); }
-
+/* Только всплывающие панели (.lg): фон и остальной интерфейс не меняются */
+body.liquid-glass .modal { background: rgb(10 7 5 / .3); }
 .lg {
-  background: linear-gradient(135deg, rgb(255 255 255 / .09), transparent 42%), color-mix(in srgb, var(--oak-2) 34%, transparent) !important;
+  background: linear-gradient(135deg, rgb(255 255 255 / .08), transparent 40%), color-mix(in srgb, var(--oak-2) 58%, transparent) !important;
   border: 1px solid rgb(255 255 255 / .13) !important;
   box-shadow:
     inset 0 1px 0 rgb(255 255 255 / .32), inset 0 -1px 0 rgb(255 255 255 / .07),
     inset 1px 0 0 rgb(255 255 255 / .1), inset -1px 0 0 rgb(255 255 255 / .1),
     0 16px 44px rgb(0 0 0 / .32) !important;
 }
-/* большие панели с текстом — плотнее, чтобы читалось */
-.sheet.lg, .menu.lg, .together.lg, .toast.lg { background: linear-gradient(135deg, rgb(255 255 255 / .08), transparent 40%), color-mix(in srgb, var(--oak-2) 58%, transparent) !important; }
 .settings-sheet.lg .set-nav { background: rgb(0 0 0 / .12); }
 .settings-sheet.lg .sec, .lg .seg, .lg .input { background: color-mix(in srgb, var(--oak) 45%, transparent); }
-.fs-controls.lg { padding: 8px 16px; border-radius: 99px; align-self: flex-start; }
-.me.lg { background: color-mix(in srgb, var(--oak-2) 25%, transparent) !important; }
-.search.lg:focus-within { border-color: rgb(255 255 255 / .28) !important; }
-
-/* ---------- подсказка времени над полосой прогресса ---------- */
-.seek-tip {
-  position: absolute; bottom: calc(100% + 4px); padding: 3px 8px; border-radius: 7px; pointer-events: none;
-  background: var(--rivet-2); color: var(--text); font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap;
-  transform: translateX(-50%); opacity: 0; transition: opacity .12s ease;
-}
-.slider.progress:hover .seek-tip, .slider.progress.drag .seek-tip { opacity: 1; }
-.slider.progress:hover::before { height: 6px; }
-.slider.progress::before, .slider.progress .slider-fill, .slider.progress .slider-buf { transition: height .12s ease; }
-.slider.progress:hover .slider-fill, .slider.progress:hover .slider-buf { height: 6px; }
-
-/* ---------- «дальше»: следующий трек очереди внизу сцены ---------- */
-.up-next {
-  margin-top: auto; width: 100%; display: grid; grid-template-columns: 40px minmax(0, 1fr) auto; align-items: center; gap: 12px;
-  padding: 8px 12px 8px 8px; border-radius: 14px; text-align: left;
-  background: color-mix(in srgb, var(--rivet) 70%, transparent); border: 1px solid var(--rivet-2);
-  transition: background .15s ease, border-color .15s ease, opacity .25s ease, transform .25s ease;
-}
-.up-next:hover { background: var(--rivet); border-color: var(--hoop-dim); }
-.up-next[hidden] { display: grid !important; opacity: 0; transform: translateY(8px); pointer-events: none; visibility: hidden; }
-.up-next + .call { margin-top: 10px; }
-.up-next-pic { width: 40px; height: 40px; border-radius: 8px; overflow: hidden; display: grid; place-items: center; background: var(--rivet-2); color: var(--text-3); font: 500 14px var(--display); }
-.up-next-pic img { width: 100%; height: 100%; object-fit: cover; }
-.up-next-main { display: flex; flex-direction: column; min-width: 0; line-height: 1.3; }
-.up-next-main small { font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--text-3); }
-.up-next-main b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.up-next-main span { font-size: 12px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.up-next > svg { color: var(--text-3); }
-.up-next:hover > svg { color: var(--amber); }
-/* низкое окно: бочка уменьшается; в звонке место под «дальше» отдаём шкалам звонка */
-.barrel { width: min(100%, 300px, 40vh); }
-@media (max-height: 700px) { .up-next { display: none !important; } }
-@media (max-height: 900px) { .stage:has(.call:not(.off)) .up-next { display: none !important; } }

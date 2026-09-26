@@ -688,7 +688,6 @@ $('#lyrics-close').onclick = closeLyrics;
 // Вызывается из showNow при смене трека
 function onTrackShown(track) {
   applyThemeFrom(track.cover);
-  if (glass.on) glassBackdrop(track.cover); // glass.js
   if (stats.cur?.id !== track.id) statsOnTrack(track);
   if (lyricsOpen() && ly.track?.id !== track.id) loadLyrics(track);
   if (cz.trackId !== track.id) censorLoad(track); // censor.js

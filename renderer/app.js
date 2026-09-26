@@ -1662,7 +1662,7 @@ async function renderSettings() {
       <p class="sec-desc">Интерфейс написан строчными буквами. Названия треков, артистов и тексты песен тоже, но их можно оставить как есть.</p>
       <div class="field"><label>Названия треков как есть</label><div class="ctl"><label class="switch"><input type="checkbox" id="keep-titles" ${c.ui?.keepTitles ? 'checked' : ''} aria-label="Названия треков как есть"><span></span></label></div></div>
       <div class="field"><label>Liquid glass</label><div class="ctl"><label class="switch"><input type="checkbox" id="glass-on" ${c.ui?.glass ? 'checked' : ''} aria-label="Liquid glass"><span></span></label>
-        <span class="set-note">панели — стекло, которое преломляет то, что под ним</span></div></div>
+        <span class="set-note">окна, меню и уведомления — стекло, которое преломляет то, что под ним</span></div></div>
       <div class="field" ${c.ui?.glass ? '' : 'hidden'}><label for="glass-strength">Сила преломления</label><div class="ctl">
         <input id="glass-strength" type="range" min="0.2" max="1.6" step="0.1" value="${+c.ui?.glassStrength || 1}">
         <span class="val" id="glass-strength-val">${Math.round((+c.ui?.glassStrength || 1) * 100)}%</span></div></div>
