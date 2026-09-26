@@ -44,6 +44,12 @@
     <symbol id="i-list" viewBox="0 0 24 24"><path d="M9 6.5h11M9 12h11M9 17.5h11" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><circle cx="4.8" cy="6.5" r="1.3" fill="currentColor"/><circle cx="4.8" cy="12" r="1.3" fill="currentColor"/><circle cx="4.8" cy="17.5" r="1.3" fill="currentColor"/></symbol>
     <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 14.5V4m0 0L8 8m4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.5 11H7a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2h-1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
     <symbol id="i-code" viewBox="0 0 24 24"><rect x="3.5" y="6" width="17" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M7.5 10.5v3M10.5 10.5v3M13.5 10.5v3M16.5 10.5v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-device" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.5 19.5h7M12 16v3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3.8a8.2 8.2 0 1 0 0 16.4c1.1 0 1.7-.7 1.7-1.5 0-.9-.8-1.3-.8-2.2 0-.9.7-1.6 1.6-1.6h2.1a3.6 3.6 0 0 0 3.6-3.6c0-4.2-3.7-7.5-8.2-7.5z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="7.8" cy="11" r="1.2" fill="currentColor"/><circle cx="10.5" cy="7.4" r="1.2" fill="currentColor"/><circle cx="15" cy="7.8" r="1.2" fill="currentColor"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 24 24"><path d="M5 4.5h3.2l1.6 4-2.1 1.3a10 10 0 0 0 6.5 6.5l1.3-2.1 4 1.6V19a1.5 1.5 0 0 1-1.6 1.5A15.5 15.5 0 0 1 3.5 6.1 1.5 1.5 0 0 1 5 4.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5 5 6.2v5.3c0 4.3 2.9 7.8 7 9 4.1-1.2 7-4.7 7-9V6.2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m9 12 2.2 2.2L15.5 10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3.5v4M15 3.5v4M6.5 7.5h11v3.5a5.5 5.5 0 0 1-11 0zM12 16.5v4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+    <symbol id="i-keys" viewBox="0 0 24 24"><rect x="3" y="6.5" width="18" height="11" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M7 10.5h.01M10.3 10.5h.01M13.7 10.5h.01M17 10.5h.01M8 14h8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
     <symbol id="i-min" viewBox="0 0 24 24"><path d="M6 12h12" stroke="currentColor" stroke-width="1.3"/></symbol>
     <symbol id="i-max" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
   </svg>
@@ -58,7 +64,14 @@
 
   <!-- Бочка: сейчас играет. Обручи, обложка и спектр реагируют на силу эффекта (--m) -->
   <section class="stage" id="stage">
-    <div class="brand">авеон</div>
+    <!-- слева сверху: кто вошёл (профиль и статистика) и настройки -->
+    <div class="stage-top">
+      <button class="me" id="open-profile" aria-label="Профиль и статистика" aria-expanded="false">
+        <span class="me-avatar" id="me-avatar">?</span>
+        <span class="me-text"><b id="me-name"></b><small id="me-sub"></small></span>
+      </button>
+      <button class="icon-btn" id="open-settings" aria-label="Настройки" title="Настройки (Ctrl+,)"><svg><use href="#i-settings"/></svg></button>
+    </div>
 
     <div class="barrel" id="barrel">
       <canvas id="viz" class="viz"></canvas>
@@ -135,8 +148,6 @@
         <button class="source" data-view="sp">Spotify</button>
       </nav>
       <button class="icon-btn" id="open-together" aria-label="Слушать вместе" title="Слушать вместе" aria-expanded="false"><svg><use href="#i-together"/></svg><i class="badge" id="together-badge" hidden></i></button>
-      <button class="icon-btn" id="open-stats" aria-label="Статистика" title="Статистика"><svg><use href="#i-stats"/></svg></button>
-      <button class="icon-btn" id="open-settings" aria-label="Настройки"><svg><use href="#i-settings"/></svg></button>
     </div>
 
     <form class="search" id="search-form" autocomplete="off">
@@ -162,7 +173,19 @@
     <div class="tracklist" id="tracklist"></div>
     <div class="empty" id="empty" hidden></div>
 
-    <section class="stats" id="stats" hidden aria-label="Статистика"></section>
+    <!-- профиль поверх библиотеки: рисует profile.js, статистику внутри — extras.js -->
+    <section class="profile" id="profile" hidden aria-label="Профиль">
+      <div class="profile-scroll">
+        <button class="btn pf-back" id="profile-close"><svg><use href="#i-chevron-l"/></svg>К музыке</button>
+        <header class="pf-hero" id="pf-hero"></header>
+        <div class="pf-grid">
+          <section class="pf-card pf-wide" id="pf-connected"></section>
+          <section class="pf-card pf-wide stats" id="stats" aria-label="Статистика"></section>
+          <section class="pf-card" id="pf-devices"></section>
+          <section class="pf-card" id="pf-account"></section>
+        </div>
+      </div>
+    </section>
 
     <section class="lyrics" id="lyrics" hidden aria-label="Текст песни">
       <div class="lyrics-head">
@@ -222,13 +245,17 @@
     </div>
   </div>
 
+  <!-- настройки: разделы слева, содержимое раздела справа (app.js → renderSettings) -->
   <div class="modal" id="settings" hidden>
-    <div class="sheet" role="dialog" aria-label="Настройки">
-      <div class="sheet-head">
-        <h2>Настройки</h2>
-        <button class="icon-btn" id="close-settings" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button>
+    <div class="sheet settings-sheet" role="dialog" aria-labelledby="set-title">
+      <nav class="set-nav" id="set-nav" aria-label="Разделы настроек"></nav>
+      <div class="set-main">
+        <div class="sheet-head">
+          <h2 id="set-title">Настройки</h2>
+          <button class="icon-btn" id="close-settings" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button>
+        </div>
+        <div class="sheet-body" id="settings-body"></div>
       </div>
-      <div class="sheet-body" id="settings-body"></div>
     </div>
   </div>
 
@@ -337,6 +364,7 @@
   <script src="artists.js"></script>
   <script src="together.js"></script>
   <script src="share.js"></script>
+  <script src="profile.js"></script>
   <script src="presence.js"></script>
 </body>
 </html>

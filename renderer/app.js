@@ -1507,12 +1507,53 @@ window.addEventListener('drop', async (e) => {
 
 // ---------- настройки ----------
 
+// Разделы настроек: какой открыт и в каком разделе лежит каждая секция (data-sec)
+const SET_TABS = [
+  ['look', 'Звук и вид', 'i-palette'],
+  ['call', 'Звонок', 'i-phone'],
+  ['censor', 'Цензура', 'i-shield'],
+  ['services', 'Сервисы', 'i-plug'],
+  ['library', 'Папки', 'i-folder'],
+  ['keys', 'Клавиши', 'i-keys'],
+];
+const SEC_TAB = { sound: 'look', ui: 'look', duck: 'call', mic: 'call', ext: 'call', censor: 'censor', ym: 'services', sc: 'services', sp: 'services', discord: 'services', local: 'library', keys: 'keys' };
+let settingsTab = 'look';
+
 function openSettings(focus) {
+  if (focus === 'account') { openProfile(); return; } // аккаунт теперь в профиле (profile.js)
+  if (SEC_TAB[focus]) settingsTab = SEC_TAB[focus];
   renderSettings().then(() => {
-    if (focus) $(`#settings [data-sec="${focus}"]`)?.scrollIntoView({ block: 'start' });
+    if (focus && SEC_TAB[focus]) $(`#settings [data-sec="${focus}"]`)?.scrollIntoView({ block: 'start' });
   });
   $('#settings').hidden = false;
 }
+
+// Подпись раздела в меню слева: включены ли бочка и цензура, сколько сервисов подключено
+function tabBadge(tab) {
+  const c = state.cfg;
+  if (tab === 'call') return c.duck.enabled ? 'вкл' : 'выкл';
+  if (tab === 'censor') return c.censor?.enabled ? 'вкл' : 'выкл';
+  if (tab === 'services') return `${[c.has['ym.token'], c.sc.clientId, state.sp.connected].filter(Boolean).length}/3`;
+  if (tab === 'library') return String(c.localFolders.length || '');
+  return '';
+}
+
+function renderSettingsNav() {
+  $('#set-nav').innerHTML = SET_TABS.map(([id, label, icon]) => `
+    <button class="set-tab${id === settingsTab ? ' on' : ''}" data-tab="${id}" aria-current="${id === settingsTab ? 'page' : 'false'}">
+      <svg><use href="#${icon}"/></svg><span>${label}</span><small>${esc(tabBadge(id))}</small>
+    </button>`).join('');
+  $('#set-title').textContent = SET_TABS.find(([id]) => id === settingsTab)[1];
+  for (const sec of $$('#settings-body .sec')) sec.hidden = SEC_TAB[sec.dataset.sec] !== settingsTab;
+}
+
+$('#set-nav').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-tab]');
+  if (!b || b.dataset.tab === settingsTab) return;
+  settingsTab = b.dataset.tab;
+  renderSettingsNav();
+  $('#settings-body').scrollTop = 0;
+});
 function closeSettings() { $('#settings').hidden = true; }
 $('#open-settings').onclick = () => openSettings();
 $('#close-settings').onclick = closeSettings;
@@ -1548,6 +1589,23 @@ function rangeField(key, label, min, max, step) {
 
 const fadeLabel = (v) => (+v ? `${+v} с` : 'выкл');
 
+const KEYS = [
+  ['Пробел', 'играть / пауза'],
+  ['← →', 'перемотать на 5 секунд'],
+  ['Ctrl + ← →', 'предыдущий / следующий трек'],
+  ['↑ ↓', 'громкость'],
+  ['M', 'выключить звук'],
+  ['S', 'перемешать'],
+  ['R', 'повтор'],
+  ['E', 'эквалайзер'],
+  ['L', 'текст песни'],
+  ['F', 'во весь экран'],
+  ['Ctrl + F', 'поиск'],
+  ['Ctrl + ,', 'настройки'],
+  ['Ctrl + V', 'открыть код альбома или пресета'],
+  ['Esc', 'закрыть окно или панель'],
+];
+
 async function renderSettings() {
   const c = state.cfg;
   const d = c.duck;
@@ -1561,13 +1619,20 @@ async function renderSettings() {
   await refreshDiscordStatus();
 
   $('#settings-body').innerHTML = `
-    ${accountSection()}
-    <section class="sec" data-sec="ui">
-      <h3 class="sec-title">Вид</h3>
-      <p class="sec-desc">Интерфейс написан строчными буквами. Названия треков, артистов и тексты песен тоже, но их можно оставить как есть.</p>
+    <section class="sec" data-sec="sound">
+      <h3 class="sec-title">Звук</h3>
+      <p class="sec-desc">Плавный переход: конец трека затихает, пока начинается следующий. Если переключить трек самому, переход короткий.</p>
       <div class="field"><label for="crossfade">Плавный переход</label><div class="ctl">
         <input id="crossfade" type="range" min="0" max="12" step="1" value="${+c.crossfade || 0}">
         <span class="val" id="crossfade-val">${fadeLabel(c.crossfade)}</span></div></div>
+      <div class="field"><label>Эквалайзер</label><div class="ctl">
+        <span class="set-note">${c.eq.enabled ? esc(eqPresetName()) : 'выключен'}</span>
+        <button class="btn" id="set-open-eq"><svg><use href="#i-eq"/></svg>Открыть</button></div></div>
+    </section>
+
+    <section class="sec" data-sec="ui">
+      <h3 class="sec-title">Вид</h3>
+      <p class="sec-desc">Интерфейс написан строчными буквами. Названия треков, артистов и тексты песен тоже, но их можно оставить как есть.</p>
       <div class="field"><label>Названия треков как есть</label><div class="ctl"><label class="switch"><input type="checkbox" id="keep-titles" ${c.ui?.keepTitles ? 'checked' : ''} aria-label="Названия треков как есть"><span></span></label></div></div>
       <div class="field"><label>Прятать кнопки окна</label><div class="ctl"><label class="switch"><input type="checkbox" id="autohide-win" ${c.ui?.autoHideWin !== false ? 'checked' : ''} aria-label="Прятать кнопки окна"><span></span></label></div></div>
     </section>
@@ -1654,16 +1719,22 @@ ${censorSettingsHtml()}
     </section>
 
     <section class="sec" data-sec="ext">
-      <h3 class="sec-title">Другие программы</h3>
+      <h3 class="sec-title">Приглушать другие программы</h3>
       <p class="sec-desc">Можно заодно приглушать другие программы, например браузер. Бочку к ним не применить, только громкость. Впиши имена процессов через запятую.</p>
       <div class="field"><label for="duck-targets">Процессы</label><div class="ctl">
         <input class="input" id="duck-targets" value="${esc(d.targets.join(', '))}" placeholder="chrome, browser, spotify" spellcheck="false">
       </div></div>
+    </section>
+
+    <section class="sec" data-sec="keys">
+      <h3 class="sec-title">Горячие клавиши</h3>
+      <dl class="keys">${KEYS.map(([k, what]) => `<dt>${k.split(' + ').map((x) => `<kbd>${esc(x)}</kbd>`).join(' + ')}</dt><dd>${esc(what)}</dd>`).join('')}</dl>
     </section>`;
 
   const body = $('#settings-body');
-  bindAccount(body);
+  renderSettingsNav();
   bindDiscord(body);
+  $('#set-open-eq', body).onclick = () => { closeSettings(); openEq(); };
 
   $$('[data-ext]', body).forEach((a) => { a.onclick = (e) => { e.preventDefault(); api.openExternal(a.dataset.ext); }; });
   $('#crossfade', body).oninput = (e) => {
@@ -1800,27 +1871,6 @@ function syncedAgo(ts) {
   return new Date(ts).toLocaleString('ru', { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' });
 }
 
-function accountSection() {
-  const a = state.account;
-  const desc = 'Альбомы, настройки бочки и статистика будут одинаковыми на всех твоих компьютерах. Токены сервисов, папки с музыкой и микрофон остаются только здесь.';
-  if (!a.loggedIn) return ''; // без входа вместо плеера экран входа
-  return `<section class="sec" data-sec="account">
-    <h3 class="sec-title">Аккаунт<span class="state ok">${esc(a.name || a.login)}</span></h3>
-    <p class="sec-desc">${desc}<br><br>Логин <code>${esc(a.login)}</code> на <code>${esc(a.server)}</code>. Синхронизация: ${a.syncing ? 'идёт…' : syncedAgo(a.lastSync)}.${a.error ? `<br>Последняя попытка не удалась: ${esc(a.error)}` : ''}</p>
-    <div class="field"><label for="acc-name">Имя</label><div class="ctl">
-      <input class="input" id="acc-name" value="${esc(a.name || '')}" maxlength="64" spellcheck="false">
-      <button class="btn" id="acc-name-save">Сохранить</button>
-    </div></div>
-    <div class="row-actions">
-      <button class="btn primary" id="acc-sync"><svg><use href="#i-refresh"/></svg>Синхронизировать</button>
-      <button class="btn" id="acc-password">Сменить пароль</button>
-      <button class="btn" id="acc-logout-all">Выйти на других устройствах</button>
-      <button class="btn" id="acc-logout">Выйти</button>
-      <button class="btn danger" id="acc-delete">Удалить аккаунт</button>
-    </div>
-  </section>`;
-}
-
 // Что поменялось после синхронизации — перерисовываем только это
 function applySynced(changed) {
   if (!changed) return;
@@ -1839,7 +1889,7 @@ function applySynced(changed) {
       if (!$('#settings').hidden) renderSettings();
     });
   }
-  if (changed.stats) loadRemoteStats().then(() => { if (!$('#stats').hidden) renderStats(); });
+  if (changed.stats) loadRemoteStats().then(() => { if (profileOpen()) renderStats(); });
 }
 
 // ---------- экран входа: без аккаунта плеер закрыт ----------
@@ -1920,6 +1970,7 @@ function showServer(edit) {
 function showAuth(message = '') {
   if (!audio.paused) togglePlay();
   closeSettings();
+  closeProfile();
   closeMenu();
   const a = state.account;
   showServer(false);
@@ -1977,65 +2028,6 @@ $('#auth-form').onsubmit = async (e) => {
   go.disabled = false;
   go.textContent = AUTH_TEXT[authMode].go;
 };
-
-function bindAccount(body) {
-  if (!$('#acc-name-save', body)) return;
-
-  $('#acc-name-save', body).onclick = async () => {
-    try {
-      state.account = await api.account.rename($('#acc-name', body).value.trim());
-      toast('Имя сохранено');
-      renderSettings();
-    } catch (err) { toast(err.message, 'err'); }
-  };
-  $('#acc-sync', body).onclick = async (e) => {
-    e.currentTarget.disabled = true;
-    try {
-      await api.account.sync();
-      toast('Синхронизировано');
-    } catch (err) { toast(err.message, 'err'); }
-    renderSettings();
-  };
-  $('#acc-password', body).onclick = async () => {
-    const old = await ask({ title: 'Смена пароля', text: 'Текущий пароль', ok: 'Дальше', password: true });
-    if (!old) return;
-    const next = await ask({
-      title: 'Смена пароля',
-      text: 'Новый пароль, не короче 8 символов. На других устройствах нужно будет войти заново.',
-      ok: 'Сменить', password: true,
-    });
-    if (!next) return;
-    try {
-      await api.account.password(old, next);
-      toast('Пароль изменён');
-    } catch (err) { toast(err.message, 'err'); }
-  };
-  $('#acc-logout-all', body).onclick = async () => {
-    try {
-      const r = await api.account.logoutAll();
-      toast(r.closed ? `Закрыто сессий: ${r.closed}` : 'Других сессий нет');
-    } catch (err) { toast(err.message, 'err'); }
-  };
-  $('#acc-logout', body).onclick = async () => {
-    state.account = await api.account.logout();
-    showAuth();
-    toast('Выход выполнен. Альбомы и статистика остались на этом компьютере');
-  };
-  $('#acc-delete', body).onclick = async () => {
-    const password = await ask({
-      title: 'Удалить аккаунт?',
-      text: 'С сервера пропадут альбомы, настройки и статистика. На этом компьютере всё останется. Введи пароль, чтобы подтвердить.',
-      ok: 'Удалить', danger: true, password: true,
-    });
-    if (!password) return;
-    try {
-      state.account = await api.account.remove(password);
-      setAuthMode('register');
-      showAuth();
-      toast('Аккаунт удалён');
-    } catch (err) { toast(err.message, 'err'); }
-  };
-}
 
 api.account.onEvent((ev) => {
   if (ev.status) state.account = ev.status;
@@ -2190,6 +2182,7 @@ async function init() {
   if (!state.account.loggedIn) showAuth();
   document.body.classList.toggle('keep-titles', !!state.cfg.ui?.keepTitles);
   applyWinAutohide();
+  renderMe(); // profile.js
   syncDuckSwitch();
   renderModes();
   applyVolume();

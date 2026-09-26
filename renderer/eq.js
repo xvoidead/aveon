@@ -69,6 +69,11 @@ function closeEq() {
 }
 
 const eqMine = () => state.cfg.eq.custom || [];
+// Как называется то, что сейчас стоит: встроенный пресет, свой или «свой вариант»
+function eqPresetName() {
+  const id = state.cfg.eq.preset;
+  return EQ_PRESETS.find(([pid]) => pid === id)?.[1] || eqMine().find((p) => p.id === id)?.name || 'свои полосы';
+}
 
 function renderEq() {
   const e = state.cfg.eq;

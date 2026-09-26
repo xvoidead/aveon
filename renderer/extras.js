@@ -251,7 +251,7 @@ setInterval(() => {
     rm.plays++;
   }
   stats.dirty = true;
-  if (!$('#stats').hidden && Math.floor(stats.cur.listened) % 15 === 0) renderStats();
+  if (profileOpen() && Math.floor(stats.cur.listened) % 15 === 0) renderStats(); // profile.js
 }, 1000);
 
 function fmtDur(sec, short = false) {
@@ -301,18 +301,9 @@ function shiftMonth(mk, delta) {
   return monthKey(new Date(y, m - 1 + delta, 1));
 }
 
-function openStats() {
-  closeLyrics();
-  stats.month = stats.month || monthKey();
-  $('#stats').hidden = false;
-  $('#open-stats').setAttribute('aria-pressed', 'true');
-  renderStats();
-}
-
-function closeStats() {
-  $('#stats').hidden = true;
-  $('#open-stats').setAttribute('aria-pressed', 'false');
-}
+// Статистика живёт в профиле (profile.js)
+function openStats() { openProfile({ to: 'stats' }); }
+function closeStats() { closeProfile(); }
 
 let statsTopList = [];
 
@@ -320,7 +311,7 @@ function renderStats() {
   const box = $('#stats');
   const allTime = Object.values(statsAll().days).reduce((a, b) => a + b, 0);
   if (allTime < 1) {
-    box.innerHTML = `<div class="stats-empty"><h3>Статистика пока пустая</h3><p>Включи любой трек. Время, артисты и топ треков месяца начнут считаться с первой минуты.</p></div>`;
+    box.innerHTML = `<h2 class="pf-h">Статистика</h2><div class="stats-empty"><h3>Пока пусто</h3><p>Включи любой трек. Время, артисты и топ треков месяца начнут считаться с первой минуты.</p></div>`;
     return;
   }
   const mk = stats.month;
@@ -333,7 +324,7 @@ function renderStats() {
 
   box.innerHTML = `
     <div class="stats-head">
-      <h1 class="lib-title">Статистика</h1>
+      <h2 class="pf-h">Статистика</h2>
       <div class="month-nav">
         <button class="icon-btn" id="m-prev" aria-label="Предыдущий месяц" ${mk <= first ? 'disabled' : ''}><svg><use href="#i-chevron-l"/></svg></button>
         <span class="label">${MONTHS[md.m - 1]} ${md.y}</span>
@@ -432,8 +423,6 @@ function drawChart(el, md, today) {
   el.onpointerleave = () => { tip.hidden = true; $$('.bar.hover', el).forEach((b) => b.classList.remove('hover')); };
 }
 
-$('#open-stats').onclick = () => ($('#stats').hidden ? openStats() : closeStats());
-window.addEventListener('resize', () => { if (!$('#stats').hidden) renderStats(); });
 
 // ---------- редактор тегов своих файлов ----------
 
