@@ -126,7 +126,7 @@ function ensure() {
     if (last) win.webContents.send('island:state', last);
     update();
   });
-  win.on('closed', () => { win = null; ready = false; });
+  win.on('closed', () => { win = null; ready = false; shown = false; });
   place();
 }
 
@@ -140,7 +140,7 @@ function level() {
 // обратно, пока он виден. Фокус не забирает. Над эксклюзивным полноэкранным режимом (не «без рамки»)
 // окно не нарисовать никак — там помогает только режим «оконный без рамки» в самой игре
 setInterval(() => {
-  if (!win || win.isDestroyed() || !win.isVisible()) return;
+  if (!win || win.isDestroyed() || !shown) return;
   if (hoverWatch.isInside(win)) return; // курсор на острове — не трогаем окно, чтобы не сорвать клик
   if (display().id !== placedOn) place(); // курсор ушёл на другой монитор — остров за ним
   win.setAlwaysOnTop(true, 'screen-saver');
@@ -157,22 +157,28 @@ function wanted() {
   return main.isMinimized() || !main.isVisible() || !main.isFocused();
 }
 
+// Остров прячем не hide(), а полной прозрачностью: окно с focusable: false после hide() и
+// showInactive() перестаёт получать клики (проверено — движение мыши доходит, нажатия нет),
+// и кнопки острова ломались после каждого события и смены окна
+let shown = false;
 function update() {
   if (!wanted()) {
-    if (win && !win.isDestroyed() && win.isVisible()) {
-      hoverWatch.reset(win); // спрятали под курсором — mouseleave не придёт
-      // и острову сказать: свернуться и забыть «раскрыт». Иначе после показа он считал себя
-      // раскрытым, не просил ловить мышь заново — и кнопки переставали нажиматься
+    if (win && !win.isDestroyed() && shown) {
+      shown = false;
+      hoverWatch.setOff(win, true); // мышь не ловим, клики насквозь
+      // острову — свернуться и забыть «раскрыт»
       if (ready) win.webContents.send('island:pointer', 'reset');
-      win.hide();
+      win.setOpacity(0);
     }
     return;
   }
   ensure();
-  if (ready && !win.isVisible()) {
-    place();
-    win.showInactive();
-  }
+  if (!ready || shown) return;
+  shown = true;
+  place();
+  win.setOpacity(1);
+  hoverWatch.setOff(win, false);
+  if (!win.isVisible()) win.showInactive(); // только в первый раз — дальше окно не прячется
 }
 
 function init(mainWindow) {

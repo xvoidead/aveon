@@ -47,7 +47,7 @@ function apply(win, s) {
 function tick() {
   for (const [win, s] of watched) {
     if (win.isDestroyed()) { watched.delete(win); continue; }
-    if (win.isVisible()) apply(win, s);
+    if (win.isVisible() && !s.off) apply(win, s); // off — окно «спрятано» прозрачностью, мышь не ловит
   }
   if (!watched.size) { clearInterval(timer); timer = null; }
 }
@@ -95,9 +95,17 @@ function reset(win) {
 }
 
 // Курсор сейчас над панелью (или только что ушёл)
+// Окно прячут не hide(), а прозрачностью (см. src/island.js): пока off — мышь не ловим вовсе
+function setOff(win, off) {
+  const s = win && watched.get(win);
+  if (!s || win.isDestroyed()) return;
+  s.off = off;
+  if (off) reset(win);
+}
+
 function isInside(win) {
   const s = win && watched.get(win);
   return !!s && (s.inside || s.hovered);
 }
 
-module.exports = { watch, setHover, setRect, reset, isInside };
+module.exports = { watch, setHover, setRect, reset, setOff, isInside };
