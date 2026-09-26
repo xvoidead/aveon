@@ -1,15 +1,28 @@
 'use strict';
 
 // ---------- liquid glass ----------
-// Стекло как в шейдере «Liquid Glass» (shadertoy.com/view/wfGXzh): панель — выпуклая линза со
-// скруглёнными углами. Внутри содержимое за ней видно почти как есть, у кромки оно преломляется
-// (тянется к центру), цвета чуть расходятся (хроматическая аберрация), по краю — блик.
-//
-// Как устроено: для каждой панели своя карта смещений (canvas → картинка), где R и G — куда сдвинуть
-// пиксель фона. Карта считается из расстояния до кромки скруглённого прямоугольника (SDF), как в
-// шейдере. SVG-фильтр с feDisplacementMap подключается через backdrop-filter: url(#…), поэтому
-// преломляется настоящее содержимое окна под панелью. Три смещения с разной силой — по одному на
-// канал R, G, B — дают радужную кромку.
+// Порт шейдера Liquid Glass от @preyneyv (shadertoy.com/view/wfGXzh), повторяет Liquid Glass из iOS 26.
+// Формулы и константы те же, что в шейдере (вкладки Common и Image):
+//  - преломление только в полосе у кромки шириной REFR_DIM; сила растёт к краю по 1 − cos,
+//    сдвиг — внутрь, против нормали, до REFR_MAG от размера окна;
+//  - у каждого канала свой показатель преломления (REFR_IOR, усиленный REFR_ABERRATION) —
+//    отсюда радужная кромка;
+//  - тонкий обод EDGE_DIM: направленный блик (RIM_LIGHT) и отражение яркого фона (bloom),
+//    смешанные «экраном» и наложенные «светлее».
+// Фон здесь — живое содержимое окна: карта смещений и обод считаются на canvas из SDF
+// скруглённого прямоугольника панели и подключаются SVG-фильтром через backdrop-filter.
+
+// Константы из Common (в долях высоты / размера окна, как UV в шейдере)
+const LG = {
+  EPS_PIX: 2,
+  REFR_DIM: 0.05,
+  REFR_MAG: 0.1,
+  REFR_ABERRATION: 5,
+  REFR_IOR: [1.51, 1.52, 1.53],
+  EDGE_DIM: 0.003,
+  RIM_LIGHT: [-Math.SQRT1_2, -Math.SQRT1_2], // normalize(vec2(-1, 1)) в шейдере; у DOM ось y вниз
+  RIM_ALPHA: 0.15,
+};
 
 const GLASS_SVG = 'http://www.w3.org/2000/svg';
 const glass = {
@@ -22,85 +35,113 @@ const glass = {
   strength: 1,
 };
 
-// Стеклянные только всплывающие панели: окна, меню, «Слушать вместе», уведомления. Остальной
-// интерфейс и фон не меняются. Что делаем стеклянным и насколько: blur — матовость, scale — сила преломления (px),
-// bevel — ширина выпуклой кромки (px)
+// Стеклянные только всплывающие панели. tint — подложка для читаемости текста (TINT_COLOR
+// в шейдере), blur — BLUR_AMOUNT: в шейдере по умолчанию размытия нет
 const GLASS_TARGETS = [
-  ['.sheet', { blur: 14, scale: 54, bevel: 30 }],
-  ['.menu', { blur: 12, scale: 36, bevel: 16 }],
-  ['.together', { blur: 12, scale: 44, bevel: 22 }],
-  ['.toast', { blur: 10, scale: 36, bevel: 14 }],
+  ['.sheet', { tint: 0.74, blur: 0 }],
+  ['.menu', { tint: 0.78, blur: 0 }],
+  ['.together', { tint: 0.74, blur: 0 }],
+  ['.toast', { tint: 0.7, blur: 0 }],
 ];
 
-// ---- карта смещений ----
+const smooth = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+const lerpN = (min, max, v) => Math.min(1, Math.max(0, (v - min) / (max - min)));
 
-function glassMap(w, h, r, bevel) {
-  const c = document.createElement('canvas');
-  c.width = w; c.height = h;
-  const g = c.getContext('2d');
-  const img = g.createImageData(w, h);
-  const d = img.data;
+// Карты для одной панели: смещение для R, G, B (x и y в красном и зелёном), цвет блика и маска обода
+function glassMaps(w, h, r, W, H, strength) {
+  const EPS = LG.EPS_PIX;
+  const DIM = LG.REFR_DIM * H;
+  const EDGE = Math.max(1, LG.EDGE_DIM * H);
+  const g = LG.REFR_IOR[1];
+  const ior = LG.REFR_IOR.map((v) => g + (v - g) * LG.REFR_ABERRATION); // mix(vec3(ior.g), ior, ABERRATION)
+  const magX = LG.REFR_MAG * W * strength, magY = LG.REFR_MAG * H * strength;
+  const scale = 2 * Math.max(magX, magY) + 2; // feDisplacementMap: сдвиг = scale · (C − 0.5)
+  const mk = () => { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); return { c, x, img: x.createImageData(w, h) }; };
+  const maps = [mk(), mk(), mk()];
+  const rim = mk(), mask = mk();
   const hx = w / 2, hy = h / 2;
   r = Math.min(r, hx, hy);
   const bx = hx - r, by = hy - r;
   for (let y = 0; y < h; y++) {
     const py = y + 0.5 - hy;
-    const ay = Math.abs(py);
     for (let x = 0; x < w; x++) {
       const px = x + 0.5 - hx;
-      const ax = Math.abs(px);
-      // расстояние до кромки скруглённого прямоугольника (отрицательное внутри) и нормаль наружу
-      const qx = ax - bx, qy = ay - by;
-      let dist, nx, ny;
-      if (qx > 0 && qy > 0) {
-        const len = Math.hypot(qx, qy) || 1;
-        dist = len - r;
-        nx = (qx / len) * Math.sign(px);
-        ny = (qy / len) * Math.sign(py);
-      } else if (qx > qy) {
-        dist = qx - r; nx = Math.sign(px); ny = 0;
+      // sdgBox: расстояние до кромки (минус внутри) и градиент — нормаль наружу
+      const wx = Math.abs(px) - bx, wy = Math.abs(py) - by;
+      const sx = px < 0 ? -1 : 1, sy = py < 0 ? -1 : 1;
+      let d, nx, ny;
+      const gmax = Math.max(wx, wy);
+      if (gmax > 0) {
+        const qx = Math.max(wx, 0), qy = Math.max(wy, 0), l = Math.hypot(qx, qy) || 1;
+        d = l - r; nx = sx * qx / l; ny = sy * qy / l;
       } else {
-        dist = qy - r; nx = 0; ny = Math.sign(py);
+        d = gmax - r;
+        if (wx > wy) { nx = sx; ny = 0; } else { nx = 0; ny = sy; }
       }
-      // 0 в глубине панели, 1 на самой кромке. Профиль выпуклый: у края преломление резко растёт
-      const t = Math.min(1, Math.max(0, 1 + dist / bevel));
-      const m = Math.pow(t, 2.4);
       const i = (y * w + x) * 4;
-      d[i] = 128 - nx * m * 127;     // R: сдвиг по x — к центру панели
-      d[i + 1] = 128 - ny * m * 127; // G: сдвиг по y
-      d[i + 2] = 128;
-      d[i + 3] = 255;
+      // refractionLayer
+      let boundary = lerpN(-DIM, EPS, d);
+      boundary *= 1 - smooth(0, EPS, d);
+      const cosB = 1 - Math.cos(boundary * Math.PI / 2);
+      for (let k = 0; k < 3; k++) {
+        const ratio = Math.pow(cosB, ior[k]);
+        const m = maps[k].img.data;
+        m[i] = Math.round(255 * (0.5 - (nx * magX * ratio) / scale));
+        m[i + 1] = Math.round(255 * (0.5 - (ny * magY * ratio) / scale));
+        m[i + 2] = 128; m[i + 3] = 255;
+      }
+      // tintLayer: обод и направленный блик
+      const edge = Math.min(smooth(EPS, 0, d), lerpN(-EDGE, 0, d));
+      const cosE = 1 - Math.cos(edge * Math.PI / 2);
+      const light = Math.round(255 * LG.RIM_ALPHA * Math.abs(nx * LG.RIM_LIGHT[0] + ny * LG.RIM_LIGHT[1]));
+      const rd = rim.img.data;
+      rd[i] = rd[i + 1] = rd[i + 2] = light; rd[i + 3] = 255;
+      const md = mask.img.data;
+      md[i] = md[i + 1] = md[i + 2] = 255; md[i + 3] = Math.round(255 * cosE);
     }
   }
-  g.putImageData(img, 0, 0);
-  return c.toDataURL();
+  const url = (m) => { m.x.putImageData(m.img, 0, 0); return m.c.toDataURL(); };
+  return { maps: maps.map(url), rim: url(rim), mask: url(mask), scale };
 }
 
 function glassFilter(w, h, r, opts) {
-  const s = glass.strength;
-  const key = `${w}x${h}r${r}b${opts.bevel}s${opts.scale}m${opts.blur}k${s}`;
+  const W = innerWidth, H = innerHeight, s = glass.strength;
+  const key = `${w}x${h}r${r}|${W}x${H}|${opts.blur}|${s}`;
   if (glass.filters.has(key)) return glass.filters.get(key);
-  const id = `lg${glass.filters.size}`;
-  const scale = opts.scale * s;
+  glass.seq = (glass.seq || 0) + 1;
+  const id = `lg${glass.seq}`;
+  const m = glassMaps(w, h, r, W, H, s);
   const f = document.createElementNS(GLASS_SVG, 'filter');
   f.id = id;
   f.setAttribute('x', '0'); f.setAttribute('y', '0');
   f.setAttribute('width', w); f.setAttribute('height', h);
   f.setAttribute('filterUnits', 'userSpaceOnUse');
   f.setAttribute('color-interpolation-filters', 'sRGB');
-  const channel = (k) => ['1 0 0 0 0', '0 1 0 0 0', '0 0 1 0 0']
-    .map((row, i) => (i === k ? row : '0 0 0 0 0')).join(' ') + ' 0 0 0 1 0';
+  const img = (href, result) => `<feImage href="${href}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none" result="${result}"/>`;
+  const only = (k) => ['1 0 0 0 0', '0 1 0 0 0', '0 0 1 0 0'].map((row, i) => (i === k ? row : '0 0 0 0 0')).join(' ') + ' 0 0 0 1 0';
+  const src = opts.blur ? 'bg' : 'SourceGraphic';
   f.innerHTML = `
-    <feImage href="${glassMap(w, h, r, opts.bevel)}" x="0" y="0" width="${w}" height="${h}" preserveAspectRatio="none" result="map"/>
-    <feGaussianBlur in="SourceGraphic" stdDeviation="${opts.blur}" edgeMode="duplicate" result="bg"/>
-    <feDisplacementMap in="bg" in2="map" scale="${scale}" xChannelSelector="R" yChannelSelector="G" result="dr"/>
-    <feDisplacementMap in="bg" in2="map" scale="${scale * 0.94}" xChannelSelector="R" yChannelSelector="G" result="dg"/>
-    <feDisplacementMap in="bg" in2="map" scale="${scale * 0.88}" xChannelSelector="R" yChannelSelector="G" result="db"/>
-    <feColorMatrix in="dr" type="matrix" values="${channel(0)}" result="r"/>
-    <feColorMatrix in="dg" type="matrix" values="${channel(1)}" result="g"/>
-    <feColorMatrix in="db" type="matrix" values="${channel(2)}" result="b"/>
+    ${img(m.maps[0], 'mr')}${img(m.maps[1], 'mg')}${img(m.maps[2], 'mb')}
+    ${opts.blur ? `<feGaussianBlur in="SourceGraphic" stdDeviation="${opts.blur}" edgeMode="duplicate" result="bg"/>` : ''}
+    <feDisplacementMap in="${src}" in2="mr" scale="${m.scale}" xChannelSelector="R" yChannelSelector="G" result="dr"/>
+    <feDisplacementMap in="${src}" in2="mg" scale="${m.scale}" xChannelSelector="R" yChannelSelector="G" result="dg"/>
+    <feDisplacementMap in="${src}" in2="mb" scale="${m.scale}" xChannelSelector="R" yChannelSelector="G" result="db"/>
+    <feColorMatrix in="dr" type="matrix" values="${only(0)}" result="r"/>
+    <feColorMatrix in="dg" type="matrix" values="${only(1)}" result="g"/>
+    <feColorMatrix in="db" type="matrix" values="${only(2)}" result="b"/>
     <feBlend in="r" in2="g" mode="screen" result="rg"/>
-    <feBlend in="rg" in2="b" mode="screen"/>`;
+    <feBlend in="rg" in2="b" mode="screen" result="col"/>
+    <feGaussianBlur in="SourceGraphic" stdDeviation="6" edgeMode="duplicate" result="soft"/>
+    <feComponentTransfer in="soft" result="hi">
+      <feFuncR type="linear" slope="1.25" intercept="-0.25"/><feFuncG type="linear" slope="1.25" intercept="-0.25"/><feFuncB type="linear" slope="1.25" intercept="-0.25"/>
+    </feComponentTransfer>
+    <feBlend in="SourceGraphic" in2="hi" mode="screen" result="refl"/>
+    ${img(m.rim, 'rim')}
+    <feBlend in="refl" in2="rim" mode="screen" result="merged"/>
+    <feBlend in="col" in2="merged" mode="lighten" result="edgeCol"/>
+    ${img(m.mask, 'mask')}
+    <feComposite in="edgeCol" in2="mask" operator="in" result="edgeOnly"/>
+    <feComposite in="edgeOnly" in2="col" operator="over"/>`;
   glass.defs.append(f);
   glass.filters.set(key, id);
   return id;
@@ -114,12 +155,11 @@ function glassApply(el) {
   const w = Math.round(el.offsetWidth), h = Math.round(el.offsetHeight);
   if (!w || !h) return; // скрыта — пересчитаем, когда появится (ResizeObserver)
   const r = Math.round(parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0);
-  const key = `${w}x${h}r${r}`;
-  if (rec.key === key && rec.strength === glass.strength) return;
+  const key = `${w}x${h}r${r}|${innerWidth}x${innerHeight}|${glass.strength}`; // сила преломления зависит и от размеров окна
+  if (rec.key === key) return;
   rec.key = key;
-  rec.strength = glass.strength;
-  const id = glassFilter(w, h, r, rec.opts);
-  el.style.backdropFilter = `url(#${id}) saturate(1.35) brightness(1.06)`;
+  el.style.backdropFilter = `url(#${glassFilter(w, h, r, rec.opts)})`;
+  el.style.setProperty('--lg-tint', `${Math.round(rec.opts.tint * 100)}%`);
 }
 
 function glassTrack(el, opts) {
@@ -139,7 +179,7 @@ function glassScan(root = document) {
 
 // Фильтров копится по одному на размер: при смене размеров окна их становится много — чистим
 function glassPrune() {
-  if (glass.filters.size < 120) return;
+  if (glass.filters.size < 40) return;
   glass.defs.innerHTML = '';
   glass.filters.clear();
   for (const rec of glass.els.values()) rec.key = '';
@@ -174,6 +214,14 @@ function glassEnable() {
   glassScan();
 }
 
+// Размер окна входит в формулы шейдера — после ресайза пересчитываем карты (с задержкой)
+let glassResizeTimer = 0;
+window.addEventListener('resize', () => {
+  if (!glass.on) return;
+  clearTimeout(glassResizeTimer);
+  glassResizeTimer = setTimeout(() => { for (const el of glass.els.keys()) glassApply(el); glassPrune(); }, 250);
+});
+
 function glassForget(root) {
   for (const el of [...glass.els.keys()]) {
     if (root === el || root.contains(el)) { glass.ro?.unobserve(el); glass.els.delete(el); }
@@ -186,7 +234,7 @@ function glassDisable() {
   document.body.classList.remove('liquid-glass');
   glass.ro?.disconnect();
   glass.mo?.disconnect();
-  for (const el of glass.els.keys()) { el.style.backdropFilter = ''; el.classList.remove('lg'); }
+  for (const el of glass.els.keys()) { el.style.backdropFilter = ''; el.style.removeProperty('--lg-tint'); el.classList.remove('lg'); }
   glass.els.clear();
 }
 
