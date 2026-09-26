@@ -1655,3 +1655,33 @@ body.is-scratching { user-select: none; }
 @media (max-width: 820px) { .set-search { display: none; } }
 html.mobile .set-search { display: none; }
 html.mobile .set-tabs { flex-direction: row; }
+
+/* ---------- настройки деревом: раздел — ветка, секции — листья ---------- */
+.set-nav { overflow-y: auto; scrollbar-width: thin; }
+.set-tab { grid-template-columns: 18px minmax(0, 1fr) auto 12px; }
+.set-caret { width: 12px !important; height: 12px !important; color: var(--text-3); opacity: .7; transition: transform .2s ease; }
+.set-node.open .set-caret { transform: rotate(90deg); }
+.set-tab.on .set-caret { color: var(--text-2); }
+.set-kids { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .22s cubic-bezier(.2, .8, .2, 1); }
+.set-node.open .set-kids { grid-template-rows: 1fr; }
+.set-kids > div { overflow: hidden; display: flex; flex-direction: column; margin-left: 20px; }
+.set-node.open .set-kids > div { padding: 2px 0 6px; }
+.set-leaf {
+  position: relative; margin-left: 12px; padding: 6px 10px; border-radius: 8px; text-align: left;
+  color: var(--text-3); font-size: 13px; transition: color .15s ease, background .15s ease;
+}
+/* линии дерева: вертикаль от ветки и отвод к каждому листу; у последнего вертикаль обрывается на нём */
+.set-leaf::before, .set-leaf::after { content: ""; position: absolute; left: -12px; border-color: var(--rivet-2); border-style: solid; border-width: 0; }
+.set-leaf::before { top: 0; bottom: 0; border-left-width: 1px; }
+.set-leaf:last-child::before { bottom: 50%; }
+.set-leaf::after { top: 50%; width: 9px; border-top-width: 1px; }
+.set-leaf:last-child::after { border-bottom-left-radius: 6px; }
+.set-leaf:hover { color: var(--text); background: var(--rivet); }
+.set-leaf.on { color: var(--amber); }
+.set-leaf.on::after { border-color: var(--amber); }
+@keyframes sec-flash { 0%, 30% { border-color: color-mix(in srgb, var(--amber) 70%, transparent); } }
+.settings-sheet .sec.sec-flash { animation: sec-flash 1.2s ease; }
+@media (max-width: 820px) { .set-kids, .set-caret { display: none !important; } .set-tab { grid-template-columns: 1fr; } }
+html.mobile .set-kids, html.mobile .set-caret { display: none !important; }
+html.mobile .set-node { display: contents; }
+@media (prefers-reduced-motion: reduce) { .set-kids, .set-caret { transition: none; } .settings-sheet .sec.sec-flash { animation: none; } }
