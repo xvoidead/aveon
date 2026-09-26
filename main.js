@@ -417,7 +417,9 @@ function registerIpc() {
   ipcMain.on('mini:hover', (e, on) => mini.hover(!!on));
   // где у всплывающего окна панель — по ней src/hover.js сам решает, ловить ли мышь
   ipcMain.on('popup:rect', (e, r) => require('./src/hover').setRect(BrowserWindow.fromWebContents(e.sender), r));
+  ipcMain.on('island:log', (e, ...parts) => require('./src/islandlog').log('island:', ...parts)); // временно
   ipcMain.on('island:action', (e, a) => {
+    require('./src/islandlog').log('main.action', a);
     if (a?.type === 'focus') { showWindow(); return; }
     if (a?.type === 'mini-close') { mini.close(); return; }
     send('island:action', a);

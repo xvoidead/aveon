@@ -3,6 +3,7 @@
 // Окно само сообщает, где панель (popup:rect) и что курсор над ней (hover). Но над областями
 // перетаскивания окно движение мыши не получает — поэтому курсор ещё и проверяем отсюда, по часам.
 const { screen } = require('electron');
+const { log } = require('./islandlog'); // временно: где теряется нажатие
 
 const EVERY = 30;
 // запас у края: зайти — на 4 px от панели, уйти — только отойдя на 16 px (чтобы у края не мигало)
@@ -20,10 +21,15 @@ function apply(win, s) {
     const m = s.inside ? MARGIN_OUT : MARGIN_IN;
     inside = x >= s.rect.x - m && x < s.rect.x + s.rect.w + m && y >= s.rect.y - m && y < s.rect.y + s.rect.h + m;
   }
-  if (inside !== s.inside) { s.inside = inside; s.onInside?.(inside); }
+  if (inside !== s.inside) {
+    s.inside = inside;
+    if (s.onInside) log('hover.inside', inside, 'rect', s.rect, 'cursor', screen.getCursorScreenPoint(), 'bounds', win.getContentBounds());
+    s.onInside?.(inside);
+  }
   const on = s.hovered || inside;
   if (on === s.on) return;
   s.on = on;
+  if (s.onInside) log('hover.catchMouse', on, 'hovered', s.hovered, 'inside', s.inside);
   win.setIgnoreMouseEvents(!on, { forward: true });
 }
 
@@ -46,6 +52,7 @@ function setHover(win, on) {
   const s = win && watched.get(win);
   if (!s || win.isDestroyed()) return;
   s.hovered = on;
+  if (s.onInside) log('hover.setHover', on);
   apply(win, s);
 }
 
@@ -59,6 +66,7 @@ function setRect(win, rect) {
 function reset(win) {
   const s = win && watched.get(win);
   if (!s || win.isDestroyed()) return;
+  if (s.onInside) log('hover.reset (окно прячут)');
   s.hovered = false;
   s.on = false;
   s.inside = false;

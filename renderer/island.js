@@ -277,6 +277,7 @@ requestAnimationFrame(tick);
 // Наведение: капсула раскрывается. Зашёл ли курсор и ушёл ли, говорит главный процесс (src/hover.js):
 // свои mouseenter/mouseleave здесь врут, когда окно переключается «пропускать клики / ловить»
 function pointerIn() {
+  api.island.log?.('pointerIn', pill.className);
   clearTimeout(leaveTimer);
   if (is('open')) { api.island.hover(true); return; } // уже раскрыт — но ловить мышь напомнить (вдруг сбросили)
   pill.classList.remove('peek', 'notice');
@@ -291,6 +292,7 @@ function pointerIn() {
   api.island.hover(true);
 }
 function pointerOut() {
+  api.island.log?.('pointerOut', pill.className, 'hover', pill.matches(':hover'));
   clearTimeout(leaveTimer);
   leaveTimer = setTimeout(() => {
     if (pill.matches(':hover')) return; // курсор всё-таки на капсуле
@@ -308,6 +310,7 @@ pill.addEventListener('mouseleave', () => { if (is('open')) pointerOut(); });
 document.addEventListener('mouseleave', () => { if (is('open')) pointerOut(); });
 // главный процесс: зашёл — раскрыть; «ушёл» у раскрытого проверяем по :hover (окно в это время ловит мышь)
 api.island.onPointer((on) => {
+  api.island.log?.('onPointer', on);
   if (on === 'reset') { // окно прячут: свернуться сразу, без задержки и без проверки :hover
     clearTimeout(leaveTimer);
     pill.classList.remove('open');
@@ -394,3 +397,10 @@ function renderEvents(list) {
   // пересозданной кнопке терялся бы
   if (box.dataset.html !== html) { box.innerHTML = html; box.dataset.html = html; }
 }
+
+
+// временно: любое нажатие в острове — в журнал (куда попало, в каком состоянии капсула)
+document.addEventListener('pointerdown', (e) => {
+  const t = e.target;
+  api.island.log?.('pointerdown', `${t.tagName}#${t.id}.${String(t.className).replace(/\s+/g, '.')}`, 'text', (t.textContent || '').slice(0, 20), 'pill', pill.className, 'at', e.clientX, e.clientY, 'pillRect', pill.getBoundingClientRect().toJSON());
+}, true);

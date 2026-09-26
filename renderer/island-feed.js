@@ -245,6 +245,7 @@ function islandNotify(text, kind = 'info', person = null, actions = []) {
     // лента событий раскрытого острова: кнопка события (выполнить и убрать) или крестик (просто убрать)
     if (a.type === 'event') {
       const k = islandHistory.findIndex((x) => x.id === a.id);
+      console.log('[остров] событие', a, 'нашлось', k >= 0, k >= 0 ? islandHistory[k].actions : null); // временно
       const ev = k >= 0 ? islandHistory[k] : null;
       if (k >= 0) { islandHistory.splice(k, 1); saveHistory(); }
       push();
