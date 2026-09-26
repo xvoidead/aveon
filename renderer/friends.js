@@ -493,12 +493,13 @@ function closeFriends() {
 friendsBtn.onclick = () => (friendsEl.hidden ? openFriends() : closeFriends());
 document.addEventListener('pointerdown', (e) => {
   if (friendsEl.hidden || friendsEl.contains(e.target) || friendsBtn.contains(e.target)) return;
-  if ($('#menu').contains(e.target) || $('#dialog').contains(e.target)) return; // меню друга и подтверждение — часть панели
+  // меню друга, подтверждение и меню сообщения (реакции) — часть панели
+  if ($('#menu').contains(e.target) || $('#dialog').contains(e.target) || e.target.closest?.('.msg-menu')) return;
   closeFriends();
 });
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape' || friendsEl.hidden) return;
-  if (!$('#menu').hidden || !$('#dialog').hidden) return; // сначала закроется меню или диалог
+  if (!$('#menu').hidden || !$('#dialog').hidden || $('.msg-menu')) return; // сначала закроется меню, диалог или меню сообщения
   e.stopPropagation();
   closeFriends();
 }, true);
