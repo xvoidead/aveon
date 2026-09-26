@@ -16,7 +16,7 @@ api.island.onState((s) => {
   if (!s.hasTrack) {
     $('#title').textContent = 'ничего не играет';
     $('#artist').textContent = '';
-    $('#line').textContent = '';
+    setLine('', true);
     return;
   }
   const root = document.documentElement.style;
@@ -32,13 +32,44 @@ api.island.onState((s) => {
   }
   $('#title').textContent = s.title;
   $('#artist').textContent = s.artist;
-  const line = s.opts?.miniLyrics === false ? '' : s.line || '';
-  $('#line').textContent = line;
-  card.classList.toggle('lyric', !!line);
+  setLine(s.opts?.miniLyrics === false ? '' : s.line || '');
   card.classList.toggle('barrel', (s.m || 0) > 0.5);
   $('#b-play use').setAttribute('href', s.playing ? '#i-pause' : '#i-play');
   $('#b-barrel').classList.toggle('on', !!s.manual);
 });
+
+// Строка текста сменяется плавно: старая уезжает вверх и гаснет, новая выезжает снизу.
+// Текст кончился (проигрыш, конец песни) — строка уходит, и только потом на её место возвращается исполнитель
+const lineEl = $('#line');
+let shownLine = '';
+let lyricOffTimer = null;
+
+function setLine(text, instant = false) {
+  if (text === shownLine) return;
+  shownLine = text;
+  clearTimeout(lyricOffTimer);
+  const quiet = instant || matchMedia('(prefers-reduced-motion: reduce)').matches;
+  for (const old of lineEl.children) {
+    if (quiet) { old.remove(); continue; }
+    old.className = 'out';
+    old.addEventListener('transitionend', () => old.remove(), { once: true });
+    setTimeout(() => old.remove(), 500); // вдруг transitionend не придёт
+  }
+  if (!text) {
+    if (quiet) card.classList.remove('lyric');
+    else lyricOffTimer = setTimeout(() => { if (!shownLine) card.classList.remove('lyric'); }, 320);
+    return;
+  }
+  card.classList.add('lyric');
+  const span = document.createElement('span');
+  span.textContent = text;
+  span.className = quiet ? 'on' : 'in';
+  lineEl.append(span);
+  if (!quiet) {
+    span.getBoundingClientRect(); // стиль «in» применился — теперь переход к «on» анимируется
+    span.className = 'on';
+  }
+}
 
 function tick() {
   if (st?.hasTrack) {

@@ -21,11 +21,20 @@ svg { width: 16px; height: 16px; }
 }
 .main { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; justify-content: space-between; }
 .text { display: flex; flex-direction: column; min-width: 0; }
-.text b, .text small, .text em { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.text b, .text small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .text b { font-weight: 600; font-size: 14px; }
 .text small { color: rgb(244 241 236 / .65); font-size: 12px; }
-.text em { font-style: normal; color: var(--amber); font-size: 12px; min-height: 0; }
-.text em:empty { display: none; }
+/* строка текста: строки лежат друг на друге и сменяются сдвигом с затуханием (mini.js → setLine) */
+.text em { position: relative; display: none; height: 16px; overflow: hidden; font-style: normal; color: var(--amber); font-size: 12px; line-height: 16px; }
+.card.lyric .text em { display: block; }
+.text em span {
+  position: absolute; inset: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  transition: transform .32s cubic-bezier(.2, .7, .2, 1), opacity .32s ease, filter .32s ease;
+}
+.text em span.in { transform: translateY(80%); opacity: 0; filter: blur(2px); }
+.text em span.on { transform: none; opacity: 1; }
+.text em span.out { transform: translateY(-80%); opacity: 0; filter: blur(2px); }
+@media (prefers-reduced-motion: reduce) { .text em span { transition: none; } }
 .card.lyric .text small { display: none; }
 .bar { position: relative; height: 10px; display: flex; align-items: center; cursor: pointer; -webkit-app-region: no-drag; }
 .bar::before { content: ""; position: absolute; left: 0; right: 0; height: 3px; border-radius: 2px; background: rgb(255 255 255 / .15); }
