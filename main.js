@@ -20,6 +20,8 @@ const friends = require('./src/friends');
 const discord = require('./src/discord');
 const eqpop = require('./src/eqpop');
 const resolve = require('./src/resolve');
+const cache = require('./src/cache');
+const cacheFiles = require('./src/cache-files');
 
 const { resolveStream, sharedStream, matchCache } = resolve;
 resolve.init(local);
@@ -98,6 +100,7 @@ function send(channel, payload) {
 // media://local/?p=<путь>  — аудиофайл с поддержкой Range (перемотка)
 // media://cover/?p=<путь>  — обложка из тегов
 // media://art/?f=<имя>     — своя обложка, заданная в редакторе тегов
+// media://cache/?f=<имя>   — трек из кэша (src/cache.js)
 function registerMediaProtocol() {
   protocol.handle('media', async (req) => {
     const u = new URL(req.url);
@@ -105,6 +108,10 @@ function registerMediaProtocol() {
       const art = local.readArt(u.searchParams.get('f'));
       if (!art) return new Response('no art', { status: 404 });
       return new Response(art.data, { headers: { 'Content-Type': art.type, 'Cache-Control': 'max-age=31536000', 'Access-Control-Allow-Origin': '*' } });
+    }
+    if (u.hostname === 'cache') {
+      const f = cacheFiles.fileOf(u.searchParams.get('f'));
+      return f ? serveFile(f, req) : new Response('forbidden', { status: 403 });
     }
     const p = u.searchParams.get('p') || '';
     if (!local.allowed.has(p)) return new Response('forbidden', { status: 403 });
@@ -114,32 +121,36 @@ function registerMediaProtocol() {
       if (!pic) return new Response('no cover', { status: 404 });
       return new Response(pic.data, { headers: { 'Content-Type': pic.type, 'Cache-Control': 'max-age=86400', 'Access-Control-Allow-Origin': '*' } });
     }
+    return serveFile(p, req);
+  });
+}
 
-    let size;
-    try { size = (await fs.promises.stat(p)).size; } catch { return new Response('not found', { status: 404 }); }
-    const type = MIME[path.extname(p).toLowerCase()] || 'application/octet-stream';
-    const range = req.headers.get('range');
-    const m = range && /bytes=(\d*)-(\d*)/.exec(range);
-    if (m && (m[1] || m[2])) {
-      let start = m[1] ? parseInt(m[1], 10) : size - parseInt(m[2], 10);
-      let end = m[1] && m[2] ? parseInt(m[2], 10) : size - 1;
-      start = Math.max(0, start);
-      end = Math.min(end, size - 1);
-      if (start > end) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
-      return new Response(Readable.toWeb(fs.createReadStream(p, { start, end })), {
-        status: 206,
-        headers: {
-          'Content-Type': type,
-          'Content-Length': String(end - start + 1),
-          'Content-Range': `bytes ${start}-${end}/${size}`,
-          'Accept-Ranges': 'bytes',
-          'Access-Control-Allow-Origin': '*',
-        },
-      });
-    }
-    return new Response(Readable.toWeb(fs.createReadStream(p)), {
-      headers: { 'Content-Type': type, 'Content-Length': String(size), 'Accept-Ranges': 'bytes', 'Access-Control-Allow-Origin': '*' },
+// Аудиофайл с поддержкой Range — без неё не работает перемотка
+async function serveFile(p, req) {
+  let size;
+  try { size = (await fs.promises.stat(p)).size; } catch { return new Response('not found', { status: 404 }); }
+  const type = MIME[path.extname(p).toLowerCase()] || 'application/octet-stream';
+  const range = req.headers.get('range');
+  const m = range && /bytes=(\d*)-(\d*)/.exec(range);
+  if (m && (m[1] || m[2])) {
+    let start = m[1] ? parseInt(m[1], 10) : size - parseInt(m[2], 10);
+    let end = m[1] && m[2] ? parseInt(m[2], 10) : size - 1;
+    start = Math.max(0, start);
+    end = Math.min(end, size - 1);
+    if (start > end) return new Response(null, { status: 416, headers: { 'Content-Range': `bytes */${size}` } });
+    return new Response(Readable.toWeb(fs.createReadStream(p, { start, end })), {
+      status: 206,
+      headers: {
+        'Content-Type': type,
+        'Content-Length': String(end - start + 1),
+        'Content-Range': `bytes ${start}-${end}/${size}`,
+        'Accept-Ranges': 'bytes',
+        'Access-Control-Allow-Origin': '*',
+      },
     });
+  }
+  return new Response(Readable.toWeb(fs.createReadStream(p)), {
+    headers: { 'Content-Type': type, 'Content-Length': String(size), 'Accept-Ranges': 'bytes', 'Access-Control-Allow-Origin': '*' },
   });
 }
 
@@ -185,6 +196,7 @@ function registerIpc() {
     account.settingsChanged(patch);
     if (patch.discord) discord.settingsChanged();
     if (patch.friends) friends.settingsChanged();
+    if (patch.cache) cache.settingsChanged();
     return config.publicView();
   });
   handle('cfg:secret', (key, value) => {
@@ -313,6 +325,10 @@ function registerIpc() {
   ipcMain.on('eqpop:live', (e, eq) => send('eqpop:live', eq));
   ipcMain.on('eqpop:action', (e, action) => { eqpop.hide(); send('eqpop:action', action); });
 
+  // Кэш треков и текстов: сколько занимает, очистка
+  handle('cache:info', () => cache.info());
+  handle('cache:clear', (kind) => cache.clear(kind));
+
   // Discord: что сейчас играет
   ipcMain.on('discord:update', (e, p) => discord.update(p));
   handle('discord:status', () => discord.status());
@@ -368,6 +384,7 @@ app.whenReady().then(() => {
   duck.setTargets(config.get().duck.targets);
   duck.start((m) => send('duck:meter', m), (s) => send('duck:status', s));
   together.init((ev) => send('together:event', ev));
+  cache.init(cacheFiles, () => send('cache:changed')).catch((e) => console.warn('cache init:', e.message));
   eqpop.init((open) => send('eqpop:shown', open));
   discord.init();
   friends.init();

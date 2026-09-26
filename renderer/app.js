@@ -1526,9 +1526,10 @@ const SET_TABS = [
   ['censor', 'Цензура', 'i-shield'],
   ['services', 'Сервисы', 'i-plug'],
   ['library', 'Папки', 'i-folder'],
+  ['cache', 'Кэш', 'i-disk'],
   ['keys', 'Клавиши', 'i-keys'],
 ].filter(([id]) => !(IS_MOBILE && id === 'keys')); // на телефоне клавиатуры нет
-const SEC_TAB = { sound: 'look', ui: 'look', duck: 'call', mic: 'call', ext: 'call', censor: 'censor', ym: 'services', sc: 'services', sp: 'services', discord: 'services', local: 'library', keys: 'keys' };
+const SEC_TAB = { sound: 'look', ui: 'look', duck: 'call', mic: 'call', ext: 'call', censor: 'censor', ym: 'services', sc: 'services', sp: 'services', discord: 'services', local: 'library', cache: 'cache', keys: 'keys' };
 let settingsTab = 'look';
 
 function openSettings(focus) {
@@ -1547,6 +1548,7 @@ function tabBadge(tab) {
   if (tab === 'censor') return c.censor?.enabled ? 'вкл' : 'выкл';
   if (tab === 'services') return `${[c.has['ym.token'], c.sc.clientId, state.sp.connected].filter(Boolean).length}/3`;
   if (tab === 'library') return String(c.localFolders.length || '');
+  if (tab === 'cache') return cacheBadge(); // cache.js
   return '';
 }
 
@@ -1629,6 +1631,7 @@ async function renderSettings() {
   const barrel = d.effect !== 'volume';
   state.account = await api.account.status().catch(() => state.account);
   await refreshDiscordStatus();
+  await refreshCacheInfo(); // cache.js
 
   $('#settings-body').innerHTML = `
     <section class="sec" data-sec="sound">
@@ -1732,6 +1735,8 @@ ${censorSettingsHtml()}
       <div class="folders">${c.localFolders.map((f) => `<div class="folder"><svg><use href="#i-folder"/></svg><span title="${esc(f)}">${esc(f || 'Вся память телефона')}</span><button data-rm-folder="${esc(f)}" aria-label="Убрать папку"><svg><use href="#i-close"/></svg></button></div>`).join('') || '<p class="sec-desc">Пока ни одной папки.</p>'}</div>
       <div class="row-actions"><button class="btn" id="folder-add"><svg><use href="#i-plus"/></svg>Добавить папку</button>${c.localFolders.length ? '<button class="btn" id="folder-rescan"><svg><use href="#i-refresh"/></svg>Пересканировать</button>' : ''}</div>
     </section>
+
+    ${cacheSection()}
 
     <section class="sec desktop-only" data-sec="ext">
       <h3 class="sec-title">Приглушать другие программы</h3>
@@ -1876,6 +1881,7 @@ ${censorSettingsHtml()}
       scanLocal();
     };
   });
+  bindCache(body); // cache.js
   $('#folder-add', body).onclick = addFolder;
   const rescan = $('#folder-rescan', body);
   if (rescan) rescan.onclick = () => scanLocal(true);

@@ -4,7 +4,8 @@ const { app } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
-const NAMES = new Set(['session', 'stats', 'statsRemote']);
+// cache и lyrics — индекс кэша треков и тексты песен (src/cache.js)
+const NAMES = new Set(['session', 'stats', 'statsRemote', 'cache', 'lyrics']);
 const cache = new Map();
 
 function fileOf(name) {

@@ -3,10 +3,20 @@
 // LRCLIB без таймкодов. from — откуда взят текст (подпись в панели).
 const mxm = require('./musixmatch');
 const lrclib = require('./lyrics');
+const cache = require('../cache');
 
 const EMPTY = { from: null, words: null, synced: '', plain: '', instrumental: false };
 
+// Найденный текст (и «текста нет») запоминаем — второй раз он открывается сразу и без сети
 async function find(track) {
+  const hit = cache.lyricsGet(track);
+  if (hit) return hit;
+  const r = await lookup(track);
+  cache.lyricsPut(track, r);
+  return r;
+}
+
+async function lookup(track) {
   let mx = null;
   try { mx = await mxm.find(track); } catch (e) { console.warn('musixmatch:', e.message); }
   if (mx?.kind === 'words') return { ...EMPTY, from: 'musixmatch', words: mx.lines };

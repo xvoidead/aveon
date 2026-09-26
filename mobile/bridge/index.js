@@ -12,6 +12,8 @@ const albums = require('../../src/albums');
 const account = require('../../src/account');
 const together = require('../../src/together');
 const friends = require('../../src/friends');
+const cache = require('../../src/cache');
+const cacheFiles = require('./cache.js');
 const censor = require('../../src/censor');
 const texts = require('../../src/services/texts');
 const sc = require('../../src/services/soundcloud');
@@ -60,6 +62,7 @@ const ready = (async () => {
 ready.then(() => {
   together.init((ev) => send('together:event', ev));
   friends.init();
+  cache.init(cacheFiles, () => send('cache:changed')).catch((e) => console.warn('cache init:', e.message));
   account.init((ev) => send('account:event', ev));
   startDuck();
 }).catch((e) => console.error('bridge start:', e));
@@ -177,6 +180,7 @@ const api = {
       config.set(patch);
       account.settingsChanged(patch);
       if (patch.friends) friends.settingsChanged();
+      if (patch.cache) cache.settingsChanged();
       if (pop.open && patch.eq) popEmit('eqpop:refresh');
       return config.publicView();
     }),
@@ -261,6 +265,11 @@ const api = {
     remove: call((id) => friends.remove(id)),
     avatar: call((userId, at) => account.avatarOf(userId, at)),
     now: (p) => { ready.then(() => friends.now(clone(p))); },
+  },
+  cache: {
+    info: call(() => cache.info()),
+    clear: call((kind) => cache.clear(kind)),
+    onChange: (cb) => on('cache:changed', cb),
   },
   store: {
     get: call((name) => store.read(name)),

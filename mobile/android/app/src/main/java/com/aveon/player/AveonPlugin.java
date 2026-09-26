@@ -295,6 +295,91 @@ public class AveonPlugin extends Plugin {
         }
     }
 
+    // ---------- кэш треков (src/cache.js) ----------
+
+    static File cacheDir(Context ctx) {
+        File d = new File(ctx.getFilesDir(), "cache-audio");
+        d.mkdirs();
+        return d;
+    }
+
+    private static final java.util.regex.Pattern CACHE_NAME = java.util.regex.Pattern.compile("^[a-f0-9]{24}\\.(mp3|m4a|aac|ogg|webm|flac)(\\.part)?$");
+
+    static File cacheFile(Context ctx, String name) {
+        if (name == null || !CACHE_NAME.matcher(name).matches()) return null;
+        return new File(cacheDir(ctx), name);
+    }
+
+    // Части (одна ссылка или сегменты HLS) пишутся подряд в один файл, готовый — только целиком
+    @PluginMethod
+    public void cacheDownload(PluginCall call) {
+        io.execute(() -> {
+            File file = cacheFile(getContext(), call.getString("name"));
+            if (file == null) {
+                call.reject("bad cache name");
+                return;
+            }
+            File part = new File(file.getPath() + ".part");
+            try {
+                JSArray urls = call.getArray("urls", new JSArray());
+                OkHttpClient client = Net.get(getContext()).newBuilder().callTimeout(10, TimeUnit.MINUTES).build();
+                try (FileOutputStream os = new FileOutputStream(part)) {
+                    byte[] buf = new byte[65536];
+                    for (int i = 0; i < urls.length(); i++) {
+                        Request req = new Request.Builder().url(urls.getString(i)).header("User-Agent", Net.UA).build();
+                        try (Response res = client.newCall(req).execute()) {
+                            if (!res.isSuccessful() || res.body() == null) throw new Exception("HTTP " + res.code());
+                            try (InputStream in = res.body().byteStream()) {
+                                int n;
+                                while ((n = in.read(buf)) > 0) os.write(buf, 0, n);
+                            }
+                        }
+                    }
+                }
+                if (!part.renameTo(file)) throw new Exception("rename failed");
+                JSObject out = new JSObject();
+                out.put("size", file.length());
+                call.resolve(out);
+            } catch (Exception e) {
+                part.delete();
+                call.reject(e.getMessage());
+            }
+        });
+    }
+
+    @PluginMethod
+    public void cacheRemove(PluginCall call) {
+        File f = cacheFile(getContext(), call.getString("name"));
+        if (f != null) f.delete();
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void cacheClear(PluginCall call) {
+        io.execute(() -> {
+            File[] list = cacheDir(getContext()).listFiles();
+            if (list != null) for (File f : list) f.delete();
+            call.resolve();
+        });
+    }
+
+    @PluginMethod
+    public void cacheList(PluginCall call) {
+        JSArray files = new JSArray();
+        File[] list = cacheDir(getContext()).listFiles();
+        if (list != null) {
+            for (File f : list) {
+                JSObject o = new JSObject();
+                o.put("name", f.getName());
+                o.put("size", f.length());
+                files.put(o);
+            }
+        }
+        JSObject out = new JSObject();
+        out.put("files", files);
+        call.resolve(out);
+    }
+
     // ---------- музыка на телефоне ----------
 
     private String audioAlias() {
