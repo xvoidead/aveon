@@ -160,6 +160,7 @@ contextBridge.exposeInMainWorld('tishe', {
     thumbState: (st) => ipcRenderer.send('thumb:state', st),
     onThumb: (cb) => on('thumb', cb),
   },
+  popup: { rect: (r) => ipcRenderer.send('popup:rect', r) }, // всплывающие окна: где панель (src/hover.js)
   openExternal: (url) => ipcRenderer.send('open:external', url),
   copy: (text) => call('clipboard:write', text),
   // Эквалайзер в своём окне (src/eqpop.js)

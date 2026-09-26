@@ -1,6 +1,7 @@
 // Мини-плеер: маленькое окно поверх всех окон с обложкой, названием, строкой текста и кнопками.
 // Его можно утащить куда угодно — место запоминается. Состояние то же, что у острова (island-feed.js).
 const { BrowserWindow, screen } = require('electron');
+const hoverWatch = require('./hover');
 const path = require('path');
 const config = require('./config');
 
@@ -48,7 +49,7 @@ function open() {
       backgroundThrottling: false,
     },
   });
-  win.setIgnoreMouseEvents(true, { forward: true }); // поля вокруг карточки пропускают клики (renderer/mini.js)
+  hoverWatch.watch(win); // поля вокруг карточки пропускают клики (src/hover.js)
   apply();
   win.loadFile(path.join(__dirname, '..', 'renderer', 'mini.html'));
   win.webContents.once('did-finish-load', () => {
@@ -79,7 +80,7 @@ function toggle() {
 }
 
 function hover(on) {
-  if (win && !win.isDestroyed()) win.setIgnoreMouseEvents(!on, { forward: true });
+  hoverWatch.setHover(win, on);
 }
 
 function isOpen() { return !!(win && !win.isDestroyed()); }

@@ -107,3 +107,19 @@ function trackHover(e) {
 }
 document.addEventListener('mousemove', trackHover);
 document.addEventListener('mouseleave', () => { if (overPanel) { overPanel = false; api.island.miniHover(false); } });
+
+// Где панель — главному процессу (src/hover.js): над ней окно ловит мышь, даже если сама панель —
+// область перетаскивания и движение мыши сюда не приходит
+(() => {
+  let last = '';
+  const send = () => {
+    const el = document.querySelector('#card');
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const rect = { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
+    const key = JSON.stringify(rect);
+    if (key !== last) { last = key; api.popup?.rect(rect); }
+  };
+  setInterval(send, 150); // панель растёт и переезжает плавно — сверяем часто, шлём только перемены
+  send();
+})();

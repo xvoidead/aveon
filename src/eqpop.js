@@ -2,6 +2,7 @@
 // плеера. Окно прозрачное — по краям поля под тень, сама панель нарисована в renderer/eqpop.html.
 // Звук живёт в окне плеера: попап присылает туда изменения, а сохраняет настройки сам (cfg:set).
 const { BrowserWindow, screen } = require('electron');
+const hoverWatch = require('./hover');
 const path = require('path');
 
 const PANEL = { width: 620, height: 470 };
@@ -41,7 +42,7 @@ function ensure(main) {
   ready = new Promise((r) => pop.webContents.once('did-finish-load', r));
   // Прозрачные поля под тень пропускают клики к окну плеера: мышь окно ловит, только пока курсор
   // над самой панелью (renderer/eqpop.js → hover). Иначе у края панели была «мёртвая зона»
-  pop.setIgnoreMouseEvents(true, { forward: true });
+  hoverWatch.watch(pop);
   pop.on('blur', () => hide()); // клик мимо — закрыть
   pop.on('closed', () => { pop = null; });
   if (!main.eqpopHooked) {
@@ -75,7 +76,7 @@ async function open(main, rect, payload) {
 function hide() {
   if (!pop || pop.isDestroyed() || !pop.isVisible()) return;
   closedAt = Date.now();
-  pop.setIgnoreMouseEvents(true, { forward: true });
+  hoverWatch.reset(pop);
   pop.hide();
   notify(false);
 }
@@ -94,7 +95,7 @@ function refresh() {
 }
 
 function hover(on) {
-  if (pop && !pop.isDestroyed()) pop.setIgnoreMouseEvents(!on, { forward: true });
+  hoverWatch.setHover(pop, on);
 }
 
 function init(cb) { notify = cb; }

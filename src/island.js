@@ -2,6 +2,7 @@
 // бочка. При наведении раскрывается с кнопками. Окно прозрачное и пропускает клики мимо капсулы.
 // Состояние присылает окно плеера (renderer/island-feed.js), нарисован остров в renderer/island.html.
 const { BrowserWindow, screen } = require('electron');
+const hoverWatch = require('./hover');
 const path = require('path');
 const config = require('./config');
 
@@ -107,7 +108,7 @@ function ensure() {
       backgroundThrottling: false,
     },
   });
-  win.setIgnoreMouseEvents(true, { forward: true });
+  hoverWatch.watch(win);
   level();
   win.loadFile(path.join(__dirname, '..', 'renderer', 'island.html'));
   win.webContents.once('did-finish-load', () => {
@@ -139,7 +140,7 @@ function wanted() {
 function update() {
   if (!wanted()) {
     if (win && !win.isDestroyed() && win.isVisible()) {
-      win.setIgnoreMouseEvents(true, { forward: true }); // спрятали под курсором — mouseleave не придёт
+      hoverWatch.reset(win); // спрятали под курсором — mouseleave не придёт
       win.hide();
     }
     return;
@@ -167,7 +168,7 @@ function state(s) {
 
 // Курсор на капсуле — ловим клики; ушёл — окно снова прозрачно для мыши
 function hover(on) {
-  if (win && !win.isDestroyed()) win.setIgnoreMouseEvents(!on, { forward: true });
+  hoverWatch.setHover(win, on); // src/hover.js: ещё и сам смотрит, где курсор
 }
 
 function settingsChanged() {

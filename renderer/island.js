@@ -274,3 +274,19 @@ $('#seek').onclick = (e) => {
 };
 // колесо над островом — громкость
 pill.addEventListener('wheel', (e) => { e.preventDefault(); act('volume', { delta: e.deltaY < 0 ? 0.05 : -0.05 }); }, { passive: false });
+
+// Где панель — главному процессу (src/hover.js): над ней окно ловит мышь, даже если сама панель —
+// область перетаскивания и движение мыши сюда не приходит
+(() => {
+  let last = '';
+  const send = () => {
+    const el = document.querySelector('#pill');
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const rect = { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
+    const key = JSON.stringify(rect);
+    if (key !== last) { last = key; api.popup?.rect(rect); }
+  };
+  setInterval(send, 150); // панель растёт и переезжает плавно — сверяем часто, шлём только перемены
+  send();
+})();
