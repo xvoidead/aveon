@@ -10,7 +10,7 @@
     "dev": "electron . --dev",
     "dist": "electron-builder --win nsis --publish never",
     "mobile:build": "node mobile/build.mjs && cap sync android",
-    "release": "electron-builder --win nsis --publish always"
+    "release": "node scripts/release.mjs"
   },
   "license": "MIT",
   "devDependencies": {
