@@ -13,11 +13,20 @@ const gh = (...args) => execFileSync('gh', args, { encoding: 'utf8', stdio: ['ig
 const env = { ...process.env };
 if (!env.GH_TOKEN) env.GH_TOKEN = gh('auth', 'token');
 
+// тег ставится на коммит с GitHub — незапушенный коммит GitHub не знает («tag_name is not a valid tag»)
+const head = execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim();
+execFileSync('git', ['fetch', '-q', 'origin'], { stdio: 'inherit' });
+const pushed = spawnSync('git', ['merge-base', '--is-ancestor', head, 'origin/main']).status === 0;
+if (!pushed) {
+  console.error(`✗ коммит ${head.slice(0, 7)} ещё не на GitHub — сначала git push, потом npm run release`);
+  process.exit(1);
+}
+
 let exists = true;
 try { gh('release', 'view', tag); } catch { exists = false; }
 if (!exists) {
   console.log(`• создаю релиз ${tag}`);
-  gh('release', 'create', tag, '--title', version, '--notes', `Авеон ${version}. Что нового — в самом плеере: профиль → «Что нового».`, '--target', execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' }).trim());
+  gh('release', 'create', tag, '--title', version, '--notes', `Авеон ${version}. Что нового — в самом плеере: профиль → «Что нового».`, '--target', head);
 }
 
 const r = spawnSync('npx', ['electron-builder', '--win', 'nsis', '--publish', 'always'], { stdio: 'inherit', env, shell: true });
