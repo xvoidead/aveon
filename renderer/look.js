@@ -6,6 +6,7 @@
 
 const LOOK_DEFAULTS = {
   skin: 'barrel',        // дизайн целиком, см. SKINS
+  glassMode: 'auto',     // «Стекло»: auto — как в системе, light | dark
   theme: 'oak',          // см. THEMES; custom — свой оттенок фона
   hue: 25,               // custom: оттенок фона 0…360
   sat: 30,               // custom: насыщенность фона, %
@@ -82,7 +83,28 @@ const SKINS = {
     palette: { '--oak': '#f4f4f1', '--oak-2': '#efeeea', '--rivet': '#e6e5e0', '--rivet-2': '#dad8d2', '--hoop-dim': '#c2c0b9', '--hoop': '#8f8d86', '--text': '#1d1d1b', '--text-2': '#55534e', '--text-3': '#85837c' },
     accent: '#c43a31',
   },
+  // Стекло: светлая или тёмная тема (palettes), акцент — из обложки. Фон сцены — обложка, заранее размытая
+  // в маленькую картинку (extras.js → ambientFrom), поэтому нигде нет ни CSS-блюра, ни backdrop-filter:
+  // «стекло» — полупрозрачная заливка поверх уже размытого фона, выглядит так же, а стоит ничего.
+  // Обложка квадратная — спектр и вращение пластинки выключены (noViz, noVinyl), их циклы даже не запускаются
+  glass: {
+    name: 'Стекло', desc: 'Светлая и тёмная тема, стекло поверх цвета обложки', display: 'onest', text: 'onest',
+    palettes: {
+      light: { '--oak': '#f5f5f3', '--oak-2': '#ecebe8', '--rivet': '#ffffff', '--rivet-2': '#e3e3e0', '--hoop-dim': '#c7c7cc', '--hoop': '#8e8e93', '--text': '#1c1c1e', '--text-2': '#4f4f54', '--text-3': '#6c6c70', '--voice': '#5b48db', '--danger': '#c4302b' },
+      dark: { '--oak': '#0a0a0b', '--oak-2': '#121214', '--rivet': '#1c1c1e', '--rivet-2': '#2c2c2e', '--hoop-dim': '#48484a', '--hoop': '#8e8e93', '--text': '#f5f5f7', '--text-2': '#c7c7cc', '--text-3': '#98989d', '--voice': '#a89bff' },
+    },
+    ambient: true, noViz: true, noVinyl: true,
+  },
 };
+
+// «Стекло» в режиме «как в системе» следит за темой Windows
+const darkQuery = matchMedia('(prefers-color-scheme: dark)');
+function skinMode(skin) {
+  if (!skin.palettes) return null;
+  if (look.glassMode === 'light' || look.glassMode === 'dark') return look.glassMode;
+  return darkQuery.matches ? 'dark' : 'light';
+}
+darkQuery.addEventListener('change', () => { if (SKINS[look.skin]?.palettes && look.glassMode === 'auto') applyLook(); });
 
 const ACCENTS = ['#f0a63a', '#ff7b6b', '#f5d547', '#7ed49a', '#5cc8e8', '#9aa8ff', '#c792ea', '#ff8ac6', '#e8e1d5'];
 
@@ -127,13 +149,23 @@ function applyLook() {
   window.LOOK = look;
   const root = document.documentElement;
   const skin = SKINS[look.skin] || SKINS.barrel;
-  const vars = skin.palette ? { ...skin.palette } : themeVars(look);
+  const mode = skinMode(skin);
+  const palette = mode ? skin.palettes[mode] : skin.palette;
+  const vars = palette ? { ...palette } : themeVars(look);
   if (look.accentMode === 'fixed') vars['--amber'] = look.accent;
   else if (skin.accent) vars['--amber'] = skin.accent;
   if (look.voice) vars['--voice'] = look.voice;
-  // extras.js → setTheme: палитра обложки не перекрашивает фон и акцент дизайнов со своими цветами
-  window.SKIN_FIXED = !!skin.palette;
+  // extras.js → setTheme: палитра обложки не перекрашивает фон и акцент дизайнов со своими цветами;
+  // на светлом фоне акцент из обложки темнее, а фон сцены — готовая размытая обложка (ambientFrom)
+  window.SKIN_FIXED = !!palette;
   window.SKIN_ACCENT = !!skin.accent;
+  window.SKIN_LIGHT = mode === 'light';
+  window.SKIN_AMBIENT = !!skin.ambient;
+  // Спектр и вращение пластинки дизайну не нужны — выключаем в том, что читают их циклы (app.js, scratch.js),
+  // сами настройки не трогаем: в другом дизайне они вернутся
+  if (skin.noViz || skin.noVinyl) {
+    window.LOOK = { ...look, ...(skin.noViz ? { viz: false } : {}), ...(skin.noVinyl ? { vinyl: false, scratch: false } : {}) };
+  }
   const display = skin.display && look.display === LOOK_DEFAULTS.display ? skin.display : look.display;
   const text = skin.text && look.text === LOOK_DEFAULTS.text ? skin.text : look.text;
   vars['--display'] = (FONTS[display] || FONTS.unbounded).css;
@@ -145,8 +177,10 @@ function applyLook() {
 
   // Размер интерфейса: CSS zoom масштабирует всё сразу, и раскладка остаётся живой
   root.style.zoom = look.scale === 100 ? '' : String(look.scale / 100);
+  root.style.setProperty('--ui-zoom', String(look.scale / 100)); // 100vh внутри zoom — в пикселях без него (styles.css, обложка «Стекла»)
   const cls = {
     ...Object.fromEntries(Object.keys(SKINS).filter((id) => id !== 'barrel').map((id) => [`skin-${id}`, look.skin === id])),
+    'glass-light': mode === 'light', 'glass-dark': mode === 'dark',
     'look-compact': look.density === 'compact', 'look-cozy': look.density === 'cozy',
     'look-no-covers': !look.covers, 'look-no-album': !look.albumCol, 'look-no-time': !look.timeCol,
     'look-calm': look.motion === 'calm', 'look-still': look.motion === 'off',
@@ -324,9 +358,10 @@ function skinSection(l) {
   </span>`;
   return `<section class="sec" data-sec="skin">
     <h3 class="sec-title">Дизайн</h3>
-    <p class="sec-desc">Внешний вид всего плеера. Тема, акцент, шрифты и остальное ниже работают в обоих.</p>
+    <p class="sec-desc">Внешний вид всего плеера. Акцент, шрифты и остальное ниже работают во всех.</p>
     <div class="look-skins">${Object.entries(SKINS).map(([id, s]) => `<button class="look-skin${l.skin === id ? ' on' : ''}" data-skin="${id}">
       ${mock(id)}<span class="skin-name">${s.name}</span><small>${s.desc}</small></button>`).join('')}</div>
+    ${SKINS[l.skin]?.palettes ? `<div class="field"><label>Тема</label><div class="ctl">${seg('glassMode', [['auto', 'Как в системе'], ['light', 'Светлая'], ['dark', 'Тёмная']], l.glassMode)}</div></div>` : ''}
   </section>`;
 }
 
@@ -566,6 +601,7 @@ loadWallpaper();
 // Считаем прямо из анализатора звука (app.js → fx.analyser), только пока что-то из этого включено
 const reactBins = new Uint8Array(2048);
 let beat = 0, level = 0;
+let beatShown = '', levelShown = '';
 
 // Общие для всех: чувствительность и сглаживание (спектр в app.js, остров в island-feed.js)
 const reactGain = () => (window.LOOK?.reactGain ?? 100) / 100;
@@ -590,8 +626,11 @@ function reactLoop() {
     beat *= 0.85;
     level *= 0.85;
   }
-  root.setProperty('--beat', beat.toFixed(3));
-  root.setProperty('--level', level.toFixed(3));
+  // В корень пишем, только когда число изменилось: каждая запись — пересчёт стилей всей страницы,
+  // а при выключенной реакции значения затухают до нуля и дальше кадры ничего не стоят
+  const b = beat.toFixed(3), lv = level.toFixed(3);
+  if (b !== beatShown) { root.setProperty('--beat', b); beatShown = b; }
+  if (lv !== levelShown) { root.setProperty('--level', lv); levelShown = lv; }
   requestAnimationFrame(reactLoop);
 }
 requestAnimationFrame(reactLoop);

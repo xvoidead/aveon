@@ -4,7 +4,7 @@
 // tray.js, hotkeys.js, livewall.js. Общие глобальные: state, api, $, $$, esc, toast, saveCfg, IS_MOBILE.
 
 const DESK_DEFAULTS = {
-  island: { enabled: true, pos: 'top', onlyAway: true, hideInGames: false, lyrics: true, friends: true, notify: true, pulse: true, rainbow: false, motion: 'music', bars: true, spin: true },
+  island: { enabled: true, pos: 'top', onlyAway: true, hideInGames: false, lyrics: true, friends: true, notify: true, pulse: false, rainbow: false, motion: 'music', bars: true, spin: false },
   mini: { onMinimize: false, top: true, opacity: 100, lyrics: true },
   tray: { enabled: true, closeToTray: false },
   livewall: { enabled: false, style: 'both', title: true, dim: 45 },
@@ -97,7 +97,7 @@ function deskSection() {
       <p class="sec-desc">«Статичный» — остров не реагирует на звук: полоски замирают, обложка не крутится, ничего не пульсирует.</p>
       <div class="sub-fields" ${i.motion === 'static' ? 'data-off' : ''}>
         ${dSw('island', 'bars', 'Полоски спектра', i.bars)}
-        ${dSw('island', 'spin', 'Обложка крутится, пока играет', i.spin)}
+        ${dSw('island', 'spin', 'Обложка кружком и крутится, пока играет', i.spin)}
         ${i.motion === 'music' ? dSw('island', 'pulse', 'Пульсирует в такт басам', i.pulse) : ''}
       </div>
       ${dSw('island', 'rainbow', 'Переливающаяся обводка цветами обложки', i.rainbow)}

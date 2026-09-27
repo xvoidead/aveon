@@ -12,6 +12,9 @@
     state  {state, beat?}            новое состояние; отправитель становится ведущим
     ping   {c}                       сверка часов: c — время клиента
     react  {e}                       реакция: одна из REACTS, не чаще раза в 300 мс
+    skip   {dir}                     «следующий» / «предыдущий» у гостя: dir — next | prev.
+                                     Очередь (волна, плейлист) есть только у того, кто её включил, —
+                                     он и переключает, остальные просьбу пропускают
     leave  {}
   сервер → клиент
     hello   {you, now}
@@ -20,6 +23,7 @@
     members {members, driver, joined?, left?}
     pong    {c, s}
     react   {e, by, from, now}       всем в руме, включая отправителя; состояние румы не меняется
+    skip    {dir, by, from}          всем, кроме отправителя
     error   {error}
 """
 from __future__ import annotations
@@ -39,6 +43,7 @@ CODE_LEN = 6
 MAX_MEMBERS = 10
 REACTS = {"🔥", "😍", "😂", "🎉", "👏", "💀", "🥁", "🛢"}
 REACT_GAP = 0.3  # с между реакциями одного участника
+SKIP_GAP = 0.4  # с между просьбами переключить трек
 MAX_MESSAGE = 64 * 1024
 
 
@@ -54,6 +59,7 @@ class Member:
     ws: WebSocket
     avatar_at: int = 0  # 0 — аватара нет; сам аватар плеер берёт из /api/avatar/{user}
     last_react: float = 0.0  # когда отправил последнюю реакцию — не чаще раза в 300 мс
+    last_skip: float = 0.0  # когда просил переключить трек — не чаще раза в 400 мс
 
 
 @dataclass
@@ -190,6 +196,13 @@ async def together(ws: WebSocket):
                 if e in REACTS and t - member.last_react >= REACT_GAP:
                     member.last_react = t
                     await broadcast(room, {"t": "react", "e": e, "by": member.name, "from": member.id, "now": now_ms()})
+
+            elif kind == "skip" and room:
+                d = msg.get("dir")
+                t = time.monotonic()
+                if d in ("next", "prev") and t - member.last_skip >= SKIP_GAP:
+                    member.last_skip = t
+                    await broadcast(room, {"t": "skip", "dir": d, "by": member.name, "from": member.id}, skip=member.id)
 
             elif kind == "leave":
                 await leave(room, member)

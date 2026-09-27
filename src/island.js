@@ -7,7 +7,7 @@ const games = require('./games');
 const path = require('path');
 const config = require('./config');
 
-const SIZE = { width: 780, height: 380 }; // с запасом: свёрнутая капсула растёт под длину строки, раскрытая — с текстом и друзьями
+const SIZE = { width: 780, height: 420 }; // с запасом: свёрнутая капсула растёт под длину строки, раскрытая — с текстом и друзьями
 
 let win = null;
 let main = null;

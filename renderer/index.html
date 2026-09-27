@@ -9,6 +9,8 @@
   <link rel="stylesheet" href="../node_modules/@fontsource/onest/400.css">
   <link rel="stylesheet" href="../node_modules/@fontsource/onest/500.css">
   <link rel="stylesheet" href="../node_modules/@fontsource/onest/600.css">
+  <link rel="stylesheet" href="../node_modules/@fontsource/onest/700.css">
+  <link rel="stylesheet" href="../node_modules/@fontsource/onest/800.css">
   <link rel="stylesheet" href="../node_modules/@fontsource/jost/300.css">
   <link rel="stylesheet" href="../node_modules/@fontsource/jost/400.css">
   <link rel="stylesheet" href="../node_modules/@fontsource/jost/500.css">
@@ -37,6 +39,7 @@
     <symbol id="i-disk" viewBox="0 0 24 24"><ellipse cx="12" cy="6.5" rx="7.5" ry="3" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M4.5 6.5v11c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3v-11M4.5 12c0 1.7 3.4 3 7.5 3s7.5-1.3 7.5-3" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 4.5v10m0 0-4-4m4 4 4-4M5 18.5h14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 19.5s-7-4.3-7-9.6A4 4 0 0 1 12 7.6a4 4 0 0 1 7 2.3c0 5.3-7 9.6-7 9.6z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-heart-fill" viewBox="0 0 24 24"><path d="M12 19.5s-7-4.3-7-9.6A4 4 0 0 1 12 7.6a4 4 0 0 1 7 2.3c0 5.3-7 9.6-7 9.6z" fill="currentColor" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
     <symbol id="i-dislike" viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="m7 17 10-10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
     <symbol id="i-check" viewBox="0 0 24 24"><path d="m5.5 12.5 4.2 4.2 8.8-9.4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-moon" viewBox="0 0 24 24"><path d="M19.5 14.2A7.5 7.5 0 0 1 9.8 4.5a7.5 7.5 0 1 0 9.7 9.7z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></symbol>
@@ -73,11 +76,14 @@
     <symbol id="i-plug" viewBox="0 0 24 24"><path d="M9 3.5v4M15 3.5v4M6.5 7.5h11v3.5a5.5 5.5 0 0 1-11 0zM12 16.5v4" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-keys" viewBox="0 0 24 24"><rect x="3" y="6.5" width="18" height="11" rx="2.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M7 10.5h.01M10.3 10.5h.01M13.7 10.5h.01M17 10.5h.01M8 14h8" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
     <symbol id="i-min" viewBox="0 0 24 24"><path d="M6 12h12" stroke="currentColor" stroke-width="1.3"/></symbol>
+    <symbol id="i-to-tray" viewBox="0 0 24 24"><path d="M12 5v9M8.5 10.5 12 14l3.5-3.5M5 15.5V18a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></symbol>
     <symbol id="i-max" viewBox="0 0 24 24"><rect x="6.5" y="6.5" width="11" height="11" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.3"/></symbol>
   </svg>
 
   <!-- Бочка: сейчас играет. Обручи, обложка и спектр реагируют на силу эффекта (--m) -->
   <section class="stage" id="stage">
+    <!-- название сверху — в дизайне «Стекло»; справа от него встаёт кружок профиля (styles.css) -->
+    <div class="stage-top" aria-hidden="true"><span class="stage-logo"></span><span class="stage-name">авеон</span></div>
     <div class="barrel" id="barrel">
       <canvas id="viz" class="viz"></canvas>
       <svg class="hoops" viewBox="0 0 320 320" aria-hidden="true">
@@ -93,6 +99,11 @@
       <div class="now-title" id="now-title">Ничего не играет</div>
       <div class="now-artist" id="now-artist">Выбери трек в библиотеке справа</div>
       <div class="now-via" id="now-via" hidden></div>
+      <!-- у названия: «нравится» и «ещё» — видны в дизайне «Стекло» (styles.css), остальным дизайнам хватает кнопок внизу -->
+      <div class="now-actions">
+        <button class="icon-btn" id="btn-like" aria-label="Нравится" title="В «Мне нравится»" aria-pressed="false" hidden><svg><use href="#i-heart"/></svg></button>
+        <button class="icon-btn" id="btn-now-more" aria-label="Ещё: альбом, SoundCloud, во весь экран, режимы" title="Ещё" aria-haspopup="menu"><svg><use href="#i-more"/></svg></button>
+      </div>
     </div>
 
     <button class="together-chip idle" id="together-chip" aria-haspopup="dialog" aria-expanded="false"><svg class="together-chip-icon"><use href="#i-together"/></svg><i class="together-dot"></i><span class="together-faces" id="together-chip-faces"></span><span id="together-chip-text"></span></button>
@@ -355,6 +366,7 @@
        и сцена (при плеере справа) иначе накрыла бы их своей «тянуть окно» -->
   <header class="titlebar">
     <div class="win-buttons">
+      <button data-win="tray" aria-label="Свернуть в трей" title="Свернуть в трей"><svg><use href="#i-to-tray"/></svg></button>
       <button data-win="min" aria-label="Свернуть"><svg><use href="#i-min"/></svg></button>
       <button data-win="max" aria-label="Развернуть"><svg><use href="#i-max"/></svg></button>
       <button data-win="close" class="win-close" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button>

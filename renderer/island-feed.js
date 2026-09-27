@@ -4,7 +4,7 @@
 // Пока играет — ~15 раз в секунду (с живыми обоями — 30), на паузе — изредка.
 // Общие глобальные из app.js и соседей: state, api, audio, fx, duck, Friends, Together, parseLRC, …
 
-const ISLAND_OPTS = { lyrics: true, friends: true, notify: true, pulse: true, rainbow: false, motion: 'music', bars: true, spin: true };
+const ISLAND_OPTS = { lyrics: true, friends: true, notify: true, pulse: false, rainbow: false, motion: 'music', bars: true, spin: false };
 const islandOpt = (k) => ({ ...ISLAND_OPTS, ...(state.cfg?.island || {}) })[k];
 
 // Уведомление в острове: заявка в друзья, друг включил трек, кто-то зашёл в комнату…
@@ -202,6 +202,9 @@ function islandNotify(text, kind = 'info', person = null, actions = []) {
       spec: full,
       ...(() => { const l = lyricNow(); return { line: l.cur, lyric: l }; })(),
       friends: friendsNow(),
+      // «нравится» — только у треков Яндекс Музыки, и снять отсюда нельзя (app.js → renderNowLike)
+      likeable: t.source === 'ym',
+      liked: !!renderNowLike.liked?.has(t.id),
       opts: { motion: islandOpt('motion'), bars: islandOpt('bars'), spin: islandOpt('spin'), pulse: islandOpt('pulse'), rainbow: islandOpt('rainbow'), lyrics: islandOpt('lyrics'), miniLyrics: state.cfg?.mini?.lyrics !== false },
     };
   }
@@ -257,6 +260,8 @@ function islandNotify(text, kind = 'info', person = null, actions = []) {
       if (a.action === 'toggle') togglePlay();
       else if (a.action === 'next') next();
       else if (a.action === 'prev') prev();
+    } else if (a.type === 'like') {
+      $('#btn-like').click(); // тот же лайк, что у названия в плеере
     } else if (a.type === 'barrel') {
       toggleForcedBarrel();
     } else if (a.type === 'seek' && isFinite(audio.duration)) {

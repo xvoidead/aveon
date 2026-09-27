@@ -172,7 +172,8 @@ function leaveHome() {
 let homePhase = 0;
 function drawHomeAir() {
   const c = $('#h-wave-air');
-  if (c && !$('#home')?.hidden && !document.hidden) {
+  // спрятан дизайном («Стекло») — нулевая ширина, не рисуем
+  if (c && !$('#home')?.hidden && !document.hidden && c.clientWidth) {
     const dpr = window.devicePixelRatio || 1;
     const w = c.clientWidth * dpr, h = c.clientHeight * dpr;
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; }
@@ -180,7 +181,7 @@ function drawHomeAir() {
     g.clearRect(0, 0, w, h);
     const still = document.documentElement.classList.contains('look-still') || matchMedia('(prefers-reduced-motion: reduce)').matches;
     if (!still) homePhase += Wave.active && !audio.paused ? 0.02 : 0.007;
-    const amber = getComputedStyle(document.documentElement).getPropertyValue('--amber').trim() || '#f0a63a';
+    const amber = vizColor('amber'); // extras.js: цвет читается раз в полсекунды, а не каждый кадр
     for (let k = 0; k < 5; k++) {
       g.beginPath();
       g.lineWidth = (k === 2 ? 2 : 1) * dpr;

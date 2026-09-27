@@ -90,14 +90,39 @@ api.island.onState((s) => {
   renderEvents(s.events || []);
   renderLabel();
   $('#b-play use').setAttribute('href', s.playing ? '#i-pause' : '#i-play');
+  pill.classList.toggle('can-like', !!s.likeable);
+  renderLike(!!s.liked);
   $('#b-barrel').classList.toggle('on', !!s.manual);
-  (s.bars || []).forEach((v, i) => { if (bars[i]) bars[i].style.height = `${Math.round(18 + v * 82)}%`; });
+  // пять уровней спектра → семь полосок волной от центра, как в iOS: басы посередине, верха по краям
+  const lv = s.bars || [];
+  bars.forEach((el, i) => { el.style.height = `${Math.round(18 + (lv[WAVE[i]] || 0) * 82)}%`; });
+  renderSide(s.friends);
+  renderSideEv();
 });
+const WAVE = [4, 2, 1, 0, 1, 3, 4];
+
+// Капли справа от свёрнутой капсулы, как вторая активность в iOS: друг слушает — его аватарка,
+// есть уведомления — последнее (аватарка или значок) и сколько их. Видны ли — решает tick
+const setHtml = (box, html) => { if (box._html !== html) { box._html = html; box.innerHTML = html; } };
+function renderSide(f) {
+  const x = f?.count ? f.live[0] : null;
+  const bg = x && avatarCss(x.av);
+  setHtml($('#side'), !x ? '' : bg ? `<i class="pic" style='background-image:${bg}'></i>` : `<i>${esc(x.letter)}</i>`);
+}
+// в капле — только непрочитанные: пришедшие с тех пор, как остров раскрывали (лента помнит два часа)
+let seenAt = Date.now();
+const unseen = () => (st?.events || []).filter((e) => e.at > seenAt);
+function renderSideEv() {
+  const n = unseen().length;
+  // значок чата цветом акцента; больше одного — ещё и сколько
+  setHtml($('#side-ev'), n ? `<svg><use href="#i-chat"/></svg>${n > 1 ? `<b>${n > 9 ? '9+' : n}</b>` : ''}` : '');
+}
+const sides = () => [...document.querySelectorAll('.side.on')];
 
 // Что написано в капсуле: уведомление > название (раскрыта) > бочка > строка текста
 // Свёрнутая капсула растёт под текст: обложка + текст + полоски. Ширина меняется плавно (CSS transition).
 // Не влезает даже в самую широкую — шрифт чуть меньше, и только потом многоточие
-const MIN_W = 200, MAX_W = 760;
+const MIN_W = 200, MAX_W = 660; // окно 780: справа ещё место под две капли (друг и уведомления)
 const measure = document.createElement('span');
 measure.className = 'measure';
 document.body.appendChild(measure);
@@ -105,7 +130,7 @@ document.body.appendChild(measure);
 function fitWidth() {
   const b = $('#p-title');
   if (expanded()) { pill.style.width = ''; b.style.fontSize = ''; return; }
-  const extra = 6 + 26 + 10 + 10 + (pill.classList.contains('no-bars') ? 0 : 30) + 16; // поля, обложка, отступы, полоски
+  const extra = 6 + 26 + 10 + 10 + (pill.classList.contains('no-bars') ? 0 : 30) + 16; // поля, обложка, отступы, 7 полосок
   measure.style.font = getComputedStyle(b).font;
   measure.innerHTML = b.innerHTML;
   let size = 13;
@@ -261,6 +286,9 @@ function letterFill() {
 }
 
 function tick() {
+  const drops = !!st?.hasTrack && !expanded() && !document.body.classList.contains('hidden');
+  $('#side').classList.toggle('on', drops && is('friend-live'));
+  $('#side-ev').classList.toggle('on', drops && unseen().length > 0);
   const fill = letterFill();
   if (fill !== null) {
     const v = `${(fill * 100).toFixed(1)}%`;
@@ -271,7 +299,7 @@ function tick() {
     const pos = st.playing ? st.pos + (Date.now() - st.at) / 1000 : st.pos;
     const dur = st.duration || 0;
     $('#t-cur').textContent = fmt(dur ? Math.min(pos, dur) : pos);
-    $('#t-dur').textContent = fmt(dur);
+    $('#t-dur').textContent = dur ? `-${fmt(dur - Math.min(pos, dur))}` : '0:00'; // справа — сколько осталось, как в iOS
     $('#seek-fill').style.width = dur ? `${Math.min(100, (pos / dur) * 100)}%` : '0';
   }
   requestAnimationFrame(tick);
@@ -287,6 +315,8 @@ function pointerIn() {
   if (is('open')) { api.island.hover(true); return; } // уже раскрыт — но ловить мышь напомнить (вдруг сбросили)
   pill.classList.remove('peek', 'notice');
   pill.classList.add('open');
+  seenAt = Date.now(); // раскрыли — уведомления видны в ленте, капля больше не нужна
+  renderSideEv();
   renderLabel();
   fitWidth();
   window.sendPillRect?.(); // сразу, не дожидаясь кадра
@@ -297,24 +327,32 @@ function pointerOut() {
   api.island.log?.('pointerOut', pill.className, 'hover', pill.matches(':hover'));
   clearTimeout(leaveTimer);
   pill.classList.remove('open');
+  sideZone = null;
   renderLabel();
   // уведомление, пришедшее под курсором, — сейчас, если ещё свежее
   const p = pendingNotice;
   pendingNotice = null;
   if (p && Date.now() - p.at < 8000) notice(p.text, p.av, p.kind);
 }
-pill.addEventListener('mouseenter', pointerIn); // быстрее часов главного процесса, если событие пришло
-// главный процесс: зашёл — раскрыть, ушёл (уже с задержкой) — свернуть
+// Раскрывается по нажатию, как в iOS; наведение только подсвечивает капсулу
+pill.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || is('open')) return;
+  e.preventDefault();
+  pointerIn();
+});
+// главный процесс: курсор над капсулой — подсветка; ушёл (уже с задержкой) — свернуть
 api.island.onPointer((on) => {
   api.island.log?.('onPointer', on);
+  pill.classList.toggle('hover', on === true);
   if (on === 'reset') { // окно прячут: свернуться сразу, без задержки и без проверки :hover
     clearTimeout(leaveTimer);
     pill.classList.remove('open');
+    sideZone = null;
     pendingNotice = null;
     renderLabel();
     return;
   }
-  if (on) pointerIn(); else pointerOut();
+  if (!on) pointerOut();
 });
 
 const act = (type, extra) => api.island.action({ type, ...extra });
@@ -323,7 +361,35 @@ $('#b-prev').onclick = () => act('thumb', { action: 'prev' });
 $('#b-next').onclick = () => act('thumb', { action: 'next' });
 $('#b-barrel').onclick = () => act('barrel');
 $('#b-open').onclick = () => act('focus');
-$('#disc').onclick = () => act('focus');
+
+// «нравится»: сердечко сразу красное (плеер пришлёт liked чуть позже), убрать лайк отсюда нельзя
+function renderLike(on) {
+  const b = $('#b-like');
+  if (b.classList.contains('on') === on) return;
+  b.classList.toggle('on', on);
+  b.title = on ? 'Уже в «Мне нравится»' : 'Нравится';
+  b.querySelector('use').setAttribute('href', on ? '#i-heart-fill' : '#i-heart');
+}
+$('#b-like').onclick = () => {
+  const b = $('#b-like');
+  if (b.classList.contains('on')) return;
+  renderLike(true);
+  b.classList.remove('pop');
+  void b.offsetWidth;
+  b.classList.add('pop');
+  act('like');
+};
+
+$('#disc').onclick = () => { if (is('open')) act('focus'); }; // свёрнутый: нажатие раскрывает остров, а не плеер
+// нажатие на каплю — раскрыть остров: там строка «кто что слушает» и лента уведомлений
+let sideZone = null;
+for (const el of document.querySelectorAll('.side')) {
+  el.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || !el.classList.contains('on')) return;
+    sideZone = el.getBoundingClientRect();
+    pointerIn();
+  });
+}
 $('#seek').onclick = (e) => {
   if (!st?.duration) return;
   const r = e.currentTarget.getBoundingClientRect();
@@ -336,11 +402,21 @@ pill.addEventListener('wheel', (e) => { e.preventDefault(); act('volume', { delt
 // область перетаскивания и движение мыши сюда не приходит
 (() => {
   let last = '';
+  const box = (r) => ({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
   const send = () => {
     const el = document.querySelector('#pill');
     if (!el) return;
-    const r = el.getBoundingClientRect();
-    const rect = { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) };
+    let r = el.getBoundingClientRect();
+    // раскрыли нажатием на кружок друга — его место тоже «наше», пока остров раскрыт: иначе курсор,
+    // оставшийся там, где был кружок (правее широкой капсулы), сразу свернул бы остров
+    if (sideZone && is('open')) {
+      const l = Math.min(r.left, sideZone.left), t = Math.min(r.top, sideZone.top);
+      r = { left: l, top: t, width: Math.max(r.right, sideZone.right) - l, height: Math.max(r.bottom, sideZone.bottom) - t };
+    }
+    const rect = box(r);
+    // над каплями окно ловит мышь (иначе клик проходит насквозь), но наведение остров не раскрывает
+    const drops = sides();
+    if (drops.length) rect.extra = drops.map((d) => box(d.getBoundingClientRect()));
     const key = JSON.stringify(rect);
     if (key !== last) { last = key; api.popup?.rect(rect); }
   };

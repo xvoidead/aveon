@@ -10,6 +10,7 @@ const OMEGA = (RPM / 60) * 360; // градусов в секунду при о�
 const vinyl = {
   node: null,         // AudioWorkletNode
   angle: 0,           // текущий угол обложки, градусы
+  shown: '',          // угол, уже записанный в --spin
   held: false,        // держат рукой
   pending: null,      // нажали, но ещё не сдвинули — может, это просто клик
   last: null,         // { a, t } — прошлый угол руки и время
@@ -125,8 +126,12 @@ function spinFrame(t) {
   const dt = Math.min(0.1, (t - vinyl.lastFrame) / 1000);
   vinyl.lastFrame = t;
   if (!vinyl.held && vinylOn() && !audio.paused && !document.hidden) vinyl.angle += OMEGA * dt;
-  const el = $('#barrel'); // на бочке: угол наследуют и обложка, и пластинка «Конверта»
-  if (el) el.style.setProperty('--spin', `${(vinyl.angle % 360).toFixed(2)}deg`);
+  // Угол пишем, только если он изменился: на паузе и с выключенным вращением кадр не трогает стили
+  const spin = `${(vinyl.angle % 360).toFixed(2)}deg`;
+  if (spin !== vinyl.shown) {
+    const el = $('#barrel'); // на бочке: угол наследуют и обложка, и пластинка «Конверта»
+    if (el) { el.style.setProperty('--spin', spin); vinyl.shown = spin; }
+  }
   requestAnimationFrame(spinFrame);
 }
 requestAnimationFrame(spinFrame);

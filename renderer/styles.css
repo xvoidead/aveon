@@ -130,6 +130,8 @@ body.win-autohide.win-reveal .win-buttons, body.win-autohide .win-buttons:focus-
 }
 .now-artist { margin-top: 4px; color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .now-via { margin-top: 3px; color: var(--text-3); font-size: 12px; }
+.now-actions { display: none; } /* «нравится» и «ещё» у названия — только в «Стекле» */
+.stage-top { display: none; } /* название «авеон» над обложкой — только в «Стекле» */
 
 .progress-row { display: flex; align-items: center; gap: 10px; width: 100%; }
 .time { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; min-width: 34px; }
@@ -994,13 +996,43 @@ kbd {
 .stage > .barrel { margin-top: auto; } /* плеер посередине между верхом и подвалом */
 
 /* ---------- аватар ---------- */
-.me-avatar.has-pic, .pf-avatar.has-pic { background-size: cover; background-position: center; }
+/* :root — сильнее правил дизайнов с их фоном кружка: shorthand background сбросил бы размер, и в кружке был бы угол фото */
+:root :is(.me-avatar, .pf-avatar).has-pic { background-size: cover; background-position: center; }
 .pf-avatar { position: relative; cursor: pointer; overflow: hidden; }
 .pf-avatar::after {
   content: "сменить"; position: absolute; inset: 0; display: grid; place-items: center; border-radius: 50%;
   font: 600 12px var(--ui); color: #fff; background: rgb(0 0 0 / .45); opacity: 0; transition: opacity .15s ease;
 }
 .pf-avatar:hover::after, .pf-avatar[aria-expanded="true"]::after, .pf-avatar:focus-visible::after { opacity: 1; }
+
+/* кадр аватара (profile.js → cropAvatar): фото на холсте, вокруг кружка — затемнение */
+.crop-modal { z-index: 38; }
+.crop .sec-desc { margin-bottom: 14px; }
+.crop-view {
+  position: relative; height: 300px; overflow: hidden; border-radius: calc(var(--u) * 14);
+  background: #0b0b0c; cursor: grab; touch-action: none;
+}
+.crop-view.drag { cursor: grabbing; }
+.crop-view:focus-visible { outline: 2px solid var(--amber); outline-offset: 3px; }
+.crop-view canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.crop-ring {
+  position: absolute; left: 50%; top: 50%; width: var(--d, 250px); height: var(--d, 250px); translate: -50% -50%;
+  border-radius: 50%; pointer-events: none; box-shadow: 0 0 0 999px rgb(0 0 0 / .56), inset 0 0 0 1.5px rgb(255 255 255 / .85);
+}
+.crop-zoom { display: flex; align-items: center; gap: 12px; margin-top: 16px; color: var(--text-3); }
+.crop-zoom svg { fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.crop-zoom .crop-zoom-s { width: 14px; height: 14px; }
+.crop-zoom .crop-zoom-l { width: 21px; height: 21px; }
+.crop-zoom input[type="range"] { flex: 1; height: 22px; margin: 0; background: transparent; cursor: pointer; -webkit-appearance: none; appearance: none; }
+.crop-zoom input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px; border-radius: 2px; background: linear-gradient(var(--text), var(--text)) 0 / var(--p, 0%) 100% no-repeat, var(--rivet-2);
+}
+.crop-zoom input[type="range"]::-webkit-slider-thumb {
+  width: 20px; height: 20px; margin-top: -8px; border-radius: 50%; background: #fff; -webkit-appearance: none;
+  box-shadow: 0 1px 4px rgb(0 0 0 / .32), 0 0 0 .5px rgb(0 0 0 / .12);
+}
+.crop-zoom input[type="range"]:focus-visible { outline: none; }
+.crop-zoom input[type="range"]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px var(--amber); }
 
 /* ---------- аватары в «Слушать вместе» ---------- */
 .together-avatar { overflow: hidden; }
@@ -2544,3 +2576,461 @@ html.skin-zen .win-buttons button:hover { background: var(--rivet); }
 html.skin-zen.look-still .barrel.fresh::before, html.skin-zen.look-still .barrel.fresh::after { animation: none; }
 /* размытая обложка за сценой на бумаге выглядит грязью — в «Дзене» фон всегда чистый */
 html.skin-zen.look-stage-cover .stage::before { display: none; }
+
+/* =====================================================================================
+   ДИЗАЙН «СТЕКЛО» (look.js → skin: 'glass', классы html.skin-glass и glass-light / glass-dark)
+   Светлая или тёмная тема, акцент из обложки. Главное — дёшево для компьютера:
+   · фон сцены — обложка, заранее размытая в картинку 64×64 (extras.js → ambientFrom, переменная --ambient):
+     браузер её только растягивает, ни одного CSS-фильтра;
+   · «стекло» — полупрозрачная заливка поверх уже размытого фона, без backdrop-filter;
+   · спектр и вращение пластинки выключены в look.js (их покадровые циклы не запускаются);
+   · анимации — только transform и opacity, неактивные строки текста без размытия.
+   ===================================================================================== */
+html.skin-glass {
+  --u: 1px;
+  --glass: rgb(255 255 255 / .58);
+  --glass-edge: rgb(255 255 255 / .8);
+  --fill: rgb(118 118 128 / .12);
+  --fill-2: rgb(118 118 128 / .2);
+  --line: rgb(0 0 0 / .08);
+  --veil: rgb(248 247 243 / .5);
+  --veil-lyrics: rgb(248 247 243 / .68);
+  --lyric-dim: .42;
+  --seg-on: #fff;
+  --seg-shadow: 0 1px 2px rgb(0 0 0 / .1), 0 3px 10px rgb(0 0 0 / .07);
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .04), 0 12px 32px rgb(0 0 0 / .07);
+  --cover-shadow: 0 24px 48px -16px rgb(50 35 10 / .5), 0 10px 22px -12px rgb(0 0 0 / .3);
+  --pop-shadow: 0 24px 60px rgb(0 0 0 / .18), 0 0 0 1px rgb(0 0 0 / .06);
+  color-scheme: light;
+}
+html.skin-glass.glass-dark {
+  --glass: rgb(30 30 32 / .52);
+  --glass-edge: rgb(255 255 255 / .09);
+  --fill: rgb(118 118 128 / .22);
+  --fill-2: rgb(118 118 128 / .32);
+  --line: rgb(255 255 255 / .08);
+  --veil: rgb(6 6 7 / .56);
+  --veil-lyrics: rgb(6 6 7 / .56);
+  --lyric-dim: .34;
+  --seg-on: #48484a;
+  --seg-shadow: 0 1px 2px rgb(0 0 0 / .35), 0 3px 10px rgb(0 0 0 / .25);
+  --card-shadow: 0 1px 2px rgb(0 0 0 / .4), 0 12px 32px rgb(0 0 0 / .35);
+  --cover-shadow: 0 28px 60px -14px rgb(0 0 0 / .75), 0 10px 22px -12px rgb(0 0 0 / .6);
+  --pop-shadow: 0 24px 60px rgb(0 0 0 / .55), 0 0 0 1px rgb(255 255 255 / .08);
+  color-scheme: dark;
+}
+html.skin-glass body { letter-spacing: -0.005em; }
+html.skin-glass :focus-visible { outline-color: color-mix(in srgb, var(--amber) 70%, var(--text)); }
+html.skin-glass ::selection { background: color-mix(in srgb, var(--amber) 28%, transparent); }
+html.skin-glass ::-webkit-scrollbar-thumb { border-radius: 99px; background-color: var(--fill-2); }
+html.skin-glass .win-buttons button:hover { background: var(--fill); }
+html.skin-glass .win-buttons .win-close:hover { background: #c4302b; color: #fff; }
+
+/* ---- сцена: размытая обложка под вуалью ---- */
+html.skin-glass .stage {
+  isolation: isolate; align-items: stretch; gap: 0; padding: 46px 28px 20px;
+  background: var(--oak-2); border-right: 1px solid var(--line);
+}
+html.skin-glass .stage::before,
+html.skin-glass.look-stage-cover .stage::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none;
+  background: linear-gradient(var(--veil), var(--veil)), var(--ambient, none) center / cover no-repeat, var(--oak-2);
+  filter: none; opacity: 1; transition: background-image .6s ease;
+}
+html.skin-glass.look-stage-flat .stage::before { background: var(--oak-2); }
+html.skin-glass :is(.hoops, .viz) { display: none; }
+/* обложка уступает место по высоте окна (как в базе), а когда виден звонок — ещё и его карточке;
+   остальные части сцены не сжимаются, чтобы текст не наезжал друг на друга */
+html.skin-glass .stage > * { flex-shrink: 0; }
+/* обложка — сколько останется от высоты окна: --reserve — всё остальное на сцене плюс 24px воздуха
+   (делится поровну: над обложкой и над «слушать вместе»); / --ui-zoom — поправка на размер интерфейса */
+html.skin-glass .stage { --reserve: 435px; }
+html.skin-glass .stage:has(.call:not(.off)) { --reserve: 556px; }
+html.skin-glass .stage:has(.now-via:not([hidden])) { --via: 20px; }
+html.skin-glass .barrel {
+  width: min(100%, 330px, calc(100vh / var(--ui-zoom, 1) - var(--reserve) - var(--via, 0px))); min-width: 150px; align-self: center;
+}
+/* верхняя строка (название и профиль) съедает столько же, сколько раньше строка профиля внизу — формула та же */
+html.skin-glass .porthole, html.skin-glass .porthole::after { border-radius: calc(var(--u) * 14); }
+html.skin-glass .porthole { width: 100%; rotate: none; cursor: default; background: var(--rivet); box-shadow: var(--cover-shadow); }
+html.skin-glass .porthole::before { display: none; }
+/* в бочке обложка тускнеет — без размытия, это дешевле */
+html.skin-glass .porthole img {
+  filter: saturate(calc(1 - var(--m) * .5)) brightness(calc(1 - var(--m) * .25));
+  transform: scale(calc(1 + var(--m) * .04));
+}
+html.skin-glass .porthole::after { box-shadow: inset 0 0 0 1px rgb(0 0 0 / .06); }
+html.skin-glass.glass-dark .porthole::after { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .06); }
+html.skin-glass .porthole-empty { font: 700 44px var(--display); color: var(--text-3); }
+html.skin-glass .in-barrel { bottom: 12px; padding: 4px 11px; font: 600 12px var(--ui); background: var(--voice); color: #fff; }
+html.skin-glass.glass-dark .in-barrel { color: var(--oak); }
+
+html.skin-glass .now { text-align: left; min-height: 0; margin-top: 24px; }
+html.skin-glass .now-title { font: 700 21px/1.25 var(--display); letter-spacing: -0.025em; -webkit-line-clamp: 1; }
+html.skin-glass .now-artist { margin-top: 2px; font-size: 15px; font-weight: 500; color: var(--text-2); }
+html.skin-glass .now-via { color: var(--text-3); }
+/* кнопки как в макете: у названия — «нравится» и «ещё», внизу — текст песни, громкость и эквалайзер;
+   во весь экран, режимы, альбом и SoundCloud — в меню «ещё» (app.js → btn-now-more). Клавиши F, E, L, K, V работают как раньше */
+html.skin-glass:not(.mobile, .dock-bottom, .dock-top) .now { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 10px; align-items: center; }
+html.skin-glass:not(.mobile, .dock-bottom, .dock-top) .now > :not(.now-actions) { grid-column: 1; }
+html.skin-glass:not(.mobile, .dock-bottom, .dock-top) .now-actions { display: flex; gap: 8px; grid-column: 2; grid-row: 1 / span 3; }
+html.skin-glass .now-actions .icon-btn { width: 36px; height: 36px; background: var(--fill); color: var(--text); }
+html.skin-glass .now-actions .icon-btn:hover { background: var(--fill-2); }
+html.skin-glass #btn-like[aria-pressed="true"] { color: var(--amber); }
+html.skin-glass:not(.mobile, .dock-bottom, .dock-top) .volume-tools { display: contents; }
+html.skin-glass:not(.mobile, .dock-bottom, .dock-top) :is(#btn-fs, #btn-modes, #btn-now-album, #btn-now-sc) { display: none; }
+html.skin-glass:not(.mobile, .dock-bottom, .dock-top) #btn-lyrics { order: -1; margin-right: 4px; }
+html.skin-glass:not(.mobile, .dock-bottom, .dock-top) #btn-eq { margin-left: 4px; }
+/* сверху, как в макете: слева значок и «авеон», справа — кружок профиля (это #open-profile из низа сцены).
+   Строка — под полосой кнопок окна: та перетаскивает окно и перехватила бы клики по кружку */
+html.skin-glass:not(.mobile, .dock-bottom, .dock-top) .stage { padding-top: 40px; }
+html.skin-glass:not(.mobile, .dock-bottom, .dock-top) .stage-top {
+  display: flex; align-items: center; gap: 10px; height: 40px; margin-bottom: 14px; padding-right: 48px; -webkit-app-region: drag;
+}
+html.skin-glass .stage-logo { width: 26px; height: 26px; flex: none; border-radius: 7px; background: url("assets/icon.png") center / cover; box-shadow: 0 2px 6px rgb(0 0 0 / .18); }
+html.skin-glass.glass-dark .stage-logo { box-shadow: 0 0 0 1px rgb(255 255 255 / .14), 0 2px 6px rgb(0 0 0 / .4); }
+html.skin-glass .stage-name { font: 700 18px var(--display); letter-spacing: -0.035em; color: var(--text); text-transform: lowercase; }
+/* поле 10px вокруг кружка — тоже не тянет окно: иначе граница перетаскивания проходит прямо по краю кнопки,
+   Windows и страница по очереди ставят свой курсор, и он мигает стрелкой и рукой */
+html.skin-glass:not(.mobile, .dock-bottom, .dock-top) .stage-account { position: absolute; top: 30px; right: 13px; margin: 0; padding: 10px; }
+/* поле 3px вокруг кружка: при наведении и открытом профиле — светлое кольцо */
+html.skin-glass:not(.mobile, .dock-bottom, .dock-top) .me { max-width: none; padding: 3px; border-radius: 50%; }
+html.skin-glass:not(.mobile, .dock-bottom, .dock-top) .me-text { display: none; }
+html.skin-glass:not(.mobile, .dock-bottom, .dock-top) .me-avatar { position: relative; overflow: visible; transition: transform .15s ease; }
+html.skin-glass:not(.mobile, .dock-bottom, .dock-top) .me:active .me-avatar { transform: scale(.92); }
+/* точка синхронизации: зелёная — всё сошлось, красная — ошибка (profile.js ставит small.err) */
+html.skin-glass:not(.mobile, .dock-bottom, .dock-top) .me-avatar::after {
+  content: ""; position: absolute; right: -1px; bottom: -1px; width: 10px; height: 10px; border-radius: 50%;
+  background: #1f8a3b; box-shadow: 0 0 0 2px var(--oak-2);
+}
+html.skin-glass.glass-dark:not(.mobile, .dock-bottom, .dock-top) .me-avatar::after { background: #32d74b; }
+html.skin-glass:not(.mobile, .dock-bottom, .dock-top) .me:has(.me-text small.err) .me-avatar::after { background: var(--danger); }
+html.skin-glass .together-chip { align-self: flex-start; margin-top: 12px; background: var(--glass); box-shadow: inset 0 0 0 1px var(--glass-edge); color: var(--voice); font-weight: 600; }
+html.skin-glass .together-chip:hover { background: var(--glass); box-shadow: inset 0 0 0 1px var(--voice); }
+/* над звонком (together.js переносит плашку в низ сцены) — строкой во всю ширину, как карточка звонка */
+html.skin-glass .stage-foot > .together-chip {
+  align-self: stretch; max-width: none; min-height: 44px; margin: 0; padding: 0 16px 0 14px; gap: 10px;
+  border-radius: calc(var(--u) * 18); font-size: 13.5px; color: var(--text);
+  box-shadow: inset 0 0 0 1px var(--glass-edge), 0 1px 2px rgb(0 0 0 / .06);
+}
+html.skin-glass .stage-foot > .together-chip:not(.idle) { color: var(--voice); }
+html.skin-glass .stage-foot > .together-chip.offline { color: var(--amber); }
+html.skin-glass .stage-foot > .together-chip .together-chip-icon { width: 19px; height: 19px; color: var(--voice); }
+html.skin-glass .stage-foot > .together-chip::after {
+  content: ""; flex: none; width: 7px; height: 7px; margin: 0 2px 0 auto;
+  border: solid var(--text-3); border-width: 1.8px 1.8px 0 0; transform: rotate(45deg); transition: transform .2s ease;
+}
+html.skin-glass .stage-foot > .together-chip[aria-expanded="true"]::after { transform: translateY(2px) rotate(-45deg); }
+html.skin-glass .stage-foot > .together-chip:is(:hover, [aria-expanded="true"]) { background: linear-gradient(var(--fill), var(--fill)), var(--glass); }
+
+/* перемотка: полоса во всю ширину, время под ней */
+html.skin-glass .progress-row { display: grid; grid-template-columns: 1fr 1fr; row-gap: 3px; margin-top: 16px; }
+html.skin-glass .progress-row .progress { grid-column: 1 / -1; grid-row: 1; }
+html.skin-glass .progress-row .time { grid-row: 2; min-width: 0; text-align: left; font-weight: 500; color: var(--text-2); }
+html.skin-glass .progress-row .time:last-child { text-align: right; }
+html.skin-glass .slider::before { height: 5px; border-radius: 3px; background: var(--fill-2); }
+html.skin-glass :is(.slider-buf, .slider-fill) { height: 5px; border-radius: 3px; }
+html.skin-glass .slider-buf { background: var(--fill-2); opacity: 1; }
+html.skin-glass .slider-fill { background: var(--text); }
+html.skin-glass .volume .slider-fill { background: var(--text-2); }
+html.skin-glass .slider-knob { width: 14px; height: 14px; margin-left: -7px; background: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / .3); }
+
+html.skin-glass .controls { width: 100%; justify-content: space-between; gap: 0; margin-top: 10px; padding: 0 2px; }
+html.skin-glass .controls .icon-btn { width: 44px; height: 44px; color: var(--text); }
+html.skin-glass :is(#btn-shuffle, #btn-repeat) { color: var(--text-2); }
+html.skin-glass :is(#btn-shuffle, #btn-repeat).on { color: var(--amber); }
+html.skin-glass :is(#btn-prev, #btn-next) svg { width: 28px; height: 28px; }
+html.skin-glass .icon-btn:hover { background: var(--fill); color: var(--text); }
+html.skin-glass .play-btn { width: 64px; height: 64px; background: var(--text); color: var(--oak); box-shadow: 0 8px 20px -6px rgb(0 0 0 / .35); }
+html.skin-glass .play-btn svg { width: 26px; height: 26px; }
+html.skin-glass .volume-row { margin-top: 10px; }
+html.skin-glass .volume-row .icon-btn { color: var(--text-2); }
+html.skin-glass .volume-tools { border-left: 0; padding-left: 2px; }
+
+/* звонок — стеклянная карточка */
+html.skin-glass .stage-foot { gap: 10px; }
+html.skin-glass .call {
+  padding: 14px 16px 16px; border: 0; border-radius: calc(var(--u) * 18);
+  background: var(--glass); box-shadow: inset 0 0 0 1px var(--glass-edge), 0 1px 2px rgb(0 0 0 / .06);
+}
+html.skin-glass .call.off { padding-top: 0; padding-bottom: 0; box-shadow: none; } /* не в звонке — карточка схлопывается, «слушать вместе» опускается вниз */
+html.skin-glass .call-state { font-weight: 600; color: var(--text); }
+html.skin-glass .call-state.talk { color: var(--voice); }
+html.skin-glass .meter-label { font-weight: 500; color: var(--text-2); }
+html.skin-glass :is(.meter, .meter-fill) { height: 5px; border-radius: 3px; }
+html.skin-glass .meter { background: var(--fill-2); }
+html.skin-glass .meter-threshold { background: var(--text); opacity: .9; }
+html.skin-glass .me:hover, html.skin-glass .me[aria-expanded="true"] { background: var(--fill); }
+html.skin-glass .me-avatar { font: 700 14px var(--ui); color: #fff; background: linear-gradient(180deg, #b9bcc6, #8a8e99); box-shadow: none; }
+
+/* переключатели как в iOS; в звонке — цветом голосов */
+html.skin-glass .switch { width: 44px; height: 26px; }
+html.skin-glass .switch span { border-radius: 13px; background: var(--fill-2); }
+html.skin-glass .switch span::after { top: 2px; left: 2px; width: 22px; height: 22px; background: #fff; box-shadow: 0 2px 5px rgb(0 0 0 / .22); }
+html.skin-glass .switch input:checked + span { background: var(--amber); }
+html.skin-glass .switch input:checked + span::after { transform: translateX(18px); background: #fff; }
+html.skin-glass .call .switch input:checked + span { background: var(--voice); }
+
+/* ---- библиотека ---- */
+html.skin-glass .library { padding: 40px 36px 0; background: var(--oak); }
+html.skin-glass .lib-top { gap: 10px; }
+/* вкладки — сегментированный переключатель; белая «таблетка» — это .source-ink, её двигает app.js */
+html.skin-glass .sources { flex: 0 1 auto; gap: 2px; padding: 3px; border-radius: calc(var(--u) * 11); background: var(--fill); scrollbar-width: none; }
+html.skin-glass .sources::-webkit-scrollbar { display: none; }
+html.skin-glass .source { z-index: 1; padding: 6px 13px; border-radius: calc(var(--u) * 8); font-size: 13px; font-weight: 500; color: var(--text-2); }
+html.skin-glass .source:hover { color: var(--text); }
+html.skin-glass .source.active { color: var(--text); font-weight: 600; }
+html.skin-glass .source-ink { z-index: 0; top: 3px; bottom: 3px; height: auto; border-radius: calc(var(--u) * 8); background: var(--seg-on); box-shadow: var(--seg-shadow); }
+html.skin-glass #open-friends { margin-left: auto; width: 36px; height: 36px; background: var(--fill); color: var(--text); }
+html.skin-glass #open-friends:hover { background: var(--fill-2); }
+
+html.skin-glass .search { height: 40px; margin-top: 16px; padding: 0 14px; border: 0; border-radius: calc(var(--u) * 12); background: var(--fill); }
+html.skin-glass .search:focus-within { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--amber) 55%, transparent); }
+html.skin-glass .search svg { color: var(--text-2); }
+html.skin-glass .search input::placeholder { color: var(--text-3); }
+
+html.skin-glass .chip { height: 32px; border: 0; border-radius: 16px; background: var(--fill); color: var(--text); font-weight: 500; }
+html.skin-glass .chip:hover { background: var(--fill-2); }
+html.skin-glass .chip.active { background: var(--text); color: var(--oak); }
+html.skin-glass .chip img { border-radius: calc(var(--u) * 6); }
+html.skin-glass .coll-arrow { background: var(--rivet); color: var(--text); box-shadow: var(--card-shadow); }
+
+html.skin-glass .lib-head { margin: 24px 0 10px; }
+html.skin-glass .lib-head h1 { font: 700 28px/1.1 var(--display); letter-spacing: -0.035em; }
+html.skin-glass .lib-head p { font-size: 13.5px; color: var(--text-2); }
+
+html.skin-glass .btn { height: 34px; padding: 0 15px; border: 0; border-radius: 17px; background: var(--fill); color: var(--text); font-size: 13px; font-weight: 600; }
+html.skin-glass .btn:hover { background: var(--fill-2); }
+html.skin-glass .btn.primary { background: var(--text); color: var(--oak); }
+html.skin-glass .btn.primary:hover { filter: none; opacity: .88; }
+html.skin-glass .btn.danger { color: var(--danger); }
+html.skin-glass .btn.icon-only { width: 34px; }
+
+html.skin-glass .tracklist { margin: 0 -10px; padding: 0 2px 24px 0; }
+html.skin-glass .row { padding: 6px 10px; border-radius: calc(var(--u) * 10); }
+html.skin-glass .row:hover { background: var(--fill); }
+html.skin-glass .row.playing { background: var(--fill); }
+html.skin-glass .row.playing .t-title { color: var(--amber); }
+html.skin-glass .row .num :is(img, .ph), html.skin-glass .row .play-hover { border-radius: calc(var(--u) * 6); }
+html.skin-glass .row .num .ph { background: var(--fill-2); }
+html.skin-glass .t-title { letter-spacing: -0.01em; }
+html.skin-glass :is(.t-artist, .t-album, .col-time) { color: var(--text-2); }
+html.skin-glass .empty h3 { font-weight: 700; letter-spacing: -0.02em; }
+
+/* главная: волна — белая карточка, справа мягкое пятно цвета той же готовой обложки */
+html.skin-glass .h-hello h1 { font-weight: 800; letter-spacing: -0.04em; }
+html.skin-glass .h-wave {
+  isolation: isolate; border-radius: calc(var(--u) * 22); background: var(--rivet);
+  box-shadow: var(--card-shadow), inset 0 0 0 1px var(--line);
+}
+html.skin-glass .h-wave::before {
+  content: ""; position: absolute; inset: 0 0 0 40%; z-index: -1; pointer-events: none;
+  background: var(--ambient, none) center / cover no-repeat;
+  -webkit-mask: linear-gradient(90deg, transparent, #000 70%); mask: linear-gradient(90deg, transparent, #000 70%);
+}
+html.skin-glass .h-wave:hover, html.skin-glass .h-wave:focus-visible { box-shadow: var(--card-shadow), inset 0 0 0 1px color-mix(in srgb, var(--amber) 45%, transparent); }
+html.skin-glass #h-wave-air { display: none; }
+html.skin-glass .h-wave-go { width: 56px; height: 56px; background: var(--text); color: var(--oak); box-shadow: 0 8px 20px -6px rgb(0 0 0 / .35); }
+html.skin-glass .h-wave-text b { font: 800 26px var(--display); letter-spacing: -0.04em; }
+html.skin-glass .h-head h2 { font: 700 20px var(--display); letter-spacing: -0.03em; }
+html.skin-glass .h-more:hover { color: var(--text); }
+html.skin-glass .h-tile { border-radius: calc(var(--u) * 14); background: var(--rivet); box-shadow: var(--card-shadow); }
+html.skin-glass .h-tile:hover { background: color-mix(in srgb, var(--rivet) 94%, var(--text)); }
+html.skin-glass :is(.h-card-pic, .h-tile-pic) { border-radius: calc(var(--u) * 12); }
+html.skin-glass .h-artist-pic { box-shadow: var(--card-shadow); }
+
+/* текст песни — поверх той же размытой обложки. Фон привязан к окну (fixed), поэтому у библиотеки
+   и у панели текста он совпадает без шва, а сама панель по-прежнему закрывает список под собой.
+   Неактивные строки без размытия — только прозрачность */
+html.skin-glass .library:has(> .lyrics:not([hidden])),
+html.skin-glass .lyrics {
+  background: linear-gradient(var(--veil-lyrics), var(--veil-lyrics)), var(--ambient, none) center / cover no-repeat, var(--oak);
+  background-attachment: fixed;
+}
+html.skin-glass .lyric {
+  font: 700 clamp(24px, 2.8vw, 38px)/1.22 var(--display); letter-spacing: -0.035em;
+  color: var(--text); opacity: var(--lyric-dim); filter: none; transform: none;
+  transition: opacity .35s ease;
+}
+html.skin-glass .lyric.past { opacity: .22; }
+html.skin-glass .lyric:hover { opacity: .6; filter: none; }
+html.skin-glass .lyric.active { opacity: 1; transform: none; }
+html.skin-glass .lyrics-plain .lyric { opacity: .9; color: var(--text-2); }
+html.skin-glass .lyrics-meta { color: var(--text-2); }
+
+/* ---- профиль и статистика ---- */
+html.skin-glass .profile { background: var(--oak); }
+html.skin-glass .pf-hero { background: var(--rivet); border: 0; border-radius: calc(var(--u) * 22); box-shadow: var(--card-shadow); }
+html.skin-glass .pf-hero::before { display: none; }
+html.skin-glass .pf-avatar { color: #fff; background: linear-gradient(180deg, #b9bcc6, #8a8e99); box-shadow: 0 10px 28px -8px rgb(0 0 0 / .35); }
+html.skin-glass .pf-name h1 { font-weight: 800; letter-spacing: -0.04em; }
+html.skin-glass .pf-card { background: var(--rivet); border: 0; border-radius: calc(var(--u) * 20); box-shadow: var(--card-shadow); }
+html.skin-glass .hero-num { font-weight: 800; letter-spacing: -0.05em; }
+html.skin-glass .chart .grid { stroke: var(--line); }
+html.skin-glass .tip { background: var(--text); color: var(--oak); box-shadow: 0 8px 20px rgb(0 0 0 / .25); }
+html.skin-glass .tip span { color: color-mix(in srgb, var(--oak) 70%, transparent); }
+
+/* ---- окна, меню, настройки ---- */
+html.skin-glass .modal { background: rgb(0 0 0 / .3); }
+html.skin-glass .sheet { background: var(--oak); border: 0; border-radius: calc(var(--u) * 22); box-shadow: var(--pop-shadow); }
+html.skin-glass .sheet-head h2 { font: 800 24px var(--display); letter-spacing: -0.035em; }
+html.skin-glass .set-nav { background: var(--oak-2); border-right: 1px solid var(--line); }
+html.skin-glass .set-tab { border-radius: calc(var(--u) * 9); }
+html.skin-glass .set-tab:hover { background: var(--fill); }
+html.skin-glass .set-tab.on { background: var(--text); color: var(--oak); }
+html.skin-glass .set-tab.on :is(svg, small) { color: inherit; }
+html.skin-glass .settings-sheet .sec { background: var(--rivet); border: 0; border-radius: calc(var(--u) * 16); box-shadow: var(--card-shadow); }
+html.skin-glass .sec { border-color: var(--line); }
+html.skin-glass .sec-title { font: 700 17px var(--display); letter-spacing: -0.02em; }
+html.skin-glass .seg { padding: 3px; gap: 2px; border: 0; border-radius: calc(var(--u) * 10); background: var(--fill); }
+html.skin-glass .seg button { padding: 5px 13px; border-radius: calc(var(--u) * 8); font-weight: 600; color: var(--text-2); }
+html.skin-glass .seg button.on { background: var(--seg-on); color: var(--text); box-shadow: var(--seg-shadow); }
+html.skin-glass :is(.input, select.input) { border-color: transparent; border-radius: calc(var(--u) * 10); background: var(--fill); }
+html.skin-glass .input:focus { border-color: color-mix(in srgb, var(--amber) 55%, transparent); }
+html.skin-glass :is(.menu, .together) { border: 0; border-radius: calc(var(--u) * 18); background: var(--oak); box-shadow: var(--pop-shadow); }
+html.skin-glass .menu { padding: 6px; }
+html.skin-glass .menu-item { border-radius: calc(var(--u) * 9); }
+html.skin-glass .menu-item:hover, html.skin-glass .menu-item:focus-visible { background: var(--fill); }
+html.skin-glass .menu-sep { background: var(--line); }
+html.skin-glass .together-code { border: 0; background: var(--fill); font: 700 28px "Cascadia Mono", Consolas, monospace; letter-spacing: .14em; }
+html.skin-glass .together-avatar { background: linear-gradient(180deg, #b9bcc6, #8a8e99); color: #fff; }
+html.skin-glass .toast { background: var(--text); color: var(--oak); border-radius: calc(var(--u) * 14); font-weight: 600; box-shadow: 0 14px 34px rgb(0 0 0 / .25); }
+html.skin-glass .toast.err { box-shadow: inset 3px 0 0 var(--danger), 0 14px 34px rgb(0 0 0 / .25); }
+html.skin-glass kbd { background: var(--fill-2); color: var(--text); box-shadow: none; }
+
+/* ---- во весь экран: та же готовая размытая обложка вместо живого блюра на весь экран ---- */
+html.skin-glass .fs-bg { background-image: var(--ambient, none) !important; filter: none; }
+html.skin-glass.look-fs-plain .fs-bg { background-image: none !important; }
+html.skin-glass.glass-light .fs-bg::after { background: rgb(248 247 243 / .45); }
+html.skin-glass.glass-dark .fs-bg::after { background: rgb(6 6 7 / .5); }
+html.skin-glass.look-fs-gradient .fs-bg { filter: none; opacity: .7; }
+html.skin-glass .fs-cover { border-radius: calc(var(--u) * 16); box-shadow: var(--cover-shadow); }
+/* текст во весь экран лежит прямо на фоне: своей подложки у панели нет, строки — крупнее */
+html.skin-glass .fs-lyrics .lyrics { background: transparent; }
+html.skin-glass .fs-lyrics .lyric { font-size: clamp(28px, 3.2vw, 54px); max-width: 20ch; }
+
+/* ---- вход: карточка по центру поверх размытой обложки ---- */
+html.skin-glass .auth {
+  --oak: inherit; --oak-2: inherit; --rivet: inherit; --rivet-2: inherit; --hoop: inherit; --hoop-dim: inherit;
+  --text: inherit; --text-2: inherit; --text-3: inherit; --amber: inherit;
+  grid-template-columns: 1fr;
+  background: linear-gradient(var(--veil), var(--veil)), var(--ambient, none) center / cover no-repeat, var(--oak-2);
+}
+html.skin-glass .auth-stage { display: none; }
+html.skin-glass .auth-main { padding: 48px 24px; }
+html.skin-glass .auth-form {
+  width: min(400px, 100%); padding: 34px 32px 26px; gap: 12px; border-radius: calc(var(--u) * 28);
+  background: color-mix(in srgb, var(--oak) 80%, transparent);
+  box-shadow: inset 0 0 0 1px var(--glass-edge), 0 40px 90px -30px rgb(0 0 0 / .45);
+}
+html.skin-glass .auth-form::before {
+  content: ""; align-self: center; width: 64px; height: 64px; margin-bottom: 4px; border-radius: 15px;
+  background: url("assets/icon.png") center / cover; box-shadow: 0 10px 24px -6px rgb(0 0 0 / .45);
+}
+html.skin-glass .auth-title { text-align: center; font: 700 26px/1.15 var(--display); letter-spacing: -0.035em; }
+html.skin-glass .auth-sub { text-align: center; margin: -2px 0 8px; font-size: 14px; color: var(--text-2); }
+html.skin-glass .auth-field { font-weight: 500; }
+html.skin-glass .auth-field .input { height: 46px; border: 0; border-radius: calc(var(--u) * 12); background: var(--fill); font-size: 16px; }
+html.skin-glass .auth-field .input:focus { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--amber) 55%, transparent); }
+html.skin-glass .auth-go { height: 50px; border-radius: calc(var(--u) * 14); background: var(--text); color: var(--oak); font-size: 16px; }
+html.skin-glass .auth-link { color: var(--text); font-weight: 600; }
+html.skin-glass .auth-switch { color: var(--text-2); }
+
+/* ---- плеер снизу или сверху: цвета те же, раскладка базовая ---- */
+html.skin-glass:is(.dock-bottom, .dock-top) .stage { padding: 10px 20px; align-items: center; }
+html.skin-glass:is(.dock-bottom, .dock-top) .barrel { width: auto; max-width: none; }
+html.skin-glass:is(.dock-bottom, .dock-top) .now { margin-top: 0; }
+html.skin-glass:is(.dock-bottom, .dock-top) .progress-row { display: flex; margin-top: 0; }
+html.skin-glass:is(.dock-bottom, .dock-top) .controls { width: auto; gap: 10px; margin-top: 0; }
+html.skin-glass:is(.dock-bottom, .dock-top) .play-btn { width: 48px; height: 48px; }
+html.skin-glass:is(.dock-bottom, .dock-top) .volume-row { margin-top: 0; }
+
+/* волна: баннер с размытой обложкой и словом «волна», под ним пульт и настройки-«таблетки».
+   Холст с линиями спрятан (wave.js его не рисует), вместо него две синусоиды маской — едут только
+   transform'ом и только пока волна играет */
+html.skin-glass .wave-air {
+  height: clamp(180px, 28vh, 230px); margin: 6px 0 0; overflow: clip; isolation: isolate;
+  border-radius: calc(var(--u) * 24); box-shadow: var(--card-shadow), inset 0 0 0 1px var(--line);
+  background: linear-gradient(var(--veil), var(--veil)), var(--ambient, none) center / cover no-repeat, var(--oak-2);
+}
+html.skin-glass .wave-canvas { display: none; }
+html.skin-glass .wave-air::before,
+html.skin-glass .wave-air::after {
+  content: ""; position: absolute; left: 0; top: 22%; height: 90px; pointer-events: none;
+  background: var(--text);
+  animation: glass-wave var(--wave-t) linear infinite paused;
+}
+html.skin-glass .wave-air::before {
+  --wave-t: 9s; --wave-p: 480px; width: calc(100% + 480px); opacity: .22;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='480' height='90' viewBox='0 0 480 90'%3E%3Cpath d='M0 45C60 15 180 15 240 45S420 75 480 45' fill='none' stroke='%23000' stroke-width='2.2'/%3E%3C/svg%3E") 0 50% / 480px 90px repeat-x;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='480' height='90' viewBox='0 0 480 90'%3E%3Cpath d='M0 45C60 15 180 15 240 45S420 75 480 45' fill='none' stroke='%23000' stroke-width='2.2'/%3E%3C/svg%3E") 0 50% / 480px 90px repeat-x;
+}
+html.skin-glass .wave-air::after {
+  --wave-t: 15s; --wave-p: 640px; width: calc(100% + 640px); opacity: .14; animation-direction: reverse;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='90' viewBox='0 0 640 90'%3E%3Cpath d='M0 50C80 20 240 20 320 50S560 80 640 50' fill='none' stroke='%23000' stroke-width='1.4'/%3E%3Cpath d='M0 38C80 58 240 58 320 38S560 18 640 38' fill='none' stroke='%23000' stroke-width='1'/%3E%3C/svg%3E") 0 50% / 640px 90px repeat-x;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='640' height='90' viewBox='0 0 640 90'%3E%3Cpath d='M0 50C80 20 240 20 320 50S560 80 640 50' fill='none' stroke='%23000' stroke-width='1.4'/%3E%3Cpath d='M0 38C80 58 240 58 320 38S560 18 640 38' fill='none' stroke='%23000' stroke-width='1'/%3E%3C/svg%3E") 0 50% / 640px 90px repeat-x;
+}
+@keyframes glass-wave { to { transform: translateX(calc(var(--wave-p) * -1)); } }
+html.skin-glass .wave-hero.live .wave-air::before,
+html.skin-glass .wave-hero.live .wave-air::after { animation-play-state: running; }
+html.skin-glass .wave-hero.dj-on .wave-air::before { background: var(--voice); opacity: .5; }
+html.skin-glass.look-still .wave-air::before, html.skin-glass.look-still .wave-air::after { animation: none; }
+@media (prefers-reduced-motion: reduce) { html.skin-glass .wave-air::before, html.skin-glass .wave-air::after { animation: none; } }
+html.skin-glass .wave-word {
+  z-index: 1; left: 30px; top: auto; bottom: 20px; transform: none;
+  font: 800 clamp(56px, 7vw, 92px)/.95 var(--display); letter-spacing: -0.055em;
+}
+html.skin-glass .wave-word span { transform: none !important; will-change: auto; text-shadow: none; }
+
+html.skin-glass .wave-deck { gap: 16px; margin-top: 18px; min-height: 64px; }
+html.skin-glass .wave-go { width: 64px; height: 64px; background: var(--text); color: var(--oak); box-shadow: 0 8px 20px -6px rgb(0 0 0 / .35); }
+html.skin-glass .wave-hero.live .wave-go { box-shadow: 0 8px 20px -6px rgb(0 0 0 / .35), 0 0 0 4px color-mix(in srgb, var(--amber) 35%, transparent); }
+html.skin-glass .wave-hero.dj-on .wave-go { box-shadow: 0 8px 20px -6px rgb(0 0 0 / .35), 0 0 0 4px color-mix(in srgb, var(--voice) 45%, transparent); }
+html.skin-glass .wave-now b { font: 700 20px/1.25 var(--display); letter-spacing: -0.025em; }
+html.skin-glass .wave-now span { color: var(--text-2); }
+/* пока волна идёт — обложка трека рядом с названием (та же картинка, что на сцене) */
+html.skin-glass .wave-hero:has(.wave-rate:not([hidden])) .wave-now { position: relative; justify-content: center; min-height: 56px; padding-left: 70px; }
+html.skin-glass .wave-hero:has(.wave-rate:not([hidden])) .wave-now::before {
+  content: ""; position: absolute; left: 0; top: 50%; width: 56px; height: 56px; margin-top: -28px; border-radius: calc(var(--u) * 10);
+  background: var(--cover-img, none) center / cover no-repeat, var(--fill); box-shadow: 0 6px 16px -6px rgb(0 0 0 / .4);
+}
+html.skin-glass .wave-rate { gap: 8px; }
+html.skin-glass .wave-rate .icon-btn { width: 40px; height: 40px; background: var(--fill); color: var(--text); }
+html.skin-glass .wave-rate .icon-btn:hover { background: var(--fill-2); color: var(--amber); }
+
+/* настройки: «хочу [что угодно] [как обычно] [на любом языке]», «диджей [молчит]» — таблетки со стрелкой;
+   запятые и точки фразы прячем (они внутри .nobr), подписи «хочу» и «диджей» остаются */
+html.skin-glass .wave-tuner { margin: 24px 0 4px; }
+html.skin-glass .wave-phrase { font: 500 19px/2.3 var(--ui); color: var(--text-2); letter-spacing: -0.01em; }
+html.skin-glass .wave-phrase .nobr { font-size: 0; }
+html.skin-glass .wave-word-opt {
+  display: inline-flex; align-items: center; gap: 7px; height: 36px; margin: 0 1px; padding: 0 13px 0 15px; vertical-align: 2px;
+  border-radius: 18px; background: var(--fill); color: var(--text);
+  font: 600 14.5px/1 var(--ui); letter-spacing: -0.005em; text-decoration: none;
+}
+html.skin-glass .wave-word-opt::after {
+  content: ""; width: 11px; height: 11px; flex: none; background: currentColor; opacity: .55;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E") center / contain no-repeat;
+}
+html.skin-glass .wave-word-opt:hover, html.skin-glass .wave-word-opt[aria-expanded="true"] { background: var(--fill-2); color: var(--text); }
+html.skin-glass .wave-word-opt:is([data-key="dj"], [data-key="voice"]) { background: color-mix(in srgb, var(--voice) 16%, transparent); color: var(--voice); }
+html.skin-glass .wave-word-opt:is([data-key="dj"], [data-key="voice"]):is(:hover, [aria-expanded="true"]) { background: color-mix(in srgb, var(--voice) 24%, transparent); color: var(--voice); }
+html.skin-glass .wave-next { margin: 30px 0 8px; font: 700 20px var(--display); letter-spacing: -0.03em; color: var(--text); }
+html.skin-glass.mobile .wave-air { margin: 14px 0 0; }
+html.skin-glass.mobile .wave-word { left: 20px; font-size: 56px; }
+
+/* миниатюра в выборе дизайна */
+.skin-mock.is-glass { background: #f5f5f3; box-shadow: inset 0 0 0 1px #e3e3e0; }
+.skin-mock.is-glass :is(.sm-rail, .sm-play) { display: none; }
+.skin-mock.is-glass .sm-stage { align-items: stretch; padding: 12px 8px 0; background: linear-gradient(160deg, #e9d8b8, #c7d6c2 60%, #b9c9d9); }
+.skin-mock.is-glass .sm-cover { width: 100%; aspect-ratio: 1; height: auto; border-radius: 5px; background: linear-gradient(135deg, #6a6b3f, #d9c29a); box-shadow: 0 6px 12px -6px rgb(0 0 0 / .5); }
+.skin-mock.is-glass .sm-t { width: 70%; background: #1c1c1e; margin-top: 7px; }
+.skin-mock.is-glass .sm-a { width: 45%; background: #6c6c70; }
+.skin-mock.is-glass .sm-bar { width: 100%; background: linear-gradient(90deg, #1c1c1e 45%, rgb(0 0 0 / .15) 45%); }
+.skin-mock.is-glass .sm-h::before { content: "Стекло"; font: 700 13px "Onest", sans-serif; letter-spacing: -0.03em; color: #1c1c1e; }
+.skin-mock.is-glass .sm-row { padding: 0 3px; border-radius: 4px; }
+.skin-mock.is-glass .sm-row i { border-radius: 3px; background: #d9d9d6; }
+.skin-mock.is-glass .sm-row b { background: #c7c7cc; }
+.skin-mock.is-glass .sm-row:nth-child(4) { background: rgb(118 118 128 / .12); }
+.skin-mock.is-glass .sm-row:nth-child(4) b { background: #8a5a26; }

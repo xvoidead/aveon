@@ -1,7 +1,7 @@
 {
   "name": "aveon",
   "productName": "авеон",
-  "version": "1.4.0",
+  "version": "1.4.2",
   "description": "Музыкальный плеер: когда в звонке Discord говорят, музыка уходит «в бочку»",
   "main": "main.js",
   "private": true,

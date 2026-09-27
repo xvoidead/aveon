@@ -6,6 +6,9 @@
 // трек, когда тот заканчивается, и раз в несколько секунд напоминает, где он сейчас, — так у всех
 // одно и то же место даже после подвисаний сети.
 // Звук не передаётся: каждый играет трек сам, через свой сервис или найденный аналог (см. main.js).
+// Очередь (волна, плейлист) есть только у того, кто её включил, — у остальных в очереди один трек
+// друга (track.shared). Поэтому «следующий» у гостя — просьба хозяину очереди (skip), и конец трека
+// тоже переключает он, даже если паузу или перемотку последним делал кто-то другой.
 
 const BEAT_EVERY = 4000;     // как часто ведущий напоминает позицию
 const DRIFT_CHECK = 2000;
@@ -33,7 +36,18 @@ const Together = {
     this.holdUntil = 0;
     this.send();
   },
-  waitsOnEnd() { return this.active() && this.room.members.length > 1 && !this.isDriver(); },
+  // Гость — играет чужой трек: своей очереди у него нет, переключает хозяин очереди
+  guest() { return this.active() && this.room.members.length > 1 && !!state.track?.shared; },
+  waitsOnEnd() { return this.guest(); },
+  askSkip(dir) {
+    const was = state.track?.id;
+    api.together.skip(dir);
+    // хозяин очереди переключит у себя — новый трек придёт как обычное состояние румы
+    clearTimeout(this.skipTimer);
+    this.skipTimer = setTimeout(() => {
+      if (this.room && state.track?.id === was) toast('Трек переключает тот, кто его включил, — он пока не ответил', 'err');
+    }, 4000);
+  },
 
   expected() {
     const r = this.remote;
@@ -177,6 +191,12 @@ api.together.onEvent((ev) => {
     case 'react':
       flyReact(ev.e, ev.mine ? '' : firstName(ev.by || ''));
       return; // панель перерисовывать незачем
+    case 'skip':
+      // просьба гостя: переключает только хозяин очереди — у кого трек свой, а не присланный
+      if (!state.track || state.track.shared) return;
+      toast(`${firstName(ev.by)} переключает трек`);
+      if (ev.dir === 'prev') prev(true); else next();
+      return;
     default:
   }
   renderTogether();
@@ -328,15 +348,18 @@ api.together.status().then((r) => { Together.room = r; renderTogetherChip(); }).
 // ---- плеер снизу или сверху: плашка румы — внутри плашки звонка, одной капсулой ----
 // Экономит место: слева рума (лица или значок), справа — звонок. Не в звонке — только рума.
 // Плашку звонка убрали в настройках (#discord скрыт) — рума остаётся на своём месте.
+// Дизайн «Стекло» — рума строкой над плашкой звонка, внизу сцены.
 const chipHome = { parent: togetherBtn.parentElement, next: togetherBtn.nextElementSibling };
 function placeTogetherChip() {
   const call = $('#discord');
   const html = document.documentElement.classList;
   const dock = html.contains('dock-bottom') || html.contains('dock-top');
-  const inside = togetherBtn.parentElement === call;
+  const glass = html.contains('skin-glass') && !dock && !html.contains('mobile');
   if (dock && call && !call.hidden) {
-    if (!inside) call.prepend(togetherBtn);
-  } else if (inside) {
+    if (togetherBtn.parentElement !== call) call.prepend(togetherBtn);
+  } else if (glass && call) {
+    if (togetherBtn.nextElementSibling !== call) call.before(togetherBtn);
+  } else if (togetherBtn.parentElement !== chipHome.parent) {
     chipHome.parent.insertBefore(togetherBtn, chipHome.next);
   }
 }

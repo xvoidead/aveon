@@ -84,6 +84,7 @@ contextBridge.exposeInMainWorld('tishe', {
     avatar: (userId, at) => call('tg:avatar', userId, at),
     send: (state, beat) => ipcRenderer.send('tg:send', state, beat),
     react: (e) => ipcRenderer.send('tg:react', e),
+    skip: (dir) => ipcRenderer.send('tg:skip', dir), // гость просит переключить трек того, чья очередь
     onEvent: (cb) => on('together:event', cb),
   },
   friends: {

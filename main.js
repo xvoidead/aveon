@@ -21,6 +21,7 @@ const friends = require('./src/friends');
 const discord = require('./src/discord');
 const eqpop = require('./src/eqpop');
 const island = require('./src/island');
+const stow = require('./src/stow');
 const mini = require('./src/mini');
 const tray = require('./src/tray');
 const hotkeys = require('./src/hotkeys');
@@ -99,7 +100,7 @@ function createWindow() {
   win.on('leave-full-screen', () => win.webContents.send('win:state', { fullscreen: false }));
   // Крестик при «закрывать в трей» только прячет окно — музыка играет дальше
   win.on('close', (e) => {
-    if (!quitting && tray.closeToTray()) { e.preventDefault(); win.hide(); }
+    if (!quitting && tray.closeToTray()) { e.preventDefault(); toTray(); }
   });
   // остров, мини-плеер и обои не держат приложение открытым
   win.on('closed', () => { island.destroy(); mini.destroy(); livewall.destroy(); });
@@ -351,6 +352,7 @@ function registerIpc() {
   handle('tg:avatar', (userId, at) => account.avatarOf(userId, at));
   ipcMain.on('tg:send', (e, state, beat) => together.send(state, beat));
   ipcMain.on('tg:react', (e, emoji) => together.react(emoji));
+  ipcMain.on('tg:skip', (e, dir) => together.skip(dir));
 
   // Друзья: заявки по логину и что они слушают
   handle('fr:list', () => friends.list());
@@ -459,6 +461,7 @@ function registerIpc() {
   ipcMain.on('win', (e, action) => {
     if (!win) return;
     if (action === 'min') win.minimize();
+    if (action === 'tray') toTray();
     if (action === 'max') (win.isMaximized() ? win.unmaximize() : win.maximize());
     if (action === 'close') win.close();
     if (action === 'fullscreen-on') win.setFullScreen(true);
@@ -466,16 +469,30 @@ function registerIpc() {
   });
 }
 
-function showWindow() {
+function revealWindow() {
   if (!win || win.isDestroyed()) return;
   if (win.isMinimized()) win.restore();
   win.show();
   win.focus();
 }
 
+// Окно в трее — вылетает из значка (src/stow.js); свёрнуто или просто позади — показать как обычно
+function showWindow() {
+  if (!win || win.isDestroyed()) return;
+  if (!win.isVisible() && tray.bounds()) stow.fromTray(win, tray.bounds(), revealWindow);
+  else revealWindow();
+}
+
+// «Свернуть в трей»: окно улетает в значок. Значка нет (выключен в настройках) — просто свернуть
+function toTray() {
+  if (!win || win.isDestroyed()) return;
+  if (tray.bounds()) stow.toTray(win, tray.bounds());
+  else win.minimize();
+}
+
 function toggleWindow() {
   if (!win || win.isDestroyed()) return;
-  if (win.isVisible() && !win.isMinimized() && win.isFocused()) win.hide();
+  if (win.isVisible() && !win.isMinimized() && win.isFocused()) toTray();
   else showWindow();
 }
 

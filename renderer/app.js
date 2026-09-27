@@ -778,6 +778,7 @@ function playFrom(list, index) {
 }
 
 function next(auto = false) {
+  if (!auto && Together.guest()) { Together.askSkip('next'); return; } // в руме чужой трек — очередь у друга
   if (!state.queue.length) return;
   const n = state.order.length;
   for (let step = 1; step <= n; step++) {
@@ -797,8 +798,10 @@ function next(auto = false) {
   }
 }
 
-function prev() {
-  if (audio.currentTime > 4 || !state.queue.length) { audio.currentTime = 0; return; }
+// force — просьба гостя из румы: он уже решил, что нужен прошлый трек, а не начало этого
+function prev(force = false) {
+  if (!force && audio.currentTime <= 4 && Together.guest()) { Together.askSkip('prev'); return; }
+  if ((!force && audio.currentTime > 4) || !state.queue.length) { audio.currentTime = 0; return; }
   for (let p = state.pos - 1; p >= 0; p--) {
     const t = state.queue[state.order[p]];
     if (t?.playable !== false) { state.pos = p; loadTrack(t); return; }
@@ -821,6 +824,7 @@ function showNow(track, stream) {
   $('#btn-now-album').disabled = false;
   $('#btn-now-sc').disabled = false;
   $('#btn-now-sc').hidden = track.source === 'sc'; // из SoundCloud и так — кнопку прячем
+  renderNowLike();
   $('#now-artist').innerHTML = track.artist ? artistLinks(track.artist) : 'Исполнитель неизвестен'; // имя — ссылка на артиста
   $('#now-cover').innerHTML = track.cover ? `<img src="${esc(track.cover)}" alt="">` : '<span class="porthole-empty">♪</span>';
   const via = $('#now-via');
@@ -1404,6 +1408,43 @@ $('#btn-now-album').onclick = (e) => {
   const btn = e.currentTarget;
   if (btn.getAttribute('aria-expanded') === 'true') { closeMenu(); return; }
   showMenu(albumMenuItems([state.track]), { anchor: btn });
+};
+
+// У названия (дизайн «Стекло»): «нравится» — в лайки Яндекс Музыки, «ещё» — альбом, SoundCloud,
+// во весь экран и режимы (modes.js), то есть всё, что в других дизайнах лежит кнопками у громкости
+// Лайкнутые за эту сессию (API лайк ставит, снять его отсюда нельзя). Множество живёт на самой функции:
+// showNow может позвать её раньше, чем интерпретатор дойдёт до этих строк
+function renderNowLike() {
+  const likedNow = (renderNowLike.liked ||= new Set());
+  const b = $('#btn-like');
+  const t = state.track;
+  b.hidden = !t || t.source !== 'ym';
+  const on = !!t && likedNow.has(t.id);
+  b.setAttribute('aria-pressed', String(on));
+  b.setAttribute('aria-label', on ? 'Уже в «Мне нравится»' : 'Нравится');
+  $('use', b).setAttribute('href', on ? '#i-heart-fill' : '#i-heart');
+}
+$('#btn-like').onclick = async () => {
+  const t = state.track;
+  const likedNow = (renderNowLike.liked ||= new Set());
+  if (!t || likedNow.has(t.id)) return;
+  likedNow.add(t.id);
+  renderNowLike();
+  await api.wave.feedback('like', t).catch(() => {});
+  toast(`«${t.title}» — в «Мне нравится»`);
+};
+$('#btn-now-more').onclick = (e) => {
+  e.stopPropagation();
+  const btn = e.currentTarget;
+  if (btn.getAttribute('aria-expanded') === 'true') { closeMenu(); return; }
+  const t = state.track;
+  showMenu([
+    ...(t ? [{ label: 'Добавить в альбом', icon: 'i-album-add', onClick: () => showMenu(albumMenuItems([t]), { anchor: btn }) }] : []),
+    ...(t && t.source !== 'sc' ? [{ label: 'Найти в SoundCloud', icon: 'i-soundcloud', onClick: () => searchIn('sc', trackQuery(t)) }] : []),
+    { label: 'Во весь экран', icon: 'i-full', count: 'F', onClick: enterFs },
+    { sep: true },
+    ...modesMenuItems(),
+  ], { anchor: btn });
 };
 
 $('#tracklist').addEventListener('dblclick', (e) => {
@@ -2408,6 +2449,14 @@ const locked = () => !authEl.hidden;
 // После входа бочка с экрана входа переезжает на своё место в плеере (FLIP):
 // форма уходит, фон растворяется, бочка летит в позицию #barrel и подменяется настоящей
 async function leaveAuth() {
+  // «Стекло»: бочки на экране входа нет — карточка входа просто растворяется
+  if (document.documentElement.classList.contains('skin-glass')) {
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      await authEl.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 260, easing: 'ease-out' }).finished.catch(() => {});
+    }
+    authEl.hidden = true;
+    return;
+  }
   const fly = $('.auth-barrel', authEl);
   const target = $('#barrel');
   const from = fly.getBoundingClientRect();

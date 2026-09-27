@@ -22,25 +22,161 @@ function paintAvatar(el, name) {
   el.textContent = url ? '' : initial(name);
 }
 
-// Картинка → квадрат 256×256 по центру, JPEG. Небольшой, чтобы спокойно синхронизироваться
-function cropAvatar(file) {
+function loadAvatarImage(file) {
   return new Promise((resolve, reject) => {
     if (!/^image\//.test(file.type)) { reject(new Error('Это не картинка')); return; }
     if (file.size > 20 * 1024 * 1024) { reject(new Error('Картинка больше 20 МБ')); return; }
     const url = URL.createObjectURL(file);
     const img = new Image();
-    img.onload = () => {
-      URL.revokeObjectURL(url);
-      const side = Math.min(img.naturalWidth, img.naturalHeight);
-      const c = document.createElement('canvas');
-      c.width = c.height = 256;
-      const g = c.getContext('2d');
-      g.imageSmoothingQuality = 'high';
-      g.drawImage(img, (img.naturalWidth - side) / 2, (img.naturalHeight - side) / 2, side, side, 0, 0, 256, 256);
-      resolve(c.toDataURL('image/jpeg', 0.86));
-    };
+    img.onload = () => { URL.revokeObjectURL(url); resolve(img); };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('Картинка не открылась')); };
     img.src = url;
+  });
+}
+
+const AVATAR_PX = 256; // квадрат 256×256, JPEG: небольшой, чтобы спокойно синхронизироваться
+const PHOTO_GLYPH = '<rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="9" cy="9" r="1.7"/><path d="m20.5 15-4.8-4.8L5 21"/>';
+
+// Окно «кадр»: фото двигается пальцем или мышью, приближается колёсиком, щипком или ползунком.
+// Что в кружке — то и будет на аватарке. Отмена — null
+async function cropAvatar(file) {
+  const img = await loadAvatarImage(file);
+  const W = img.naturalWidth, H = img.naturalHeight;
+  if (!W || !H) throw new Error('Картинка не открылась');
+  const short = Math.min(W, H);
+  const zMax = clamp(short / 100, 2, 6);
+  const dpr = devicePixelRatio || 1;
+  // на экран — уменьшенная копия: большое фото с телефона не пересчитываем на каждый кадр
+  const k = Math.min(1, Math.min(2048, 260 * zMax * dpr) / short);
+  const pic = k < 1
+    ? await createImageBitmap(img, { resizeWidth: Math.round(W * k), resizeHeight: Math.round(H * k), resizeQuality: 'high' }).catch(() => img)
+    : img;
+
+  return new Promise((resolve) => {
+    const dlg = document.createElement('div');
+    dlg.className = 'modal crop-modal';
+    dlg.innerHTML = `
+      <form class="sheet dialog crop" role="dialog" aria-modal="true" aria-labelledby="crop-title" aria-describedby="crop-desc">
+        <h2 id="crop-title">Аватар</h2>
+        <p class="sec-desc" id="crop-desc">Перетащи фото и приблизь: что в кружке — то и будет на аватарке.</p>
+        <div class="crop-view" tabindex="0" aria-label="Кадр аватара: стрелки двигают фото, плюс и минус приближают">
+          <canvas></canvas><i class="crop-ring"></i>
+        </div>
+        <label class="crop-zoom">
+          <svg class="crop-zoom-s" viewBox="0 0 24 24" aria-hidden="true">${PHOTO_GLYPH}</svg>
+          <input type="range" min="1" max="${zMax}" step="any" value="1" aria-label="Приближение">
+          <svg class="crop-zoom-l" viewBox="0 0 24 24" aria-hidden="true">${PHOTO_GLYPH}</svg>
+        </label>
+        <div class="dialog-actions">
+          <button type="button" class="btn" data-crop="cancel">Отмена</button>
+          <button type="submit" class="btn primary">Сохранить</button>
+        </div>
+      </form>`;
+    document.body.append(dlg);
+    const view = $('.crop-view', dlg), cv = $('canvas', dlg), g = cv.getContext('2d'), range = $('input', dlg);
+    // x, y — сдвиг центра фото от центра кружка, в CSS-пикселях; z — приближение (1 — фото ровно закрывает кружок)
+    let vw = 0, vh = 0, d = 0, x = 0, y = 0, z = 1, raf = 0;
+    const scale = () => (d / short) * z;
+    const draw = () => {
+      raf = 0;
+      const s = scale();
+      g.setTransform(dpr, 0, 0, dpr, 0, 0);
+      g.clearRect(0, 0, vw, vh);
+      g.imageSmoothingQuality = 'high';
+      g.drawImage(pic, vw / 2 + x - (W * s) / 2, vh / 2 + y - (H * s) / 2, W * s, H * s);
+    };
+    const paint = () => {
+      const s = scale(), mx = (W * s - d) / 2, my = (H * s - d) / 2;
+      x = clamp(x, -mx, mx); // кружок всегда целиком на фото
+      y = clamp(y, -my, my);
+      range.value = z;
+      range.style.setProperty('--p', `${((z - 1) / (zMax - 1)) * 100}%`);
+      raf ||= requestAnimationFrame(draw);
+    };
+    // приближение вокруг точки (px, py от центра кружка): то, что под курсором, остаётся под ним
+    const zoomAt = (nz, px = 0, py = 0) => {
+      nz = clamp(nz, 1, zMax);
+      x = px - ((px - x) * nz) / z;
+      y = py - ((py - y) * nz) / z;
+      z = nz;
+      paint();
+    };
+    const ro = new ResizeObserver(() => {
+      vw = view.clientWidth; vh = view.clientHeight;
+      d = Math.round(Math.min(vw, vh) * 0.84);
+      view.style.setProperty('--d', `${d}px`);
+      cv.width = Math.round(vw * dpr);
+      cv.height = Math.round(vh * dpr);
+      paint();
+    });
+    ro.observe(view);
+
+    const pts = new Map();
+    const at = (e) => { const r = view.getBoundingClientRect(); return [e.clientX - r.left - vw / 2, e.clientY - r.top - vh / 2]; };
+    view.addEventListener('pointerdown', (e) => {
+      view.setPointerCapture(e.pointerId);
+      pts.set(e.pointerId, at(e));
+      view.classList.add('drag');
+    });
+    view.addEventListener('pointermove', (e) => {
+      const was = pts.get(e.pointerId);
+      if (!was) return;
+      const now = at(e);
+      pts.set(e.pointerId, now);
+      const other = [...pts.values()].find((p) => p !== now);
+      if (!other) { x += now[0] - was[0]; y += now[1] - was[1]; paint(); return; }
+      // два пальца: середина между ними тащит фото, расстояние — приближает
+      x += (now[0] - was[0]) / 2;
+      y += (now[1] - was[1]) / 2;
+      const d0 = Math.hypot(was[0] - other[0], was[1] - other[1]);
+      const d1 = Math.hypot(now[0] - other[0], now[1] - other[1]);
+      zoomAt(d0 ? z * (d1 / d0) : z, (now[0] + other[0]) / 2, (now[1] + other[1]) / 2);
+    });
+    const up = (e) => { pts.delete(e.pointerId); if (!pts.size) view.classList.remove('drag'); };
+    view.addEventListener('pointerup', up);
+    view.addEventListener('pointercancel', up);
+    view.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      zoomAt(z * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), ...at(e)); // ctrlKey — щипок на тачпаде
+    }, { passive: false });
+    view.addEventListener('keydown', (e) => {
+      const step = e.shiftKey ? 40 : 10;
+      const move = { ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step] }[e.key];
+      if (move) { x += move[0]; y += move[1]; paint(); }
+      else if (e.key === '+' || e.key === '=') zoomAt(z * 1.15);
+      else if (e.key === '-') zoomAt(z / 1.15);
+      else if (e.key === '0') { x = y = 0; zoomAt(1); }
+      else return;
+      e.preventDefault();
+    });
+    range.addEventListener('input', () => zoomAt(+range.value));
+
+    const done = (result) => {
+      ro.disconnect();
+      cancelAnimationFrame(raf);
+      dlg.remove();
+      if (pic !== img) pic.close();
+      resolve(result);
+    };
+    $('[data-crop="cancel"]', dlg).onclick = () => done(null);
+    dlg.addEventListener('pointerdown', (e) => { if (e.target === dlg) done(null); });
+    dlg.addEventListener('keydown', (e) => {
+      e.stopPropagation(); // стрелки, пробел и плюс — окну, а не горячим клавишам плеера
+      if (e.key === 'Escape') done(null);
+    });
+    $('form', dlg).onsubmit = (e) => {
+      e.preventDefault();
+      const s = scale(), side = d / s; // кружок в пикселях исходного фото
+      const c = document.createElement('canvas');
+      c.width = c.height = AVATAR_PX;
+      const cg = c.getContext('2d');
+      cg.fillStyle = '#fff'; // прозрачный PNG — на белом, а не на чёрном
+      cg.fillRect(0, 0, AVATAR_PX, AVATAR_PX);
+      cg.imageSmoothingQuality = 'high';
+      cg.drawImage(img, W / 2 - (d / 2 + x) / s, H / 2 - (d / 2 + y) / s, side, side, 0, 0, AVATAR_PX, AVATAR_PX);
+      done(c.toDataURL('image/jpeg', 0.88));
+    };
+    view.focus();
   });
 }
 
@@ -59,7 +195,9 @@ function pickAvatar() {
     const file = input.files?.[0];
     if (!file) return;
     try {
-      await setAvatar(await cropAvatar(file));
+      const dataUrl = await cropAvatar(file);
+      if (!dataUrl) return; // передумал
+      await setAvatar(dataUrl);
       toast('Аватар обновлён');
     } catch (e) { toast(e.message, 'err'); }
   };
@@ -330,7 +468,7 @@ $('#profile-close').onclick = closeProfile;
 // иначе обработчик app.js успел бы закрыть настройки, и тот же Esc закрыл бы и профиль
 document.addEventListener('keydown', (e) => {
   if (e.key !== 'Escape' || !profileOpen() || locked()) return;
-  if (['#settings', '#editor', '#dialog', '#fs', '#admin', '#changelog'].some((id) => $(id) && !$(id).hidden) || !$('#menu').hidden || !$('#together').hidden || !$('#friends').hidden) return;
+  if (['#settings', '#editor', '#dialog', '#fs', '#admin', '#changelog'].some((id) => $(id) && !$(id).hidden) || !$('#menu').hidden || !$('#together').hidden || !$('#friends').hidden || $('.crop-modal')) return;
   closeProfile();
 }, true);
 window.addEventListener('resize', () => { if (profileOpen()) renderStats(); });

@@ -72,4 +72,7 @@ function destroy() {
   if (tray) { tray.destroy(); tray = null; }
 }
 
-module.exports = { init, state, refresh, settingsChanged: () => { apply(); refresh(true); }, closeToTray, destroy };
+// где значок на экране — туда улетает остров «в трей» (src/island.js → stow)
+const bounds = () => (tray && !tray.isDestroyed() ? tray.getBounds() : null);
+
+module.exports = { init, state, refresh, bounds, settingsChanged: () => { apply(); refresh(true); }, closeToTray, destroy };

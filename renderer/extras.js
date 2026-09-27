@@ -30,7 +30,30 @@ function rgbToHsl(r, g, b) {
 function resetTheme() {
   themeSeq++;
   lastPalette = null;
+  lastCoverImg = ambientFor = null;
   for (const v of THEME_VARS) document.documentElement.style.removeProperty(v);
+  document.documentElement.style.removeProperty('--ambient');
+}
+
+// «Стекло» (look.js → SKIN_AMBIENT): фон сцены — обложка, размытая один раз на холсте 64×64.
+// Браузер потом только растягивает готовую картинку: ни CSS-фильтров, ни перерисовки размытия каждый кадр
+let lastCoverImg = null;
+let ambientFor = null;
+function ambientFrom(img) {
+  lastCoverImg = img;
+  if (!window.SKIN_AMBIENT || ambientFor === img) return;
+  ambientFor = img;
+  const root = document.documentElement.style;
+  try {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d');
+    g.filter = 'blur(7px) saturate(1.7)';
+    g.drawImage(img, -24, -24, 112, 112); // с запасом за краями — размытие не темнит углы
+    root.setProperty('--ambient', `url("${c.toDataURL('image/jpeg', 0.9)}")`);
+  } catch {
+    root.removeProperty('--ambient'); // картинку не прочитать (без CORS) — остаётся ровный фон
+  }
 }
 
 function applyThemeFrom(url) {
@@ -42,6 +65,7 @@ function applyThemeFrom(url) {
   img.onload = () => {
     if (seq !== themeSeq) return;
     try { setTheme(analyzeCover(img)); } catch { /* обложка без CORS — оставляем прежнюю палитру */ }
+    ambientFrom(img);
   };
   img.src = url;
 }
@@ -87,6 +111,7 @@ function analyzeCover(img) {
 // Перекрасить заново после смены настройки «фон в цвет обложки»
 function reapplyTheme() {
   if (lastPalette) setTheme(lastPalette);
+  if (lastCoverImg) ambientFrom(lastCoverImg); // включили «Стекло» посреди трека
 }
 
 function setTheme(p) {
@@ -102,10 +127,15 @@ function setTheme(p) {
     '--text': hsl(p.bgHue, 0.3, 0.93),
     '--text-2': hsl(p.bgHue, 0.16, 0.74),
     '--text-3': hsl(p.bgHue, 0.1, 0.57),
-    // Чёрно-белая обложка — светлый приглушённый акцент того же тона
-    '--amber': p.vivid ? hsl(p.accentHue, clamp(p.accentSat, 0.55, 0.9), 0.66) : hsl(p.bgHue, 0.14, 0.8),
+    // Чёрно-белая обложка — светлый приглушённый акцент того же тона.
+    // На светлом дизайне (look.js → SKIN_LIGHT) акцент и голоса темнее: иначе их не прочитать на белом
+    '--amber': window.SKIN_LIGHT
+      ? (p.vivid ? hsl(p.accentHue, clamp(p.accentSat, 0.45, 0.8), 0.38) : hsl(p.bgHue, 0.1, 0.34))
+      : (p.vivid ? hsl(p.accentHue, clamp(p.accentSat, 0.55, 0.9), 0.66) : hsl(p.bgHue, 0.14, 0.8)),
     // Цвет голосов не должен сливаться с акцентом музыки
-    '--voice': p.vivid && hueDist(p.accentHue, 232) < 50 ? hsl(158, 0.55, 0.7) : '#9aa8ff',
+    '--voice': p.vivid && hueDist(p.accentHue, 232) < 50
+      ? hsl(158, 0.55, window.SKIN_LIGHT ? 0.3 : 0.7)
+      : (window.SKIN_LIGHT ? '#5b48db' : '#9aa8ff'),
   };
   const root = document.documentElement.style;
   const l = window.LOOK || {};

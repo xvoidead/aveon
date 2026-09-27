@@ -13,20 +13,24 @@
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></symbol>
     <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="13.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></symbol>
-    <symbol id="i-next" viewBox="0 0 24 24"><path d="M6 6.8v10.4a.8.8 0 0 0 1.25.66l7.6-5.2a.8.8 0 0 0 0-1.32l-7.6-5.2A.8.8 0 0 0 6 6.8z" fill="currentColor"/><rect x="16.5" y="6" width="2.2" height="12" rx="1.1" fill="currentColor"/></symbol>
-    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M18 6.8v10.4a.8.8 0 0 1-1.25.66l-7.6-5.2a.8.8 0 0 1 0-1.32l7.6-5.2A.8.8 0 0 1 18 6.8z" fill="currentColor"/><rect x="5.3" y="6" width="2.2" height="12" rx="1.1" fill="currentColor"/></symbol>
+    <symbol id="i-next" viewBox="0 0 24 24"><path d="M2 6.9v10.2a.9.9 0 0 0 1.4.75L11 12.9v4.2a.9.9 0 0 0 1.4.75l8.1-5.1a.9.9 0 0 0 0-1.5L12.4 6.15A.9.9 0 0 0 11 6.9v4.2L3.4 6.15A.9.9 0 0 0 2 6.9z" fill="currentColor"/></symbol>
+    <symbol id="i-prev" viewBox="0 0 24 24"><path d="M22 6.9v10.2a.9.9 0 0 1-1.4.75L13 12.9v4.2a.9.9 0 0 1-1.4.75l-8.1-5.1a.9.9 0 0 1 0-1.5l8.1-5.1A.9.9 0 0 1 13 6.9v4.2l7.6-4.95A.9.9 0 0 1 22 6.9z" fill="currentColor"/></symbol>
     <symbol id="i-barrel" viewBox="0 0 24 24"><path d="M7 3.5h10c1.3 2.4 2 5.3 2 8.5s-.7 6.1-2 8.5H7C5.7 18.1 5 15.2 5 12s.7-6.1 2-8.5zM5.4 8.5h13.2M5.4 15.5h13.2" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
+    <symbol id="i-heart" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.3a4.3 4.3 0 0 1 7.5 2.5C19.5 15.4 12 20 12 20z" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></symbol>
+    <symbol id="i-heart-fill" viewBox="0 0 24 24"><path d="M12 20s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.3a4.3 4.3 0 0 1 7.5 2.5C19.5 15.4 12 20 12 20z" fill="currentColor"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M12 4.5c4.7 0 8.5 3.1 8.5 7s-3.8 7-8.5 7c-1 0-2-.1-2.9-.4L5 19.5l1.1-3.6C4.5 14.7 3.5 13.2 3.5 11.5c0-3.9 3.8-7 8.5-7z" fill="currentColor"/></symbol>
     <symbol id="i-open" viewBox="0 0 24 24"><path d="M14 4.5h5.5V10M19.5 4.5 11 13M18 14v4a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 5 18V8a1.5 1.5 0 0 1 1.5-1.5h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   </svg>
 
+  <div class="side left" id="side-ev"></div>
   <div class="pill" id="pill">
     <div class="glow"></div>
     <div class="ring"></div>
     <div class="row">
       <div class="disc" id="disc"></div>
-      <i class="dot"></i>
       <div class="label"><b id="p-title"></b><small id="p-sub"></small></div>
-      <div class="bars" id="bars"><i></i><i></i><i></i><i></i><i></i></div>
+      <div class="bars" id="bars"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <button class="like" id="b-like" title="Нравится"><svg><use href="#i-heart"/></svg></button>
     </div>
     <div class="full">
       <div class="seek">
@@ -45,6 +49,7 @@
       <div class="friends" id="friends" hidden></div>
     </div>
   </div>
+  <div class="side" id="side"></div>
 
   <script src="island.js"></script>
 </body>

@@ -37,11 +37,20 @@ function apply(win, s) {
     s.inside = inside;
     s.onInside?.(inside);
   }
-  const on = s.hovered || inside;
+  // extra — кнопки рядом с панелью (кружок друга у острова): над ними мышь ловим, но «зашёл на панель» не считаем
+  const on = s.hovered || inside || overExtra(win, s);
   if (on === s.on) return;
   s.on = on;
   if (s.onInside) log('hover.catchMouse', on, 'hovered', s.hovered, 'inside', s.inside);
   win.setIgnoreMouseEvents(!on, { forward: true });
+}
+
+function overExtra(win, s) {
+  if (!s.extra?.length) return false;
+  const p = screen.getCursorScreenPoint();
+  const b = win.getContentBounds();
+  const x = p.x - b.x, y = p.y - b.y;
+  return s.extra.some((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h);
 }
 
 function tick() {
@@ -79,7 +88,9 @@ function setHover(win, on) {
 function setRect(win, rect) {
   const s = win && watched.get(win);
   if (!s) return;
-  s.rect = rect && [rect.x, rect.y, rect.w, rect.h].every(Number.isFinite) ? rect : null;
+  const ok = (r) => r && [r.x, r.y, r.w, r.h].every(Number.isFinite);
+  s.rect = ok(rect) ? { x: rect.x, y: rect.y, w: rect.w, h: rect.h } : null;
+  s.extra = Array.isArray(rect?.extra) ? rect.extra.filter(ok).slice(0, 4) : [];
 }
 
 // Окно спрятали под курсором — mouseleave не придёт: сбрасываем, чтобы после показа не ловило мышь зря

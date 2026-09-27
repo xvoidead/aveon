@@ -531,7 +531,8 @@ const still = () => document.documentElement.classList.contains('look-still') ||
 function drawWave() {
   const c = $('#wave-canvas');
   const box = $('#wave-hero');
-  if (c && box && !box.hidden && !document.hidden) {
+  // холст спрятан дизайном («Стекло») — нулевая ширина: ни линий, ни букв, ни чтения стилей
+  if (c && box && !box.hidden && !document.hidden && c.clientWidth) {
     const dpr = window.devicePixelRatio || 1;
     const w = c.clientWidth * dpr, h = c.clientHeight * dpr;
     if (c.width !== w || c.height !== h) { c.width = w; c.height = h; measureWord(); }
@@ -548,9 +549,9 @@ function drawWave() {
 
     const g = c.getContext('2d');
     g.clearRect(0, 0, w, h);
-    const cs = getComputedStyle(document.documentElement);
-    const amber = cs.getPropertyValue('--amber').trim() || '#f0a63a';
-    const voice = cs.getPropertyValue('--voice').trim() || '#9aa8ff';
+    // extras.js: цвета читаются раз в полсекунды, а не каждый кадр
+    const amber = vizColor('amber');
+    const voice = vizColor('voice');
     const mid = Math.floor(LINES / 2);
     const amp = h * 0.075 * (0.4 + waveEnergy);
     for (let k = 0; k < LINES; k++) {

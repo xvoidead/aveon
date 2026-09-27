@@ -9,63 +9,90 @@ body.pos-right { justify-content: flex-end; padding-right: 8px; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 svg { width: 18px; height: 18px; }
 
+/* как Dynamic Island: чистый чёрный без обводки; лёгкая тень — только чтобы капсулу было видно на тёмных окнах */
 .pill {
-  position: relative; width: 280px; height: 36px; border-radius: 22px; background: #000; overflow: hidden;
-  box-shadow: 0 6px 22px rgb(0 0 0 / .35), inset 0 0 0 1px rgb(255 255 255 / .06);
+  position: relative; flex: none; width: 280px; height: 36px; border-radius: 22px; background: #000; overflow: hidden;
+  box-shadow: 0 4px 16px rgb(0 0 0 / .28);
   transition: width .42s var(--ease), height .42s var(--ease), border-radius .42s var(--ease), box-shadow .3s ease, opacity .3s ease, transform .3s ease;
 }
+/* курсор над свёрнутой капсулой: чуть больше — «нажми, раскроется» */
+.pill.hover:not(.open) { transform: scale(1.04); cursor: pointer; }
 body.hidden .pill { opacity: 0; transform: scale(.8) translateY(-10px); }
 body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 /* бочка: обводка цветом голосов, как индикатор звонка */
-.pill.barrel { box-shadow: 0 6px 22px rgb(0 0 0 / .35), 0 0 0 1.5px var(--voice), 0 0 18px -2px var(--voice); }
+.pill.barrel { box-shadow: 0 4px 16px rgb(0 0 0 / .28), 0 0 0 1.5px var(--voice), 0 0 18px -2px var(--voice); }
 .glow { position: absolute; inset: 0; pointer-events: none; opacity: calc(var(--m) * .35); background: radial-gradient(120% 140% at 50% 120%, var(--voice), transparent 60%); }
 
 .row { position: absolute; left: 6px; right: 12px; top: 5px; height: 26px; display: flex; align-items: center; gap: 10px; transition: top .42s var(--ease), height .42s var(--ease); }
+/* обложка — скруглённый квадрат, как в iOS; кружком и с вращением — только с настройкой «крутится» */
 .disc {
-  width: 26px; height: 26px; flex: none; border-radius: 50%; background: #222 center / cover no-repeat; cursor: pointer;
-  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08); transition: width .42s var(--ease), height .42s var(--ease), border-radius .42s var(--ease);
-  animation: spin 9s linear infinite; animation-play-state: paused;
+  width: 26px; height: 26px; flex: none; border-radius: 7px; background: #222 center / cover no-repeat; cursor: pointer;
+  transition: width .42s var(--ease), height .42s var(--ease), border-radius .42s var(--ease);
 }
-.pill.playing:not(.open):not(.peek) .disc { animation-play-state: running; }
+.pill:not(.no-spin):not(.open):not(.peek):not(.notice) .disc { border-radius: 50%; animation: spin 9s linear infinite; animation-play-state: paused; }
+.pill.playing:not(.no-spin):not(.open):not(.peek):not(.notice) .disc { animation-play-state: running; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .label { flex: 1; min-width: 0; display: flex; flex-direction: column; opacity: 0; transition: opacity .2s ease; }
 .label b, .label small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .label b { font-weight: 600; font-size: 13px; }
 .label small { color: rgb(244 241 236 / .6); font-size: 12px; }
 .pill .label { opacity: 1; } /* подпись есть всегда: строка текста или название и исполнитель */
-.pill.barrel:not(.peek):not(.open) .label b { color: var(--voice); font-size: 12px; }
-.pill.barrel:not(.peek):not(.open) .label small { display: none; }
+.pill.barrel:not(.peek):not(.open):not(.notice) .label b { color: var(--voice); font-size: 12px; }
+.pill.barrel:not(.peek):not(.open):not(.notice) .label small { display: none; }
+.pill.peek .label b { font-size: 14px; color: #fff; }
+.pill.peek .label small { font-size: 13px; color: rgb(244 241 236 / .5); }
 
-.bars { display: flex; align-items: center; gap: 2.5px; height: 18px; flex: none; }
-.bars i { width: 3px; height: 20%; border-radius: 2px; background: var(--amber); transition: height .09s linear, background .3s ease; }
+/* волна как в iOS: тонкие полоски от центра, цвет обложки приглушён */
+.bars { display: flex; align-items: center; gap: 2px; height: 18px; flex: none; }
+.bars i { width: 2.5px; height: 20%; border-radius: 2px; background: color-mix(in srgb, var(--amber) 72%, #7a7a7a); transition: height .09s linear, background .3s ease; }
 .pill.barrel .bars i { background: var(--voice); }
 .pill:not(.playing) .bars i { height: 12% !important; opacity: .5; }
 
-.pill.peek { width: 310px; height: 56px; border-radius: 28px; }
-.pill.peek .row { top: 8px; height: 40px; }
-.pill.peek .disc { width: 40px; height: 40px; border-radius: 11px; animation: none; }
+/* смена трека: капсула на пару секунд — как живая активность iOS, полностью круглая */
+.pill.peek { width: 360px; height: 64px; border-radius: 32px; }
+.pill.peek .row { left: 10px; right: 20px; top: 10px; height: 44px; }
+.pill.peek .disc { width: 44px; height: 44px; border-radius: 11px; }
 
-.pill.open { width: 340px; height: 142px; border-radius: 30px; }
-.pill.open .row { top: 12px; height: 54px; }
-.pill.open .disc { width: 54px; height: 54px; border-radius: 14px; animation: none; }
-.pill.open .label b { font-size: 15px; }
-.pill.open .label small { font-size: 13px; }
+/* раскрытый плеер: крупная обложка, много воздуха, радиус как у углов экрана */
+.pill.open { width: 380px; height: 188px; border-radius: 42px; }
+.pill.open .row { left: 22px; right: 24px; top: 20px; height: 60px; gap: 14px; }
+.pill.open .disc { width: 60px; height: 60px; border-radius: 14px; }
+.pill.open .label b { font-size: 16px; font-weight: 600; color: #fff; }
+.pill.open .label small { font-size: 16px; font-weight: 500; color: rgb(244 241 236 / .5); }
+.pill.open .bars { align-self: flex-start; margin-top: 4px; }
 
-.full { position: absolute; left: 16px; right: 16px; top: 74px; opacity: 0; pointer-events: none; transition: opacity .18s ease; }
-.pill.open .full { opacity: 1; pointer-events: auto; transition-delay: .12s; }
-.seek { display: flex; align-items: center; gap: 10px; font-size: 11px; color: rgb(244 241 236 / .55); font-variant-numeric: tabular-nums; }
-.seek span { min-width: 30px; }
+/* «нравится» — в правом верхнем углу раскрытого острова вместо полосок (у треков Яндекс Музыки) */
+.like { display: none; flex: none; align-self: flex-start; width: 34px; height: 34px; margin: -4px -6px 0 0; place-items: center; border-radius: 50%; color: rgb(244 241 236 / .7); transition: color .15s, transform .12s; }
+.like svg { width: 24px; height: 24px; }
+.like:hover { color: #fff; }
+.like:active { transform: scale(.86); }
+.like.on { color: #ff375f; cursor: default; }
+.like.pop svg { animation: like-pop .45s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes like-pop { 0% { transform: scale(.6); } 60% { transform: scale(1.25); } 100% { transform: none; } }
+.pill.open.can-like .like { display: grid; }
+.pill.open.can-like .bars { display: none; }
+
+/* содержимое проявляется из размытия, как в iOS */
+.full { position: absolute; left: 22px; right: 22px; top: 100px; opacity: 0; pointer-events: none; filter: blur(6px); transform: scale(.96); transition: opacity .18s ease, filter .25s ease, transform .3s var(--ease); }
+.pill.open .full { opacity: 1; pointer-events: auto; filter: none; transform: none; transition-delay: .1s; }
+.seek { display: flex; align-items: center; gap: 12px; font-size: 12px; color: rgb(244 241 236 / .5); font-variant-numeric: tabular-nums; }
+.seek span { min-width: 34px; }
 .seek span:last-child { text-align: right; }
 .bar { flex: 1; height: 16px; display: flex; align-items: center; cursor: pointer; position: relative; }
-.bar::before { content: ""; position: absolute; left: 0; right: 0; height: 4px; border-radius: 2px; background: rgb(255 255 255 / .14); }
-.bar i { position: relative; height: 4px; border-radius: 2px; background: #f4f1ec; width: 0; }
-.ctl { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 4px; }
-.ctl button { width: 34px; height: 34px; display: grid; place-items: center; border-radius: 50%; color: rgb(244 241 236 / .8); transition: background .15s, color .15s, transform .12s; }
-.ctl button:hover { background: rgb(255 255 255 / .1); color: #fff; }
-.ctl button:active { transform: scale(.9); }
-.ctl .play { width: 38px; height: 38px; background: #f4f1ec; color: #000; }
-.ctl .play:hover { background: #fff; color: #000; }
-#b-barrel.on { color: var(--voice); background: color-mix(in srgb, var(--voice) 18%, transparent); }
+.bar::before { content: ""; position: absolute; left: 0; right: 0; height: 7px; border-radius: 4px; background: rgb(255 255 255 / .16); }
+.bar i { position: relative; height: 7px; border-radius: 4px; background: #fff; width: 0; }
+/* кнопки — белые значки без подложек: ⏪ ▶ ⏩ по центру, «бочка» и «открыть» по краям */
+.ctl { display: grid; grid-template-columns: 1fr auto auto auto 1fr; align-items: center; gap: 22px; margin-top: 12px; }
+.ctl button { width: 40px; height: 40px; display: grid; place-items: center; border-radius: 50%; color: #fff; transition: opacity .15s, transform .12s, color .15s; }
+.ctl button svg { width: 30px; height: 30px; }
+.ctl button:hover { opacity: .75; }
+.ctl button:active { transform: scale(.86); }
+.ctl .play svg { width: 34px; height: 34px; }
+#b-barrel, #b-open { width: 32px; height: 32px; color: rgb(244 241 236 / .55); }
+#b-barrel svg, #b-open svg { width: 22px; height: 22px; }
+#b-barrel { justify-self: start; }
+#b-open { justify-self: end; }
+#b-barrel.on { color: var(--voice); }
 
 /* ---- строка текста песни в свёрнутом острове ---- */
 
@@ -74,27 +101,48 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 .label b.swap { animation: swap .35s ease; }
 @keyframes swap { from { opacity: 0; transform: translateY(6px); } }
 
-/* ---- уведомление: как peek, но со значком ---- */
-.pill.notice { width: 310px; height: 56px; border-radius: 28px; }
-.pill.notice .row { top: 8px; height: 40px; }
-.pill.notice .disc { width: 40px; height: 40px; border-radius: 50%; animation: none; }
-.pill.notice .label b { color: var(--voice); }
-
 /* ---- друзья в раскрытом острове ---- */
-.pill.open.has-friends { height: 176px; }
 .friends { display: flex; align-items: center; gap: 8px; margin-top: 8px; padding-top: 8px; border-top: 1px solid rgb(255 255 255 / .08); font-size: 12px; color: rgb(244 241 236 / .65); }
+.friends[hidden], .lyr[hidden] { display: none; }
 .friends i { width: 22px; height: 22px; margin-left: -6px; border-radius: 50%; display: grid; place-items: center; font: 600 11px "Onest", sans-serif; font-style: normal; color: #000; background: var(--voice); box-shadow: 0 0 0 2px #000; }
 .friends i:first-child { margin-left: 0; }
 /* не влезает — строка катается влево-вправо: сдвиг = ширина строки (100cqw) − ширина текста, для короткой он 0 */
 .friends span { flex: 1; min-width: 0; overflow: hidden; white-space: nowrap; container-type: inline-size; }
 .friends span em { display: inline-block; width: max-content; font-style: normal; animation: sway 7s ease-in-out infinite alternate; }
 @keyframes sway { 0%, 15% { transform: translateX(0); } 85%, 100% { transform: translateX(min(0px, calc(100cqw - 100%))); } }
-.dot { position: absolute; left: 26px; top: 5px; width: 8px; height: 8px; border-radius: 50%; background: var(--voice); box-shadow: 0 0 0 2px #000; display: none; }
-.pill.friend-live:not(.open) .dot { display: block; }
+/* капли справа от свёрнутой капсулы, как вторая активность в iOS: друг слушает (#side) и уведомления
+   (#side-ev). Видна ли — класс .on (island.js → tick). Появляется, будто отрывается от края капсулы:
+   выезжает из-под неё, растёт с пружинкой; прячется — втягивается обратно */
+.side {
+  flex: none; width: 0; height: 36px; margin-left: 0; border-radius: 50%; background: #000; overflow: hidden;
+  display: grid; place-items: center; pointer-events: none; position: relative;
+  opacity: 0; transform: translateX(-26px) scale(.35);
+  box-shadow: 0 4px 16px rgb(0 0 0 / .28);
+  transition: width .45s var(--ease), margin .45s var(--ease), opacity .25s ease, transform .5s cubic-bezier(.34, 1.5, .6, 1);
+}
+.side.on { width: 36px; margin-left: 8px; opacity: 1; transform: none; pointer-events: auto; cursor: pointer; }
+.side.on:hover { transform: scale(1.1); }
+.side.on:active { transform: scale(.94); transition-duration: .12s; }
+.side > * { opacity: 0; transform: scale(.6); transition: opacity .2s ease, transform .35s var(--ease); }
+.side.on > * { opacity: 1; transform: none; transition-delay: .12s; }
+.side i { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font: 600 12px "Onest", sans-serif; font-style: normal; color: #000; background: var(--voice) center / cover no-repeat; }
+.side i.pic { color: transparent; }
+.side i.ico { background: rgb(255 255 255 / .1); }
+.side i.ico .emoji { width: 15px; height: 15px; margin: 0; vertical-align: 0; }
+/* капля уведомлений — слева от капсулы: отрывается от её левого края, значок чата */
+.side.left { transform: translateX(26px) scale(.35); }
+.side.left.on { margin-left: 0; margin-right: 8px; transform: none; }
+.side.left.on:hover { transform: scale(1.1); }
+.side.left.on:active { transform: scale(.94); }
+.side svg { width: 18px; height: 18px; color: var(--voice); display: block; }
+.side.on > svg { transform: translate(.5px, -.5px); } /* у пузыря хвостик слева снизу — на глаз центр чуть выше и правее */
+.side.left.on { overflow: visible; } /* счётчик на краю капли, как бейдж в iOS */
+/* сколько уведомлений, если больше одного */
+.side b { position: absolute; right: -3px; top: -3px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; background: #ff453a; color: #fff; font: 700 9px/14px "Onest", sans-serif; text-align: center; box-shadow: 0 0 0 1.5px #000; }
 
 /* ---- пульс в такт басам ---- */
 .pill.pulse.playing:not(.open) { transform: scale(calc(1 + var(--bass, 0) * .045)); transition: width .42s var(--ease), height .42s var(--ease), border-radius .42s var(--ease), box-shadow .3s ease, opacity .3s ease, transform .08s linear; }
-.pill.pulse.playing:not(.open) { box-shadow: 0 6px 22px rgb(0 0 0 / .35), 0 0 calc(var(--bass, 0) * 26px) calc(var(--bass, 0) * 2px) color-mix(in srgb, var(--amber) 55%, transparent); }
+.pill.pulse.playing:not(.open) { box-shadow: 0 4px 16px rgb(0 0 0 / .28), 0 0 calc(var(--bass, 0) * 26px) calc(var(--bass, 0) * 2px) color-mix(in srgb, var(--amber) 55%, transparent); }
 
 /* ---- переливающаяся обводка цветами обложки ---- */
 @property --ang { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
@@ -109,8 +157,6 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 .pill.lyric.barrel:not(.open):not(.peek):not(.notice) .label b { color: var(--voice); }
 
 /* ---- раскрытый остров: три строки текста, текущая — крупно ---- */
-.pill.open.has-lyr { height: 222px; }
-.pill.open.has-lyr.has-friends { height: 256px; }
 .lyr { margin-top: 10px; padding-top: 8px; border-top: 1px solid rgb(255 255 255 / .08); text-align: center; }
 .lyr p { margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 #l-prev, #l-next { font-size: 12px; color: rgb(244 241 236 / .38); line-height: 18px; min-height: 18px; }
@@ -140,11 +186,12 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 .pill.no-spin .disc { animation: none !important; }
 .pill.m-calm .bars i { transition: height .45s ease; }
 .pill.m-static .bars i { transition: none; }
-.pill.m-static .bars i:nth-child(1) { height: 45% !important; }
-.pill.m-static .bars i:nth-child(2) { height: 80% !important; }
-.pill.m-static .bars i:nth-child(3) { height: 55% !important; }
-.pill.m-static .bars i:nth-child(4) { height: 95% !important; }
-.pill.m-static .bars i:nth-child(5) { height: 40% !important; }
+.pill.m-static .bars i:nth-child(1), .pill.m-static .bars i:nth-child(7) { height: 30% !important; }
+.pill.m-static .bars i:nth-child(2) { height: 60% !important; }
+.pill.m-static .bars i:nth-child(3) { height: 80% !important; }
+.pill.m-static .bars i:nth-child(4) { height: 100% !important; }
+.pill.m-static .bars i:nth-child(5) { height: 70% !important; }
+.pill.m-static .bars i:nth-child(6) { height: 45% !important; }
 .pill.m-static { transform: none !important; }
 .pill.m-static .ring { animation-play-state: paused; }
 .pill.m-static .glow { opacity: 0; }
@@ -154,21 +201,21 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 
 
 /* предпросмотр положения из настроек */
-.pill.previewing { box-shadow: 0 6px 22px rgb(0 0 0 / .35), 0 0 0 2px var(--amber), 0 0 24px -4px var(--amber); }
+.pill.previewing { box-shadow: 0 4px 16px rgb(0 0 0 / .28), 0 0 0 2px var(--amber), 0 0 24px -4px var(--amber); }
 
 /* ширину свёрнутой капсулы задаёт island.js → fitWidth (под длину строки), здесь только плавность */
 .pill:not(.open):not(.peek):not(.notice) .label b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: font-size .3s ease; }
-.pill.open, .pill.peek, .pill.notice { width: var(--w-open, 340px); }
-.pill.peek, .pill.notice { width: 310px; }
 .measure { position: absolute; left: -9999px; top: 0; white-space: nowrap; visibility: hidden; font-weight: 600; }
 
-/* уведомление: до двух строк, эмодзи картинками; подпись — откуда (друзья, рума, от админов) */
-/* высота фиксированная: в капсуле всё спозиционировано абсолютно — 64 px хватает на две строки и подпись */
-.pill.notice { height: 64px; border-radius: 32px; }
-.pill.notice .row { top: 8px; height: 48px; }
-.pill.notice .disc { width: 44px; height: 44px; }
-.pill.notice .label b { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.22; font-size: 12.5px; }
-.pill.notice .label small { font-size: 10.5px; }
+/* уведомление — как входящий звонок в iOS: круглая капсула, аватарка кружком,
+   сверху серая подпись (откуда: друзья, рума, от админов), под ней крупный текст до двух строк */
+.pill.notice { width: 380px; height: 76px; border-radius: 38px; }
+.pill.notice .row { left: 12px; right: 22px; top: 12px; height: 52px; gap: 12px; }
+.pill.notice .disc { width: 52px; height: 52px; border-radius: 14px; }
+.pill.notice.face .disc { border-radius: 50%; }
+.pill.notice .label { flex-direction: column-reverse; justify-content: center; gap: 1px; }
+.pill.notice .label b { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.22; font-size: 14px; font-weight: 500; color: #fff; }
+.pill.notice .label small { display: block; font-size: 12px; color: rgb(244 241 236 / .5); }
 .label img.emoji { display: inline-block; width: 1.2em; height: 1.2em; vertical-align: -0.24em; margin: 0 .03em; }
 
 /* лента событий внизу раскрытого острова: до трёх строк, у каждой — кнопки и крестик */
@@ -191,12 +238,13 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 .ev button.primary { background: var(--voice); color: #000; }
 .ev .ev-x { width: 22px; padding: 0; background: transparent; color: rgb(244 241 236 / .45); font-size: 15px; }
 .ev .ev-x:hover { background: rgb(255 255 255 / .1); color: #f4f1ec; }
-/* высота раскрытой капсулы: +30 px на событие (строка друзей при событиях спрятана) */
-.pill.open.has-events { height: calc(142px + 12px + var(--ev) * 30px); }
-.pill.open.has-events.has-lyr { height: calc(222px + 12px + var(--ev) * 30px); }
-
 /* строка текста в раскрытом острове: не влезает — шрифт меньше (fitLyricLine), совсем длинная — две строки */
 #l-cur.two { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 19px; }
-.pill.open.has-lyr { height: calc(222px + var(--lx, 0px)); }
-.pill.open.has-lyr.has-friends { height: calc(256px + var(--lx, 0px)); }
-.pill.open.has-events.has-lyr { height: calc(222px + 12px + var(--ev) * 30px + var(--lx, 0px)); }
+
+/* высота раскрытой капсулы: плеер 188, строка друзей +34, текст песни +80 (длинная строка ещё +--lx),
+   +30 на событие (строка друзей при событиях спрятана). Окно острова — src/island.js → SIZE */
+.pill.open.has-friends { height: 222px; }
+.pill.open.has-lyr { height: calc(268px + var(--lx, 0px)); }
+.pill.open.has-lyr.has-friends { height: calc(302px + var(--lx, 0px)); }
+.pill.open.has-events { height: calc(200px + var(--ev) * 30px); }
+.pill.open.has-events.has-lyr { height: calc(280px + var(--ev) * 30px + var(--lx, 0px)); }

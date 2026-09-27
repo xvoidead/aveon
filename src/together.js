@@ -69,6 +69,9 @@ function onMessage(m) {
     case 'react':
       if (room) emit({ type: 'react', e: m.e, by: m.by, from: m.from, mine: m.from === room.you });
       break;
+    case 'skip': // гость просит переключить — переключает тот, чья очередь (renderer/together.js)
+      if (room) emit({ type: 'skip', dir: m.dir, by: m.by, from: m.from });
+      break;
     case 'error':
       if (pending) { pending.reject(new Error(m.error)); pending = null; }
       else emit({ type: 'error', error: m.error });
@@ -177,6 +180,11 @@ function react(e) {
   if (room) sendRaw({ t: 'react', e });
 }
 
+// «Следующий» / «предыдущий» у гостя: очередь у того, кто включил трек, — просим его (together.py, skip)
+function skip(dir) {
+  if (room && (dir === 'next' || dir === 'prev')) sendRaw({ t: 'skip', dir });
+}
+
 function init(onEvent) { notify = onEvent; }
 
-module.exports = { init, create, join, leave, send, react, status };
+module.exports = { init, create, join, leave, send, react, skip, status };
