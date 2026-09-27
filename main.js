@@ -22,6 +22,7 @@ const discord = require('./src/discord');
 const eqpop = require('./src/eqpop');
 const island = require('./src/island');
 const stow = require('./src/stow');
+const updater = require('./src/updater');
 const mini = require('./src/mini');
 const tray = require('./src/tray');
 const hotkeys = require('./src/hotkeys');
@@ -367,6 +368,10 @@ function registerIpc() {
 
   // Версия (для «Что нового»), админка и объявление
   handle('app:version', () => app.getVersion());
+  // автообновления (src/updater.js): статус, «проверить», «перезапустить»
+  handle('update:status', () => updater.status());
+  handle('update:check', () => updater.check());
+  handle('update:install', () => updater.install(() => { quitting = true; }));
   handle('adm:overview', () => account.adminApi.overview());
   handle('adm:users', (q) => account.adminApi.users(q));
   handle('adm:kick', (id) => account.adminApi.kick(id));
@@ -554,6 +559,7 @@ app.whenReady().then(() => {
   discord.init();
   friends.init();
   tray.init(deskActions);
+  updater.init((s) => send('update:event', s));
   mini.init(win, () => { tray.refresh(true); send('desk:changed'); });
   livewall.init(() => send('desk:changed'));
   hotkeys.init({

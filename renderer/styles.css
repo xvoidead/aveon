@@ -375,6 +375,14 @@ input[type="range"] { flex: 1; accent-color: var(--amber); }
 }
 .toast.err { box-shadow: inset 3px 0 0 var(--danger), 0 12px 30px rgb(0 0 0 / 0.4); }
 .toast.hide { opacity: 0; }
+/* скачалось обновление (updates.js): плашка с «Перезапустить» / «Позже» — висит, пока не ответят */
+.toast.update-card { display: flex; align-items: center; gap: 10px; max-width: 520px; padding: 12px 12px 12px 16px; }
+.update-card > div { display: flex; flex-direction: column; gap: 2px; margin-right: 6px; }
+.update-card small { color: var(--text-3); font-size: 12px; }
+.update-card .btn { flex: none; }
+/* строка статуса вверху «Что нового» */
+.upd-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; padding: 10px 12px 10px 14px; border-radius: 12px; background: var(--rivet); color: var(--text-2, var(--text)); font-size: 13px; }
+.upd-line .btn { flex: none; }
 .drop-hint {
   position: fixed; inset: 16px 16px 16px 416px; z-index: 25; display: grid; place-items: center;
   border: 2px dashed var(--amber); border-radius: 18px; background: color-mix(in srgb, var(--amber) 6%, transparent);

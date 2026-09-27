@@ -1,15 +1,16 @@
 {
   "name": "aveon",
   "productName": "авеон",
-  "version": "1.4.2",
+  "version": "1.4.3",
   "description": "Музыкальный плеер: когда в звонке Discord говорят, музыка уходит «в бочку»",
   "main": "main.js",
   "private": true,
   "scripts": {
     "start": "electron .",
     "dev": "electron . --dev",
-    "dist": "electron-builder --win nsis",
-    "mobile:build": "node mobile/build.mjs && cap sync android"
+    "dist": "electron-builder --win nsis --publish never",
+    "mobile:build": "node mobile/build.mjs && cap sync android",
+    "release": "electron-builder --win nsis --publish always"
   },
   "license": "MIT",
   "devDependencies": {
@@ -29,6 +30,7 @@
     "@fontsource/manrope": "^5.3.0",
     "@fontsource/onest": "^5.3.1",
     "@fontsource/unbounded": "^5.3.0",
+    "electron-updater": "^6.8.9",
     "hls.js": "^1.7.3",
     "music-metadata": "^11.16.1"
   },
@@ -92,6 +94,14 @@
       "artifactName": "aveon-setup-${version}.${ext}",
       "deleteAppDataOnUninstall": false,
       "runAfterFinish": true
-    }
+    },
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "xvoidead",
+        "repo": "aveon",
+        "releaseType": "release"
+      }
+    ]
   }
 }

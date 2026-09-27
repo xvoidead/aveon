@@ -6,6 +6,14 @@
 
 const CHANGELOG = [
   {
+    v: '1.4.3',
+    title: 'Автообновления',
+    items: [
+      'Плеер обновляется сам: новая версия качается в фоне, а когда готова — плашка «Перезапустить». Нажмёшь «Позже» — встанет при выходе',
+      'В «Что нового» видно, есть ли обновление, и можно проверить вручную',
+    ],
+  },
+  {
     v: '1.4.2',
     title: 'Остров как в iPhone, новые дизайны и трей',
     items: [
@@ -164,6 +172,7 @@ function openChangelog(since = null) {
   }
   $('#cl-title', changelogEl).textContent = since ? `Авеон обновился до ${appVersion}` : 'Что нового';
   $('#cl-body', changelogEl).innerHTML = changelogHtml(since);
+  if (typeof renderUpdateLine === 'function') renderUpdateLine(); // updates.js: статус обновлений сверху
   changelogEl.hidden = false;
 }
 

@@ -180,6 +180,13 @@ contextBridge.exposeInMainWorld('tishe', {
     onThumb: (cb) => on('thumb', cb),
   },
   app: { version: () => call('app:version') },
+  // автообновления: state — idle | checking | none | downloading | ready | error | dev (src/updater.js)
+  update: {
+    status: () => call('update:status'),
+    check: () => call('update:check'),
+    install: () => call('update:install'),
+    onEvent: (cb) => on('update:event', cb),
+  },
   admin: {
     overview: () => call('adm:overview'),
     users: (q) => call('adm:users', q),
