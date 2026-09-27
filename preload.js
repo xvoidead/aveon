@@ -175,6 +175,7 @@ contextBridge.exposeInMainWorld('tishe', {
     action: (a) => ipcRenderer.send('win', a),
     onState: (cb) => on('win:state', cb),
     onReveal: (cb) => on('win:reveal', cb),
+    onMoving: (cb) => on('win:moving', cb), // окно тащат — анимации замирают (main.js)
     // Кнопки в превью окна на панели задач
     thumbState: (st) => ipcRenderer.send('thumb:state', st),
     onThumb: (cb) => on('thumb', cb),

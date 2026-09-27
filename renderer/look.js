@@ -612,6 +612,7 @@ function reactStep(prev, x) {
 }
 
 function reactLoop() {
+  if (window.WIN_MOVING) { requestAnimationFrame(reactLoop); return; } // окно тащат — пульс замер (app.js)
   const on = look.reactCover || look.reactGlow || look.reactHoops;
   const root = document.documentElement.style;
   if (on && fx.analyser && !audio.paused && !document.hidden) {

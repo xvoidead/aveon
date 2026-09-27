@@ -99,6 +99,29 @@ function createWindow() {
   win.on('maximize', () => win.webContents.send('win:state', { maximized: true }));
   win.on('unmaximize', () => win.webContents.send('win:state', { maximized: false }));
   win.on('leave-full-screen', () => win.webContents.send('win:state', { fullscreen: false }));
+  // Окно тащат или тянут за край — плеер замирает (renderer: body.win-moving): обложка, пульс и спектр каждый кадр
+  // меняли размеры кнопок внутри области перетаскивания, Chromium пересчитывал её и слал в Windows
+  // прямо посреди перетаскивания — окно дёргалось. Конец — 'moved' или тишина 300 мс
+  let moving = false;
+  let moveTimer = null;
+  const moveEnd = () => {
+    clearTimeout(moveTimer);
+    if (!moving) return;
+    moving = false;
+    if (!win.isDestroyed()) win.webContents.send('win:moving', false);
+  };
+  const moveTick = () => {
+    if (!moving) { moving = true; win.webContents.send('win:moving', true); }
+    clearTimeout(moveTimer);
+    moveTimer = setTimeout(moveEnd, 300);
+  };
+  win.on('will-move', moveTick);
+  win.on('move', moveTick);
+  win.on('moved', () => { clearTimeout(moveTimer); moveTimer = setTimeout(moveEnd, 60); });
+  // ресайз — то же самое: пока тянут край, анимации не пересчитывают вёрстку каждый кадр
+  win.on('will-resize', moveTick);
+  win.on('resize', moveTick);
+  win.on('resized', () => { clearTimeout(moveTimer); moveTimer = setTimeout(moveEnd, 60); });
   // Крестик при «закрывать в трей» только прячет окно — музыка играет дальше
   win.on('close', (e) => {
     if (!quitting && tray.closeToTray()) { e.preventDefault(); toTray(); }

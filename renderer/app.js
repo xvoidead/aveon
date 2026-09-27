@@ -882,6 +882,7 @@ function startViz() {
   const data = new Uint8Array(fx.analyser.frequencyBinCount);
   const draw = () => {
     if (audio.paused || document.hidden || window.LOOK?.viz === false) { vizRunning = false; g.clearRect(0, 0, viz.width, viz.height); return; }
+    if (window.WIN_MOVING) { requestAnimationFrame(draw); return; } // окно тащат — спектр замер
     const dpr = window.devicePixelRatio || 1;
     const w = viz.clientWidth * dpr, h = viz.clientHeight * dpr;
     if (viz.width !== w || viz.height !== h) { viz.width = w; viz.height = h; }
@@ -2732,6 +2733,12 @@ function setWinReveal(on) {
 }
 // где курсор, говорит главный процесс (main.js): над областью перетаскивания окно само движение мыши не видит
 api.win.onReveal?.((on) => { if (document.body.classList.contains('win-autohide')) setWinReveal(on); });
+// Окно тащат — всё, что двигается каждый кадр, замирает на месте (main.js → win:moving):
+// иначе области перетаскивания пересчитываются посреди движения и окно дёргается
+api.win.onMoving?.((on) => {
+  window.WIN_MOVING = on;
+  document.body.classList.toggle('win-moving', on);
+});
 function applyWinAutohide() {
   document.body.classList.toggle('win-autohide', state.cfg.ui?.autoHideWin !== false);
 }

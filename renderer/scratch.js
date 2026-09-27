@@ -125,6 +125,7 @@ setInterval(() => {
 function spinFrame(t) {
   const dt = Math.min(0.1, (t - vinyl.lastFrame) / 1000);
   vinyl.lastFrame = t;
+  if (window.WIN_MOVING) { requestAnimationFrame(spinFrame); return; } // окно тащат — обложка замерла (app.js)
   if (!vinyl.held && vinylOn() && !audio.paused && !document.hidden) vinyl.angle += OMEGA * dt;
   // Угол пишем, только если он изменился: на паузе и с выключенным вращением кадр не трогает стили
   const spin = `${(vinyl.angle % 360).toFixed(2)}deg`;
