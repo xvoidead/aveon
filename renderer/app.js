@@ -1608,8 +1608,46 @@ function moveSourceInk(instant = false) {
   ink.style.setProperty('--ink-w', `${b.offsetWidth}px`);
   if (instant) { void ink.offsetWidth; ink.style.transition = ''; }
 }
-window.addEventListener('resize', () => moveSourceInk(true));
-document.fonts?.ready.then(() => moveSourceInk(true)); // ширины вкладок — после загрузки шрифтов
+// Вкладки не влезают в строку (узкое окно, крупный шрифт дизайна) — лишние с конца уходят в «ещё ▾»,
+// как в браузере. Активная не прячется никогда. Раньше они просто уезжали за край, и найти их было нельзя.
+// В «Форме» вкладки — столбиком слева, там строка не нужна
+function fitSources() {
+  const nav = $('#sources');
+  if (!nav || IS_MOBILE) return;
+  const tabs = $$('.source', nav);
+  let more = $('#sources-more');
+  if (!more) {
+    more = document.createElement('button');
+    more.id = 'sources-more';
+    more.className = 'sources-more';
+    more.setAttribute('aria-label', 'Ещё разделы');
+    more.innerHTML = 'ещё<svg><use href="#i-chevron-r"/></svg>';
+    more.onclick = (e) => {
+      e.stopPropagation();
+      if (more.getAttribute('aria-expanded') === 'true') { closeMenu(); return; }
+      showMenu($$('.source.overflowed').map((t) => ({ label: t.textContent, onClick: () => openView(t.dataset.view) })), { anchor: more });
+    };
+    nav.append(more);
+  }
+  if (nav.lastElementChild !== more) nav.append(more); // вкладки переставляют (look.js → applySources) — «ещё» всегда последней
+  tabs.forEach((t) => t.classList.remove('overflowed'));
+  more.hidden = true;
+  if (getComputedStyle(nav).flexDirection.startsWith('column') || nav.scrollWidth <= nav.clientWidth + 1) return;
+  more.hidden = false;
+  for (const t of tabs.slice().reverse()) {
+    if (nav.scrollWidth <= nav.clientWidth + 1) break;
+    if (!t.hidden && !t.classList.contains('active')) t.classList.add('overflowed'); // hidden — спрятана в настройках
+  }
+}
+let fitSourcesFrame = 0;
+const refitSources = () => {
+  cancelAnimationFrame(fitSourcesFrame);
+  fitSourcesFrame = requestAnimationFrame(() => { fitSources(); moveSourceInk(true); });
+};
+window.addEventListener('resize', refitSources);
+document.fonts?.ready.then(refitSources); // ширины вкладок — после загрузки шрифтов
+window.refitSources = refitSources; // look.js → applySources: вкладки переставили или спрятали
+new ResizeObserver(refitSources).observe($('#sources')); // ширину строки меняют и дизайн, и где плеер
 
 function animateViewSwitch(from, to) {
   const order = $$('.source').map((b) => b.dataset.view);
@@ -1636,6 +1674,7 @@ async function openView(view, sub = null) {
   if (view !== 'home') leaveHome(); // home.js
   saveCfg({ view });
   $$('.source').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+  fitSources(); // открыли раздел из «ещё» — теперь он виден, а спрятан другой
   moveSourceInk(prevView === view);
   // въезжаем в следующем кадре: к нему главная и волна (home.js, wave.js) уже покажут свои блоки
   if (prevView !== view) requestAnimationFrame(() => animateViewSwitch(prevView, view));
@@ -2738,6 +2777,12 @@ api.win.onReveal?.((on) => { if (document.body.classList.contains('win-autohide'
 api.win.onMoving?.((on) => {
   window.WIN_MOVING = on;
   document.body.classList.toggle('win-moving', on);
+  // отпустили: на миг меняем высоту полосы перетаскивания — Chromium заново считает все области,
+  // иначе после ресайза часть кнопок могла остаться под старой «тянуть окно» и не нажиматься
+  if (!on) {
+    document.body.classList.add('drag-refresh');
+    requestAnimationFrame(() => requestAnimationFrame(() => document.body.classList.remove('drag-refresh')));
+  }
 });
 function applyWinAutohide() {
   document.body.classList.toggle('win-autohide', state.cfg.ui?.autoHideWin !== false);

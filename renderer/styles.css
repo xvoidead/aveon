@@ -41,9 +41,16 @@ svg { width: 18px; height: 18px; flex: none; }
 :focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; border-radius: 6px; }
 
 /* ---------- заголовок окна: только кнопки, тянуть можно за пустые места ---------- */
+/* Тянуть окно — за полосу вдоль верха (.drag-strip, первая в разметке). Всё, на что можно нажать,
+   помечено no-drag и стоит в разметке после неё — поэтому перебивает её, где бы ни оказалось
+   (всплывающие окна в низком окне поднимаются к самому верху). Кнопки окна — в .titlebar в конце */
+.drag-strip { position: fixed; top: 0; left: 0; right: 0; height: 36px; -webkit-app-region: drag; pointer-events: none; }
+:is(button, a[href], input, select, textarea, label, summary, [role="button"], [role="tab"], [role="slider"], [contenteditable="true"], [tabindex]:not([tabindex="-1"]), .row, .chip, .source) { -webkit-app-region: no-drag; }
+/* после ресайза — пересчитать области перетаскивания заново (app.js → win:moving) */
+body.drag-refresh .drag-strip { height: 36.5px; }
 .titlebar {
   position: fixed; top: 0; left: 0; right: 0; height: 36px; z-index: 10;
-  -webkit-app-region: drag; display: flex; justify-content: flex-end; pointer-events: none;
+  display: flex; justify-content: flex-end; pointer-events: none;
 }
 .win-buttons { display: flex; -webkit-app-region: no-drag; pointer-events: auto; }
 .win-buttons button { width: 44px; height: 36px; display: grid; place-items: center; color: var(--text-3); }
@@ -1003,9 +1010,27 @@ kbd {
 .slider.progress:hover .slider-fill, .slider.progress:hover .slider-buf { height: 6px; }
 
 /* низкое окно: бочка уменьшается; в звонке место под «дальше» отдаём шкалам звонка */
-.barrel { width: min(100%, 300px, calc(100vh - 470px)); min-width: 150px; }
+.barrel { width: min(100%, var(--barrel-max, 300px), calc(100vh / var(--ui-zoom, 1) - var(--reserve, 470px) - var(--via, 0px))); min-width: 110px; }
+/* --reserve — всё остальное на сцене по высоте: звонок и строка «звучит через» тоже едят место,
+   иначе в низком окне низ сцены (громкость, «дальше», аккаунт) уезжал за край */
+.stage:has(.call:not(.off)) { --reserve: 591px; }
+.stage:has(.call.no-meters:not(.off)) { --reserve: 530px; }
+.stage:has(.now-via:not([hidden])) { --via: 20px; }
 .stage-foot .call.off { margin-top: -10px; }
 .stage > .barrel { margin-top: auto; } /* плеер посередине между верхом и подвалом */
+/* Не влезает по высоте (низкое окно, звонок, строка «звучит через», крупный масштаб) — сцена
+   прокручивается, а не обрезает снизу громкость, «дальше», звонок и аккаунт. Ничего не сжимается */
+html:not(.dock-bottom, .dock-top, .mobile) .stage { overflow: hidden auto; scrollbar-width: none; }
+html:not(.dock-bottom, .dock-top, .mobile) .stage::-webkit-scrollbar { display: none; } /* листается колёсиком, полосы нет */
+html:not(.dock-bottom, .dock-top, .mobile) .stage > * { flex-shrink: 0; }
+/* Обложка занимает ровно то, что осталось по высоте после всего остального на сцене (flex 1 1 0),
+   ширина — из высоты (aspect-ratio). Так в любом дизайне, со звонком, «звучит через» и крупным
+   масштабом низ сцены не уезжает за край; больше --barrel-max не растёт — остаток делят auto-отступы */
+html:not(.dock-bottom, .dock-top, .mobile) .stage > .barrel {
+  flex: 1 1 0; height: auto; min-height: 96px; max-height: var(--barrel-max, 300px);
+  width: auto !important; min-width: 0 !important; max-width: 100%; aspect-ratio: 1; align-self: center;
+}
+html.skin-glass .barrel { --barrel-max: 330px; }
 
 /* ---------- аватар ---------- */
 /* :root — сильнее правил дизайнов с их фоном кружка: shorthand background сбросил бы размер, и в кружке был бы угол фото */
@@ -1245,6 +1270,8 @@ html:is(.dock-bottom, .dock-top) .together-chip.idle { padding: 8px; }
 html:is(.dock-bottom, .dock-top) .together-chip.idle #together-chip-text { display: none; }
 /* узкое окно: громкость ужимается до кнопки */
 @media (max-width: 1100px) { html:is(.dock-bottom, .dock-top) .volume-row .volume { display: none; } }
+/* плеер полосой, окно узкое: «звучит через …» растягивала строку, и кружок профиля уезжал за край */
+@media (max-width: 1180px) { html:is(.dock-bottom, .dock-top) .now-via { display: none; } }
 html:is(.dock-bottom, .dock-top) .stage-foot { grid-column: 6; grid-row: 1 / 3; margin: 0; width: auto; flex-direction: row; align-items: center; gap: 8px; }
 html:is(.dock-bottom, .dock-top) .stage-account { margin: 0; }
 html:is(.dock-bottom, .dock-top) .me-text { display: none; }
@@ -1865,6 +1892,14 @@ html:is(.dock-bottom, .dock-top) .call-head { min-width: 0; }
 @keyframes tab-in-l { from { opacity: 0; transform: translateX(-22px); } }
 .tab-in-r { animation: tab-in-r .3s cubic-bezier(.2, .8, .2, 1) both; }
 .tab-in-l { animation: tab-in-l .3s cubic-bezier(.2, .8, .2, 1) both; }
+/* «ещё ▾»: вкладки, что не влезли в строку (app.js → fitSources) */
+.source.overflowed { display: none; }
+.sources-more {
+  display: inline-flex; align-items: center; gap: 3px; flex: none; padding: 6px 0; color: var(--text-3); font-weight: 500; white-space: nowrap; transition: color .15s;
+}
+.sources-more:hover, .sources-more[aria-expanded="true"] { color: var(--text); }
+.sources-more svg { width: 13px; height: 13px; transform: rotate(90deg); }
+.sources-more[hidden] { display: none; }
 @media (prefers-reduced-motion: reduce) { .source-ink { transition: none; } .tab-in-r, .tab-in-l { animation: none; } }
 
 /* ---------- режимы: таймер сна, фокус (плашки на сцене) ---------- */
@@ -2321,7 +2356,7 @@ html.skin-form:not(.look-stage-cover):not(.look-stage-flat) .stage {
   background: linear-gradient(180deg, color-mix(in oklab, var(--pri-c) calc(100% - var(--m) * 60%), var(--surf-1)), var(--surf-1) 64%);
 }
 html.skin-form.look-stage-flat .stage { background: var(--surf-1); }
-html.skin-form .barrel { width: min(100%, 290px); }
+html.skin-form .barrel { --barrel-max: 290px; }
 html.skin-form .hoops { display: none; }
 html.skin-form .viz { inset: 0; width: 100%; height: 100%; }
 /* обложка-«цветок»; если в настройках выбрана другая форма обложки — она и остаётся */
@@ -2455,7 +2490,9 @@ html.skin-zen ::selection { background: color-mix(in srgb, var(--seal) 22%, tran
 html.skin-zen .stage { background: var(--oak); border-color: transparent; padding-top: 64px; gap: 16px; }
 html.skin-zen:not(.look-stage-cover):not(.look-stage-flat) .stage { background: var(--oak); }
 html.skin-zen :is(.hoops, .viz) { display: none; }
-html.skin-zen .barrel { width: min(100%, 290px); }
+html.skin-zen .barrel { --barrel-max: 290px; }
+html.skin-zen .stage { --reserve: 496px; }
+html.skin-zen .stage:has(.call:not(.off)) { --reserve: 617px; }
 /* энсо: мазок тушью, по классу fresh прорисовывается по кругу за 1.1 с */
 html.skin-zen .barrel::before {
   content: ""; position: absolute; inset: 0; pointer-events: none; rotate: -8deg;
@@ -3046,3 +3083,24 @@ html.skin-glass.mobile .wave-word { left: 20px; font-size: 56px; }
 .skin-mock.is-glass .sm-row b { background: #c7c7cc; }
 .skin-mock.is-glass .sm-row:nth-child(4) { background: rgb(118 118 128 / .12); }
 .skin-mock.is-glass .sm-row:nth-child(4) b { background: #8a5a26; }
+
+/* ---------- низкое окно: сцена плотнее (во всех дизайнах, плеер слева или справа) ----------
+   Обложка и так ужимается до остатка высоты (.stage > .barrel выше), но в «Форме», «Дзене» и
+   «Стекле» остальное на сцене в окне ~600 px само не влезало. .stage.stage — чтобы перебить отступы дизайнов */
+@media (max-height: 700px) {
+  html:not(.dock-bottom, .dock-top, .mobile) .stage.stage { padding-top: 40px; padding-bottom: 12px; }
+  html:not(.skin-glass, .dock-bottom, .dock-top, .mobile) .stage.stage { gap: 8px; }
+  /* у «Стекла» промежутков нет (gap: 0) — расстояния заданы отступами, их и ужимаем */
+  html.skin-glass:not(.dock-bottom, .dock-top, .mobile) .stage-top { margin-bottom: 4px; }
+  html.skin-glass:not(.dock-bottom, .dock-top, .mobile) .progress-row { margin-top: 8px; }
+  html.skin-glass:not(.dock-bottom, .dock-top, .mobile) .controls { margin-top: 4px; }
+  html.skin-glass:not(.dock-bottom, .dock-top, .mobile) .volume-row { margin-top: 4px; }
+  html.skin-glass:not(.dock-bottom, .dock-top, .mobile) .stage-foot { gap: 6px; }
+  html.skin-glass:not(.dock-bottom, .dock-top, .mobile) .stage .call .meters { display: none; }
+  html.skin-glass:not(.dock-bottom, .dock-top, .mobile) .stage .call .call-head { margin-bottom: 0; }
+}
+@media (max-height: 640px) {
+  /* шкалы звонка прячем — переключатель «тихо» остаётся */
+  html:not(.dock-bottom, .dock-top, .mobile) .stage .call .meters { display: none; }
+  html:not(.dock-bottom, .dock-top, .mobile) .stage .call .call-head { margin-bottom: 0; }
+}

@@ -13,7 +13,7 @@ html.mobile body {
   overscroll-behavior: none;
   touch-action: manipulation;
 }
-html.mobile .titlebar { display: none; }
+html.mobile .titlebar, html.mobile .drag-strip { display: none; }
 html.mobile .mobile-only { display: revert !important; }
 
 /* ---------- библиотека ---------- */

@@ -21,6 +21,10 @@
   <link rel="stylesheet" href="styles.css">
 </head>
 <body class="paused"><!-- paused снимает updatePlayState (app.js), когда музыка пошла -->
+  <!-- Полоса вдоль верха, за которую тащат окно, — ПЕРВОЙ в разметке: Electron применяет области
+       перетаскивания по порядку, и любая кнопка ниже по разметке (всплывающие окна, вкладки «Формы»,
+       плеер сверху) её перебивает. Раньше полоса была последней и глушила всё в верхних 36 px -->
+  <div class="drag-strip" aria-hidden="true"></div>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
     <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></symbol>
     <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="13.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></symbol>
@@ -363,7 +367,8 @@
   </div>
 
   <!-- Кнопки окна — последними в разметке: области перетаскивания Electron применяет по порядку,
-       и сцена (при плеере справа) иначе накрыла бы их своей «тянуть окно» -->
+       и сцена (при плеере справа) иначе накрыла бы их своей «тянуть окно». Сама полоса тут
+       ничего не перетаскивает — это .drag-strip в начале body -->
   <header class="titlebar">
     <div class="win-buttons">
       <button data-win="tray" aria-label="Свернуть в трей" title="Свернуть в трей"><svg><use href="#i-to-tray"/></svg></button>

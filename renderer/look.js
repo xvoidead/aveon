@@ -241,6 +241,7 @@ function applySources() {
     nav.appendChild(b);
     b.hidden = look.hidden.includes(id);
   }
+  window.refitSources?.(); // app.js: что не влезло — в «ещё»
 }
 
 // Какую вкладку открыть при запуске (app.js → init)
