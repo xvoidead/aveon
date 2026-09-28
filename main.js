@@ -3,6 +3,20 @@ const fs = require('fs');
 const path = require('path');
 const { Readable } = require('stream');
 
+// npm run tester: второй экземпляр рядом с основным — свой вход, настройки и кэш (%APPDATA%/aveon-tester),
+// чтобы проверять друзей, руму и сообщения с двух аккаунтов. Острова и трея нет (при первом запуске),
+// глобальные клавиши и ссылки aveon:// остаются за основным
+const TESTER = process.argv.includes('--tester');
+if (TESTER) {
+  const dir = path.join(app.getPath('appData'), 'aveon-tester');
+  app.setPath('userData', dir);
+  const cfg = path.join(dir, 'config.json');
+  if (!fs.existsSync(cfg)) {
+    fs.mkdirSync(dir, { recursive: true });
+    fs.writeFileSync(cfg, JSON.stringify({ island: { enabled: false }, tray: { enabled: false }, mini: { open: false } }));
+  }
+}
+
 const config = require('./src/config');
 const duck = require('./src/duck');
 const local = require('./src/services/local');
@@ -78,7 +92,7 @@ function createWindow() {
     minHeight: 600,
     frame: false,
     backgroundColor: '#1b1411',
-    title: 'авеон',
+    title: TESTER ? 'авеон — тестер' : 'авеон',
     icon: path.join(__dirname, 'renderer', 'assets', 'icon.png'), // панель задач и Alt+Tab (и при npm start)
     show: false,
     webPreferences: {
@@ -549,7 +563,7 @@ app.on('before-quit', () => { quitting = true; });
 
 // Ссылки aveon://track/КОД — «Открыть в авеоне» со страницы трека (сервер: /t/КОД, Discord)
 let pendingLink = process.argv.find((a) => a.startsWith('aveon://')) || null;
-if (process.defaultApp) app.setAsDefaultProtocolClient('aveon', process.execPath, [path.resolve(process.argv[1] || '.')]);
+if (TESTER) { /* ссылки aveon:// открывает основной экземпляр */ } else if (process.defaultApp) app.setAsDefaultProtocolClient('aveon', process.execPath, [path.resolve(process.argv[1] || '.')]);
 else app.setAsDefaultProtocolClient('aveon');
 function openLink(url) {
   if (!url?.startsWith('aveon://')) return;
@@ -585,7 +599,7 @@ app.whenReady().then(() => {
   updater.init((s) => send('update:event', s));
   mini.init(win, () => { tray.refresh(true); send('desk:changed'); });
   livewall.init(() => send('desk:changed'));
-  hotkeys.init({
+  if (!TESTER) hotkeys.init({
     play: () => send('thumb', 'toggle'),
     next: () => send('thumb', 'next'),
     prev: () => send('thumb', 'prev'),

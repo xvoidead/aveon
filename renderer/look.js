@@ -5,7 +5,7 @@
 // Общие глобальные из app.js: state, api, $, $$, esc, toast, ask, saveCfg, VIEWS, NAMES, IS_MOBILE, openView.
 
 const LOOK_DEFAULTS = {
-  skin: 'barrel',        // дизайн целиком, см. SKINS
+  skin: 'glass',         // дизайн целиком, см. SKINS; по умолчанию — «Стекло» (кто выбирал сам, остаётся на своём)
   glassMode: 'auto',     // «Стекло»: auto — как в системе, light | dark
   theme: 'oak',          // см. THEMES; custom — свой оттенок фона
   hue: 25,               // custom: оттенок фона 0…360
@@ -249,7 +249,9 @@ function lookStartView(last) {
   const v = look.startView;
   const want = v && v !== 'last' && VIEWS.includes(v) ? v : last;
   if (!look.hidden.includes(want)) return want;
-  return sourceOrder().find((id) => !look.hidden.includes(id)) || 'local';
+  // вкладку скрыли в настройках — последняя открытая из видимых (app.js → openView пишет viewHistory), иначе первая видимая
+  const recent = (state.cfg?.viewHistory || []).find((id) => VIEWS.includes(id) && !look.hidden.includes(id));
+  return recent || sourceOrder().find((id) => !look.hidden.includes(id)) || 'local';
 }
 
 // Сцена «размытая обложка»: картинка текущего трека (extras.js → applyThemeFrom)

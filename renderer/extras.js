@@ -187,6 +187,8 @@ function sessionSnapshot() {
     queue: list.map(slimTrack),
     pos: state.pos - from,
     view: state.view,
+    sub: state.sub ?? null, // открытый плейлист или альбом в разделе
+    wave: typeof Wave !== 'undefined' && Wave.active ? { mode: Wave.mode } : null, // слушали волну
     savedAt: Date.now(),
   };
 }
@@ -211,6 +213,16 @@ async function restoreSession() {
   // Трек ставим на паузу ровно там, где остановились; звук не включаем
   loadTrack(queue[pos], { autoplay: false, startAt: s.position || 0, quiet: true });
   $('#time-cur').textContent = fmt(s.position || 0);
+  // Где слушали — туда и возвращаемся: волна снова включена и дальше подкидывает треки (wave.js),
+  // открытый плейлист или альбом открыт снова
+  if (s.wave) {
+    Wave.active = true;
+    Wave.mode = s.wave.mode || waveMode();
+    for (const t of queue) Wave.heard.add(t.id);
+    renderWaveHero();
+    if (state.view === 'wave') renderWave();
+  }
+  if (s.sub != null && s.view === state.view && state.sub == null) openView(s.view, s.sub);
 }
 
 onAudio('pause', () => saveSession());
@@ -700,8 +712,10 @@ function syncWords(force) {
   const cur = n - 1;
   nodes.forEach((w, i) => {
     const on = letters && i === cur && t < wordEnd(ly.lines, ly.active, cur);
-    if (!on && w.classList.contains('now')) w.classList.add('filled'); // залито — дальше без перехода цвета
-    w.classList.toggle('now', on);
+    // w-now, а не now: .now — это блок «сейчас играет», и в «Стекле» его стиль (блок, отступ сверху) цеплялся
+    // к слову — текущее слово рвало строку текста
+    if (!on && w.classList.contains('w-now')) w.classList.add('filled'); // залито — дальше без перехода цвета
+    w.classList.toggle('w-now', on);
     if (on) {
       const s = l.words[cur].t;
       w.style.setProperty('--p', Math.min(1, Math.max(0, (t - s) / Math.max(0.05, wordEnd(ly.lines, ly.active, cur) - s))).toFixed(3));

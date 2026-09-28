@@ -126,10 +126,14 @@ function showMenu(items, { x, y, anchor } = {}) {
     menuAnchor = anchor;
     anchor.setAttribute('aria-expanded', 'true');
   }
-  // Не даём меню вылезти за окно
-  const w = menuEl.offsetWidth, h = menuEl.offsetHeight;
-  menuEl.style.left = `${Math.max(8, Math.min(x - (anchor ? w : 0), innerWidth - w - 8))}px`;
-  menuEl.style.top = `${y + h > innerHeight - 8 ? Math.max(8, (anchor ? anchor.getBoundingClientRect().top - 4 : y) - h) : y}px`;
+  // Не даём меню вылезти за окно. Считаем в экранных пикселях (так приходят координаты кнопки и мыши),
+  // а в стиль пишем, поделив на размер интерфейса (look.js → zoom на <html>): иначе при 95% меню съезжало
+  const z = parseFloat(document.documentElement.style.zoom) || 1;
+  const w = menuEl.offsetWidth * z, h = menuEl.offsetHeight * z;
+  const left = Math.max(8, Math.min(x - (anchor ? w : 0), innerWidth - w - 8));
+  const top = y + h > innerHeight - 8 ? Math.max(8, (anchor ? anchor.getBoundingClientRect().top - 4 : y) - h) : y;
+  menuEl.style.left = `${left / z}px`;
+  menuEl.style.top = `${top / z}px`;
   menuEl.querySelector('.menu-item')?.focus();
 }
 
@@ -1630,14 +1634,47 @@ function fitSources() {
     nav.append(more);
   }
   if (nav.lastElementChild !== more) nav.append(more); // вкладки переставляют (look.js → applySources) — «ещё» всегда последней
-  tabs.forEach((t) => t.classList.remove('overflowed'));
-  more.hidden = true;
-  if (getComputedStyle(nav).flexDirection.startsWith('column') || nav.scrollWidth <= nav.clientWidth + 1) return;
-  more.hidden = false;
-  for (const t of tabs.slice().reverse()) {
-    if (nav.scrollWidth <= nav.clientWidth + 1) break;
-    if (!t.hidden && !t.classList.contains('active')) t.classList.add('overflowed'); // hidden — спрятана в настройках
+  if (getComputedStyle(nav).flexDirection.startsWith('column')) {
+    tabs.forEach((t) => t.classList.remove('overflowed'));
+    more.hidden = true;
+    return;
   }
+  // Полные ширины вкладок меряем, только пока строка в обычном виде; пока шапка сворачивается или
+  // разворачивается (tabsMini), вкладки на экране сжаты — считаем по запомненным, иначе в конце разворота
+  // вкладки перескакивали бы из «ещё» и обратно
+  if (!tabsMini.on && !tabsMini.anim) {
+    tabs.forEach((t) => t.classList.remove('overflowed'));
+    more.hidden = false;
+    for (const t of tabs) t._w = t.offsetWidth;
+    more._w = more.offsetWidth;
+    const cs = getComputedStyle(nav);
+    nav._gap = parseFloat(cs.columnGap) || 0;
+    nav._pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+  }
+  // сколько места у строки: ширина её ряда без соседей (в «Стекле» сама строка ужимается по содержимому)
+  const row = nav.parentElement;
+  const rs = getComputedStyle(row);
+  const rowGap = parseFloat(rs.columnGap) || 0;
+  let room = row.clientWidth - parseFloat(rs.paddingLeft) - parseFloat(rs.paddingRight);
+  for (const c of row.children) {
+    const w = c === nav ? 0 : c.getBoundingClientRect().width;
+    if (w) room -= w + rowGap;
+  }
+  const gap = nav._gap || 0;
+  const shown = tabs.filter((t) => !t.hidden); // hidden — спрятана в настройках
+  let need = (nav._pad || 0) + shown.reduce((sum, t) => sum + (t._w || 0), 0) + gap * Math.max(0, shown.length - 1);
+  const cut = new Set();
+  if (need > room + 1) {
+    need += gap + (more._w || 0);
+    for (const t of shown.slice().reverse()) {
+      if (need <= room + 1) break;
+      if (t.classList.contains('active')) continue;
+      cut.add(t);
+      need -= (t._w || 0) + gap;
+    }
+  }
+  tabs.forEach((t) => t.classList.toggle('overflowed', cut.has(t)));
+  more.hidden = !cut.size;
 }
 let fitSourcesFrame = 0;
 const refitSources = () => {
@@ -1647,6 +1684,47 @@ const refitSources = () => {
 window.addEventListener('resize', refitSources);
 document.fonts?.ready.then(refitSources); // ширины вкладок — после загрузки шрифтов
 window.refitSources = refitSources; // look.js → applySources: вкладки переставили или спрятали
+
+// Листаешь вниз — шапка библиотеки схлопывается: вкладки до текущего раздела, поиск, плейлисты и
+// заголовок уезжают (styles.css → .tabs-mini). Вверх, к началу списка или в другой раздел — обратно.
+// Реагируем на уверенную прокрутку (24 px в одну сторону) и полсекунды после переключения не слушаем:
+// схлопнутая шапка в низком окне сдвигает прокрутку сама, иначе шапка дрожала бы туда-сюда
+const tabsMini = { on: false, anim: false, frame: 0, acc: 0, lock: 0, last: new WeakMap() };
+function setTabsMini(on) {
+  if (tabsMini.on === on) return;
+  tabsMini.on = on;
+  tabsMini.acc = 0;
+  tabsMini.lock = performance.now() + 500;
+  $('#content').classList.toggle('tabs-mini', on);
+  // пока вкладки сжимаются или разворачиваются, подчёркивание каждый кадр идёт за активной — раньше оно
+  // стояло на старом месте и прыгало в конце
+  tabsMini.anim = true;
+  const until = performance.now() + 560;
+  cancelAnimationFrame(tabsMini.frame);
+  const follow = () => {
+    moveSourceInk(true);
+    if (performance.now() < until) { tabsMini.frame = requestAnimationFrame(follow); return; }
+    tabsMini.anim = false;
+    fitSources();
+    moveSourceInk(true);
+  };
+  tabsMini.frame = requestAnimationFrame(follow);
+}
+document.addEventListener('scroll', (e) => {
+  const el = e.target;
+  // только сам список, главная и панель библиотеки: текст песни, профиль и статистика листаются поверх — не они
+  if (IS_MOBILE || !(el instanceof Element) || !(el.id === 'content' || el.matches('#tracklist, .home'))) return;
+  const y = el.scrollTop;
+  const dy = y - (tabsMini.last.get(el) ?? y);
+  tabsMini.last.set(el, y);
+  if (performance.now() < tabsMini.lock) return;
+  if (y < 12) { setTabsMini(false); return; }
+  if (Math.sign(dy) !== Math.sign(tabsMini.acc)) tabsMini.acc = 0;
+  tabsMini.acc += dy;
+  if (tabsMini.acc > 24) setTabsMini(true);
+  else if (tabsMini.acc < -24) setTabsMini(false);
+}, true);
+$('#sources').addEventListener('click', () => setTabsMini(false)); // нажали на капсулу — развернуть
 new ResizeObserver(refitSources).observe($('#sources')); // ширину строки меняют и дизайн, и где плеер
 
 function animateViewSwitch(from, to) {
@@ -1672,8 +1750,12 @@ async function openView(view, sub = null) {
   state.sub = sub;
   if (view !== 'wave') leaveWaveView(); // wave.js
   if (view !== 'home') leaveHome(); // home.js
-  saveCfg({ view });
+  // несколько последних вкладок: если последнюю потом скроют в настройках, при запуске откроется предыдущая (look.js → lookStartView)
+  const viewHistory = [view, ...(state.cfg.viewHistory || []).filter((v) => v !== view)].slice(0, 6);
+  state.cfg.viewHistory = viewHistory; // сразу: вкладки переключают быстрее, чем сохраняются настройки
+  saveCfg({ view, viewHistory });
   $$('.source').forEach((b) => b.classList.toggle('active', b.dataset.view === view));
+  setTabsMini(false); // новый раздел — шапка снова целиком
   fitSources(); // открыли раздел из «ещё» — теперь он виден, а спрятан другой
   moveSourceInk(prevView === view);
   // въезжаем в следующем кадре: к нему главная и волна (home.js, wave.js) уже покажут свои блоки

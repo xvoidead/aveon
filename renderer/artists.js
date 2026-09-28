@@ -102,6 +102,14 @@ async function openArtists(sub, { keepScroll = false } = {}) {
   art.index = buildIndex(tracks);
   loadMissingLikes();
   const [key, albumId] = (sub || '').split(SUB_SEP);
+  // своих артистов нет (ни файлов, ни лайков) — вместо пустого раздела последний, у кого был
+  const last = !key && !art.index.size && lastArtist();
+  if (last) {
+    art.names.set(last.key, last.name);
+    if (last.ym && !art.ymHints.has(last.key)) art.ymHints.set(last.key, last.ym);
+    openView('artists', last.key);
+    return;
+  }
   if (key && albumId) openDiscAlbum(artistFor(key), albumId);
   else if (key) renderArtist(artistFor(key));
   else renderArtistGrid();
@@ -119,10 +127,14 @@ function renderArtistChips(artist, inAlbum = false) {
     box.append(b);
   };
   if (artist) {
-    chip('Все артисты', 'i-prev', false, () => openView('artists'));
-    if (inAlbum) chip(artist.name, 'i-user', false, () => openView('artists', artist.key));
+    // своих артистов нет — «Все артисты» вернули бы сюда же, кнопка не нужна
+    if (art.index.size) chip('Все артисты', 'i-prev', false, () => openView('artists'));
+    // к артисту из альбома — сначала запоминаем, где обложка альбома: при смене раздела список очищают,
+    // а она потом полетит обратно на свою карточку (zoomFly)
+    if (inAlbum) chip(artist.name, 'i-user', false, () => { rememberAlbumPic(); openView('artists', artist.key); });
     return;
   }
+  if (!art.index.size) return; // артистов нет — и сортировать нечего
   chip('А–Я', '', art.sort === 'name', () => { art.sort = 'name'; renderArtistGrid(); });
   chip('Больше треков', '', art.sort === 'count', () => { art.sort = 'count'; renderArtistGrid(); });
 }
@@ -277,7 +289,16 @@ function heroHtml(artist, disco, loading) {
 
 const sectionHead = (title, count) => `<h3 class="disc-h">${esc(title)}${count != null ? `<span>${count}</span>` : ''}</h3>`;
 
+// Последний артист, на чьей странице был — его и открываем, если своих артистов нет
+function lastArtist() {
+  try { const a = JSON.parse(localStorage.getItem('aveon.lastArtist') || 'null'); return a?.key ? a : null; } catch { return null; }
+}
+function rememberArtist(artist) {
+  try { localStorage.setItem('aveon.lastArtist', JSON.stringify({ key: artist.key, name: artist.name, ym: ymArtistId(artist) || null })); } catch {}
+}
+
 function renderArtist(artist, { keepScroll = false } = {}) {
+  rememberArtist(artist);
   renderArtistChips(artist);
   $('#view-title').textContent = artist.name;
   const d = art.disco.get(artist.key);
@@ -329,10 +350,17 @@ function renderArtist(artist, { keepScroll = false } = {}) {
       </section>`;
     }).join('')}</section>`);
   }
+  // вернулись из альбома этого артиста — обложка улетает из шапки альбома обратно на свою карточку
+  const back = zoom.back?.key === artist.key ? zoom.back : null;
+  const fromRect = back?.rect;
+  const fromSrc = back?.src;
+  zoom.back = null;
   el.innerHTML = parts.join('');
   const bg = el.querySelector('.hero-bg[data-bg]');
   if (bg?.dataset.bg) bg.style.backgroundImage = `url("${bg.dataset.bg.replace(/"/g, '%22')}")`;
-  el.scrollTop = keepScroll ? scroll : 0;
+  // вернулись из альбома — страница там же, откуда его открыли: карточка на месте, и обложке есть куда вернуться
+  el.scrollTop = back?.scroll != null ? back.scroll : keepScroll ? scroll : 0;
+  if (fromRect) requestAnimationFrame(() => zoomFly(fromRect, el.querySelector(`.disc-card[data-disc="${CSS.escape(back.id)}"] .disc-pic`), fromSrc, back.radius));
 
   const bits = [];
   if (disco) bits.push(`${disco.albums.length} ${plural(disco.albums.length, 'релиз', 'релиза', 'релизов')} в Яндекс Музыке`);
@@ -341,6 +369,91 @@ function renderArtist(artist, { keepScroll = false } = {}) {
   $('#view-sub').textContent = bits.join(' · ');
   markPlaying();
   renderActions();
+}
+
+// ---- zoom-переход, как в iOS 18: обложка из сетки артиста перелетает в шапку альбома и обратно ----
+// Летит копия обложки поверх всего (position: fixed), настоящая в шапке появляется, когда долетела.
+// zoom.from — откуда вылетела (запомнили при нажатии на карточку), zoom.back — альбом, из которого вернулись
+const zoom = { from: null, back: null };
+// скругление обложки как есть в этом дизайне (в px страницы): копия начинает с него и приходит к скруглению цели
+const radius = (el) => parseFloat(getComputedStyle(el).borderTopLeftRadius) || 0;
+const noMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches || document.documentElement.classList.contains('look-still');
+function zoomFly(from, toEl, src, fromRadius) {
+  if (!from || !toEl || noMotion()) return;
+  for (const old of document.querySelectorAll('.zoom-clip')) old.remove(); // прошлый полёт, если не доиграл
+  // Цель может быть за краем списка в первый миг (шапка ещё сворачивается или разворачивается) — летим всё равно:
+  // копия каждый кадр ищет цель заново и обрезается рамкой списка
+  if (!toEl.getBoundingClientRect().width) return;
+  // Размер интерфейса (look.js → zoom на <html>): прямоугольники приходят уже в экранных пикселях, а копия
+  // лежит внутри увеличенной страницы — её координаты делим на масштаб, иначе при 95% она промахивалась
+  const z = parseFloat(document.documentElement.style.zoom) || 1;
+  // Летит внутри рамки списка, как в iOS: над вкладками, поиском и кнопками раздела не проходит
+  const clip = document.createElement('div');
+  clip.className = 'zoom-clip';
+  const f = document.createElement('div');
+  f.className = 'zoom-fly';
+  f.innerHTML = src ? `<img src="${esc(src)}" alt="">` : '♪';
+  clip.append(f);
+  document.body.append(clip);
+  toEl.style.visibility = 'hidden';
+  // Каждый кадр — заново где цель и где список: пока летит, страница может сдвинуться (шапка библиотеки
+  // разворачивается после прокрутки, окно меняют по размеру, догружаются картинки). Раньше копия летела
+  // в точку, замеренную в первый миг, и промахивалась на сдвиг
+  const T = 480;
+  const t0 = performance.now();
+  const ease = (x) => 1 - (1 - x) ** 3; // мягкое торможение без перелёта
+  const lerp = (a, b, k) => a + (b - a) * k;
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    toEl.style.visibility = '';
+    clip.remove();
+  };
+  const frame = () => {
+    if (done) return;
+    if (!toEl.isConnected) { finish(); return; } // раздел сменили посреди полёта
+    const k = ease(Math.min(1, (performance.now() - t0) / T));
+    const list = $('#tracklist').getBoundingClientRect();
+    const to = toEl.getBoundingClientRect();
+    Object.assign(clip.style, { left: `${list.left / z}px`, top: `${list.top / z}px`, width: `${list.width / z}px`, height: `${list.height / z}px` });
+    const w = lerp(from.width, to.width, k), h = lerp(from.height, to.height, k);
+    Object.assign(f.style, {
+      left: `${(lerp(from.left, to.left, k) - list.left) / z}px`,
+      top: `${(lerp(from.top, to.top, k) - list.top) / z}px`,
+      width: `${w / z}px`, height: `${h / z}px`,
+      borderRadius: `${lerp(fromRadius, radius(toEl), k)}px`,
+    });
+    if (k >= 1) finish(); else requestAnimationFrame(frame);
+  };
+  frame();
+  setTimeout(finish, 1200); // кадры не шли (окно спрятали) — обложку всё равно вернуть
+}
+
+function rememberAlbumPic() {
+  const pic = $('#tracklist .alb-pic');
+  if (!pic || !zoom.back) return;
+  zoom.back.rect = pic.getBoundingClientRect();
+  zoom.back.src = pic.querySelector('img')?.getAttribute('src');
+  zoom.back.radius = radius(pic);
+}
+
+// Шапка альбома: крупная обложка, тип, название, год и кнопки — сюда и прилетает обложка
+function albumHeroHtml(artist, album, tracks) {
+  const kind = album.type === 'single' ? 'Сингл' : 'Альбом';
+  const meta = [artist.name, album.year, summary(tracks)].filter(Boolean).join(' · ');
+  return `<section class="alb-hero">
+    <span class="alb-pic">${album.cover ? `<img src="${esc(album.cover)}" alt="">` : '♪'}</span>
+    <div class="alb-text">
+      <span class="alb-kind">${kind}</span>
+      <h2 class="alb-name">${esc(album.title)}</h2>
+      <p class="alb-meta">${esc(meta)}</p>
+      <div class="alb-actions">
+        <button class="btn primary" data-hero="play"><svg><use href="#i-play"/></svg><span>Слушать</span></button>
+        <button class="btn" data-hero="shuffle"><svg><use href="#i-shuffle"/></svg><span>Вперемешку</span></button>
+      </div>
+    </div>
+  </section>`;
 }
 
 async function openDiscAlbum(artist, id) {
@@ -369,7 +482,22 @@ async function openDiscAlbum(artist, id) {
   const head = [artist.name, album.year, album.type === 'single' ? 'сингл' : ''].filter(Boolean).join(' · ');
   if (!tracks.length) { showEmpty({ title: 'Ничего не нашлось', text: 'В этом альбоме нет таких треков.' }); renderArtistChips(artist, true); return; }
   renderTracks(tracks, `${head} · ${summary(tracks)}`);
+  const list = $('#tracklist');
+  list.insertAdjacentHTML('afterbegin', albumHeroHtml(artist, { ...known, ...album }, tracks));
+  $('#content').classList.add('hero-on'); // название уже в шапке альбома
   renderArtistChips(artist, true);
+  zoom.back = { key: artist.key, id, scroll: zoom.from?.id === id ? zoom.from.scroll : null };
+  // прилетели с карточки артиста (не дольше полутора секунд назад — иначе альбом грузился, и лететь поздно)
+  const z = zoom.from;
+  zoom.from = null;
+  if (z && z.id === id && performance.now() - z.at < 1500) {
+    zoomFly(z.rect, list.querySelector('.alb-pic'), album.cover || known?.cover, z.radius);
+    list.classList.remove('zoom-in');
+    void list.offsetWidth;
+    list.classList.add('zoom-in'); // треки проявляются следом за обложкой
+    clearTimeout(zoom.timer);
+    zoom.timer = setTimeout(() => list.classList.remove('zoom-in'), 900); // иначе проявлялись бы при каждой перерисовке
+  }
 }
 
 // ---- артисты в поиске сервиса: строка карточек над найденными треками ----
@@ -408,7 +536,12 @@ $('#tracklist').addEventListener('click', (e) => {
   const card = e.target.closest('.artist-card');
   if (card) { openView('artists', card.dataset.artistKey); return; }
   const disc = e.target.closest('.disc-card');
-  if (disc) { openView('artists', `${state.sub.split(SUB_SEP)[0]}${SUB_SEP}${disc.dataset.disc}`); return; }
+  if (disc) {
+    const pic = disc.querySelector('.disc-pic');
+    zoom.from = { id: disc.dataset.disc, rect: pic.getBoundingClientRect(), radius: radius(pic), at: performance.now(), scroll: $('#tracklist').scrollTop };
+    openView('artists', `${state.sub.split(SUB_SEP)[0]}${SUB_SEP}${disc.dataset.disc}`);
+    return;
+  }
   const hero = e.target.closest('[data-hero]');
   if (hero && state.shown.length) {
     const shuffle = hero.dataset.hero === 'shuffle';

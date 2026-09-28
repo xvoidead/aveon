@@ -11,6 +11,8 @@
 <!-- Остров поверх всех окон (src/island.js, renderer/island.js) -->
 <body class="hidden">
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <!-- «жидкость»: силуэты размываются вместе и снова получают резкий край — рядом стоящие слипаются перемычкой -->
+    <filter id="goo" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b"/><feColorMatrix in="b" mode="matrix" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 20 -9"/></filter>
     <symbol id="i-play" viewBox="0 0 24 24"><path d="M8 5.5v13a1 1 0 0 0 1.5.86l10.4-6.5a1 1 0 0 0 0-1.72L9.5 4.64A1 1 0 0 0 8 5.5z" fill="currentColor"/></symbol>
     <symbol id="i-pause" viewBox="0 0 24 24"><rect x="6.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/><rect x="13.5" y="5" width="4" height="14" rx="1.2" fill="currentColor"/></symbol>
     <symbol id="i-next" viewBox="0 0 24 24"><path d="M2 6.9v10.2a.9.9 0 0 0 1.4.75L11 12.9v4.2a.9.9 0 0 0 1.4.75l8.1-5.1a.9.9 0 0 0 0-1.5L12.4 6.15A.9.9 0 0 0 11 6.9v4.2L3.4 6.15A.9.9 0 0 0 2 6.9z" fill="currentColor"/></symbol>
@@ -22,6 +24,7 @@
     <symbol id="i-open" viewBox="0 0 24 24"><path d="M14 4.5h5.5V10M19.5 4.5 11 13M18 14v4a1.5 1.5 0 0 1-1.5 1.5h-10A1.5 1.5 0 0 1 5 18V8a1.5 1.5 0 0 1 1.5-1.5h4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   </svg>
 
+  <div class="goo" aria-hidden="true"><i id="g-pill"></i><i id="g-ev"></i><i id="g-side"></i></div>
   <div class="side left" id="side-ev"></div>
   <div class="pill" id="pill">
     <div class="glow"></div>

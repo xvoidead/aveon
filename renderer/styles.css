@@ -219,10 +219,10 @@ body.win-autohide.win-reveal .win-buttons, body.win-autohide .win-buttons:focus-
 .library { position: relative; display: flex; flex-direction: column; min-width: 0; min-height: 0; padding: 44px 32px 0 36px; overflow-x: hidden; overflow-y: auto; }
 .lib-top { display: flex; align-items: center; gap: 12px; -webkit-app-region: drag; }
 .lib-top > * { -webkit-app-region: no-drag; }
-.sources { display: flex; gap: 22px; flex: 1; min-width: 0; overflow-x: auto; }
+.sources { display: flex; gap: 22px; flex: 1; min-width: 0; overflow-x: auto; transition: gap .45s cubic-bezier(.34, 1.25, .5, 1); }
 .source {
-  position: relative; padding: 6px 0; color: var(--text-3); font-weight: 500; white-space: nowrap;
-  transition: color .15s;
+  position: relative; padding: 6px 0; color: var(--text-3); font-weight: 500; white-space: nowrap; max-width: 260px;
+  transition: color .15s, max-width .45s cubic-bezier(.34, 1.25, .5, 1), padding .45s cubic-bezier(.34, 1.25, .5, 1), opacity .25s ease;
 }
 .source:hover { color: var(--text-2); }
 .source.active { color: var(--text); }
@@ -1331,7 +1331,7 @@ html.look-react-hoops .hoops { transform: scale(calc(1 - var(--m) * 0.07 + var(-
 .icon-btn:disabled { opacity: .4; cursor: default; }
 
 /* ---------- текст по буквам (richsync): текущее слово заливается слева направо ---------- */
-.lyric.active.karaoke .w.now {
+.lyric.active.karaoke .w.w-now {
   color: transparent; text-shadow: none;
   /* мягкая граница 12 %: при --p = 0 слово ещё не тронуто, при --p = 1 залито целиком — без скачков на краях */
   background: linear-gradient(90deg, var(--text) calc(var(--p, 0) * 112% - 12%), var(--text-3) calc(var(--p, 0) * 112%));
@@ -1426,6 +1426,9 @@ html:is(.dock-bottom, .dock-top) .me-avatar { width: 34px; height: 34px; }
 
 /* ---------- волна (wave.js): эфир сверху, шкала приёмника снизу ---------- */
 .library.wave-on .search, .library.wave-on .collections-wrap, .library.wave-on .lib-head { display: none; }
+/* главная и волна листаются без полосы прокрутки — колёсиком, как лента */
+.home, .library.home-on, .library.wave-on, .library.wave-on .tracklist { scrollbar-width: none; }
+.home::-webkit-scrollbar, .library.home-on::-webkit-scrollbar, .library.wave-on::-webkit-scrollbar, .library.wave-on .tracklist::-webkit-scrollbar { display: none; }
 .wave-hero { position: relative; margin: 0 0 8px; }
 
 /* эфир: линии на всю ширину, слово «волна» лежит на средней линии */
@@ -1549,6 +1552,12 @@ html.mobile .wave-phrase { font-size: 19px; line-height: 1.7; }
 
 /* ---------- обложка-пластинка и скретч (scratch.js) ---------- */
 .porthole { rotate: var(--spin, 0deg); cursor: grab; touch-action: none; }
+/* как в Apple Music: на паузе обложка мягко отступает, пошла музыка — пружинисто возвращается.
+   Своё свойство scale — не мешает ни вращению (rotate), ни пульсу под басы (transform) */
+.porthole { transition: scale .7s var(--spring, cubic-bezier(.34, 1.45, .64, 1)); }
+body.paused .porthole { scale: .88; }
+html:is(.dock-bottom, .dock-top) body.paused .porthole { scale: .92; }
+@media (prefers-reduced-motion: reduce) { .porthole { transition: none; } }
 .porthole.scratching { cursor: grabbing; }
 /* бороздки винила поверх обложки — едва заметно, сильнее, пока держат */
 .porthole::before {
@@ -3104,3 +3113,55 @@ html.skin-glass.mobile .wave-word { left: 20px; font-size: 56px; }
   html:not(.dock-bottom, .dock-top, .mobile) .stage .call .meters { display: none; }
   html:not(.dock-bottom, .dock-top, .mobile) .stage .call .call-head { margin-bottom: 0; }
 }
+
+/* ---------- листаешь вниз — шапка библиотеки схлопывается (как панель вкладок в iOS 26) ----------
+   app.js → tabsMini: вкладки сжимаются до текущего раздела, поиск, плейлисты и заголовок уезжают вверх,
+   списку достаётся их место. Листаешь вверх, дошёл до начала или сменил раздел — разворачивается */
+.library .search, .library .collections-wrap, .library .lib-head {
+  transition: max-height .45s cubic-bezier(.34, 1.1, .5, 1), margin .45s cubic-bezier(.34, 1.1, .5, 1), opacity .25s ease;
+}
+.library .search { max-height: 60px; }
+.library .collections-wrap { max-height: 60px; }
+.library .lib-head { max-height: 200px; }
+.library.tabs-mini .search, .library.tabs-mini .collections-wrap, .library.tabs-mini .lib-head {
+  max-height: 0; margin-top: 0; margin-bottom: 0; opacity: 0; overflow: hidden; pointer-events: none;
+}
+.library.tabs-mini .search { border-width: 0; }
+.library .tracklist { transition: margin-top .45s cubic-bezier(.34, 1.1, .5, 1); }
+.library.tabs-mini .tracklist { margin-top: 10px; } /* под сжатой капсулой — немного воздуха */
+html:not(.skin-form) .library.tabs-mini .sources { gap: 0; cursor: pointer; }
+html:not(.skin-form) .library.tabs-mini .source:not(.active), html:not(.skin-form) .library.tabs-mini .sources-more {
+  max-width: 0; opacity: 0; pointer-events: none;
+  padding-left: 0; padding-right: 0; /* у вкладок «Стекла» свои поля — без этого капсула оставалась широкой */
+}
+@media (prefers-reduced-motion: reduce) {
+  .library .search, .library .collections-wrap, .library .lib-head, .sources, .source { transition: none; }
+}
+
+/* ---------- альбом на странице артиста: шапка и zoom-переход (artists.js → zoomFly) ---------- */
+.alb-hero { display: flex; align-items: flex-end; gap: 22px; padding: 8px 12px 22px; }
+.alb-pic {
+  width: 168px; height: 168px; flex: none; border-radius: 9px; overflow: hidden; display: grid; place-items: center; /* как у карточки (8px при 150) — в полёте форма не меняется */
+  background: var(--rivet-2); color: var(--text-3); font-size: 44px; box-shadow: 0 18px 44px rgb(0 0 0 / .4);
+}
+.alb-pic img { width: 100%; height: 100%; object-fit: cover; }
+.alb-text { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+.alb-kind { font-size: 12px; color: var(--text-3); }
+.alb-name { margin: 0; font: 700 30px/1.1 var(--display); letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.alb-meta { margin: 2px 0 0; font-size: 13px; color: var(--text-2); }
+.alb-actions { display: flex; gap: 8px; margin-top: 10px; }
+.zoom-clip { position: fixed; z-index: 60; overflow: hidden; pointer-events: none; }
+.zoom-fly {
+  position: absolute; overflow: hidden; pointer-events: none; display: grid; place-items: center;
+  background: var(--rivet-2); color: var(--text-3); box-shadow: 0 18px 44px rgb(0 0 0 / .4);
+}
+.zoom-fly img { width: 100%; height: 100%; object-fit: cover; }
+/* пока обложка летит, остальное в альбоме проявляется снизу, лесенкой */
+#tracklist.zoom-in > .alb-hero .alb-text { animation: zoom-rise .45s .12s both cubic-bezier(.2, .9, .3, 1); }
+#tracklist.zoom-in > .row { animation: zoom-rise .45s both cubic-bezier(.2, .9, .3, 1); }
+#tracklist.zoom-in > .row:nth-child(2) { animation-delay: .16s; }
+#tracklist.zoom-in > .row:nth-child(3) { animation-delay: .2s; }
+#tracklist.zoom-in > .row:nth-child(4) { animation-delay: .24s; }
+#tracklist.zoom-in > .row:nth-child(n + 5) { animation-delay: .28s; }
+@keyframes zoom-rise { from { opacity: 0; transform: translateY(10px); } }
+@media (prefers-reduced-motion: reduce) { #tracklist.zoom-in > * { animation: none !important; } }

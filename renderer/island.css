@@ -10,9 +10,12 @@ button { font: inherit; color: inherit; background: none; border: 0; padding: 0;
 svg { width: 18px; height: 18px; }
 
 /* как Dynamic Island: чистый чёрный без обводки; лёгкая тень — только чтобы капсулу было видно на тёмных окнах */
+/* Чёрный силуэт капсулы и капель рисует слой .goo под ними (ниже): там они склеиваются, как жидкость.
+   Сами капсула и капли прозрачные — поверх только их содержимое, оно остаётся чётким */
+.goo { position: fixed; inset: 0; pointer-events: none; filter: url(#goo) drop-shadow(0 4px 12px rgb(0 0 0 / .3)); }
+.goo i { position: absolute; left: 0; top: 0; width: 0; height: 0; background: #000; opacity: 0; will-change: transform; }
 .pill {
-  position: relative; flex: none; width: 280px; height: 36px; border-radius: 22px; background: #000; overflow: hidden;
-  box-shadow: 0 4px 16px rgb(0 0 0 / .28);
+  position: relative; flex: none; width: 280px; height: 36px; border-radius: 22px; background: transparent; overflow: hidden;
   transition: width .42s var(--ease), height .42s var(--ease), border-radius .42s var(--ease), box-shadow .3s ease, opacity .3s ease, transform .3s ease;
 }
 /* курсор над свёрнутой капсулой: чуть больше — «нажми, раскроется» */
@@ -20,7 +23,7 @@ svg { width: 18px; height: 18px; }
 body.hidden .pill { opacity: 0; transform: scale(.8) translateY(-10px); }
 body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 /* бочка: обводка цветом голосов, как индикатор звонка */
-.pill.barrel { box-shadow: 0 4px 16px rgb(0 0 0 / .28), 0 0 0 1.5px var(--voice), 0 0 18px -2px var(--voice); }
+.pill.barrel { box-shadow: 0 0 0 1.5px var(--voice), 0 0 18px -2px var(--voice); }
 .glow { position: absolute; inset: 0; pointer-events: none; opacity: calc(var(--m) * .35); background: radial-gradient(120% 140% at 50% 120%, var(--voice), transparent 60%); }
 
 .row { position: absolute; left: 6px; right: 12px; top: 5px; height: 26px; display: flex; align-items: center; gap: 10px; transition: top .42s var(--ease), height .42s var(--ease); }
@@ -114,10 +117,9 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
    (#side-ev). Видна ли — класс .on (island.js → tick). Появляется, будто отрывается от края капсулы:
    выезжает из-под неё, растёт с пружинкой; прячется — втягивается обратно */
 .side {
-  flex: none; width: 0; height: 36px; margin-left: 0; border-radius: 50%; background: #000; overflow: hidden;
+  flex: none; width: 0; height: 36px; margin-left: 0; border-radius: 50%; background: transparent; overflow: hidden;
   display: grid; place-items: center; pointer-events: none; position: relative;
   opacity: 0; transform: translateX(-26px) scale(.35);
-  box-shadow: 0 4px 16px rgb(0 0 0 / .28);
   transition: width .45s var(--ease), margin .45s var(--ease), opacity .25s ease, transform .5s cubic-bezier(.34, 1.5, .6, 1);
 }
 .side.on { width: 36px; margin-left: 8px; opacity: 1; transform: none; pointer-events: auto; cursor: pointer; }
@@ -137,12 +139,16 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 .side svg { width: 18px; height: 18px; color: var(--voice); display: block; }
 .side.on > svg { transform: translate(.5px, -.5px); } /* у пузыря хвостик слева снизу — на глаз центр чуть выше и правее */
 .side.left.on { overflow: visible; } /* счётчик на краю капли, как бейдж в iOS */
+/* пришло новое уведомление — капля подпрыгивает; силуэт в слое .goo повторяет её, и она «булькает» у капсулы */
+.side.left.on.bump { animation: drop-bump .6s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes drop-bump { 0% { transform: scale(1); } 30% { transform: scale(1.28); } 60% { transform: scale(.94); } 100% { transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .side.left.on.bump { animation: none; } }
 /* сколько уведомлений, если больше одного */
 .side b { position: absolute; right: -3px; top: -3px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; background: #ff453a; color: #fff; font: 700 9px/14px "Onest", sans-serif; text-align: center; box-shadow: 0 0 0 1.5px #000; }
 
 /* ---- пульс в такт басам ---- */
 .pill.pulse.playing:not(.open) { transform: scale(calc(1 + var(--bass, 0) * .045)); transition: width .42s var(--ease), height .42s var(--ease), border-radius .42s var(--ease), box-shadow .3s ease, opacity .3s ease, transform .08s linear; }
-.pill.pulse.playing:not(.open) { box-shadow: 0 4px 16px rgb(0 0 0 / .28), 0 0 calc(var(--bass, 0) * 26px) calc(var(--bass, 0) * 2px) color-mix(in srgb, var(--amber) 55%, transparent); }
+.pill.pulse.playing:not(.open) { box-shadow: 0 0 calc(var(--bass, 0) * 26px) calc(var(--bass, 0) * 2px) color-mix(in srgb, var(--amber) 55%, transparent); }
 
 /* ---- переливающаяся обводка цветами обложки ---- */
 @property --ang { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
@@ -201,7 +207,7 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 
 
 /* предпросмотр положения из настроек */
-.pill.previewing { box-shadow: 0 4px 16px rgb(0 0 0 / .28), 0 0 0 2px var(--amber), 0 0 24px -4px var(--amber); }
+.pill.previewing { box-shadow: 0 0 0 2px var(--amber), 0 0 24px -4px var(--amber); }
 
 /* ширину свёрнутой капсулы задаёт island.js → fitWidth (под длину строки), здесь только плавность */
 .pill:not(.open):not(.peek):not(.notice) .label b { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; transition: font-size .3s ease; }

@@ -9,10 +9,8 @@ const bars = [...document.querySelectorAll('.bars i')];
 
 let st = null;
 let lastId = null;
-let lastNotice = null;
 let lastLine = '';
 let peekTimer = 0;
-let noticeTimer = 0;
 let leaveTimer = 0;
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -51,11 +49,9 @@ api.island.onPreview((on) => {
 api.island.onState((s) => {
   st = s;
   for (const [k, v] of Object.entries(s.avatars || {})) avatars.set(k, v);
-  if (s.notice && s.notice.id !== lastNotice) {
-    lastNotice = s.notice.id;
-    notice(s.notice.text, s.notice.av, s.notice.kind);
-  }
-  document.body.classList.toggle('hidden', !s.hasTrack && !is('notice') && !previewing);
+  // Уведомление остров не раскрывает: событие уходит в каплю слева (renderSideEv — она подпрыгивает),
+  // а прочитать его — в ленте раскрытого острова
+  document.body.classList.toggle('hidden', !s.hasTrack && !previewing);
   if (!s.hasTrack) return;
   const root = document.documentElement.style;
   if (s.amber) root.setProperty('--amber', s.amber);
@@ -112,10 +108,19 @@ function renderSide(f) {
 // в капле — только непрочитанные: пришедшие с тех пор, как остров раскрывали (лента помнит два часа)
 let seenAt = Date.now();
 const unseen = () => (st?.events || []).filter((e) => e.at > seenAt);
+let evShown = 0;
 function renderSideEv() {
   const n = unseen().length;
   // значок чата цветом акцента; больше одного — ещё и сколько
   setHtml($('#side-ev'), n ? `<svg><use href="#i-chat"/></svg>${n > 1 ? `<b>${n > 9 ? '9+' : n}</b>` : ''}` : '');
+  // пришло новое — капля коротко подпрыгивает (вместо раскрытой капсулы с текстом)
+  if (n > evShown && evShown >= 0) {
+    const el = $('#side-ev');
+    el.classList.remove('bump');
+    void el.offsetWidth;
+    el.classList.add('bump');
+  }
+  evShown = n;
 }
 const sides = () => [...document.querySelectorAll('.side.on')];
 
@@ -231,11 +236,6 @@ function peek() {
   peekTimer = setTimeout(() => { pill.classList.remove('peek'); renderLabel(); }, 3500);
 }
 
-// av — ключ аватарки друга: на время уведомления она вместо обложки
-// откуда уведомление — в подписи
-const NOTICE_FROM = { friend: 'друзья', together: 'рума', admin: 'от админов', info: 'авеон' };
-let pendingNotice = null; // пришло, пока остров раскрыт под курсором, — покажем, когда свернётся
-
 // эмодзи картинками Apple, как в окне плеера (renderer/app.js → emojify)
 const EMOJI_CDN = 'https://cdn.jsdelivr.net/npm/emoji-datasource-apple@15.1.2/img/apple/64/';
 const EMOJI_RE = /\p{Regional_Indicator}{2}|[#*0-9]\uFE0F?\u20E3|\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier})?(?:\u200D\p{Extended_Pictographic}(?:\uFE0F|\p{Emoji_Modifier})?)*/gu;
@@ -247,28 +247,6 @@ document.addEventListener('error', (e) => {
   if (!img.dataset.retry && img.src.includes('-fe0f')) { img.dataset.retry = '1'; img.src = img.src.replace(/-fe0f/g, ''); return; }
   img.replaceWith(document.createTextNode(img.alt));
 }, true);
-
-function notice(text, av = '', kind = 'info') {
-  if (is('open')) { pendingNotice = { text, av, kind, at: Date.now() }; return; }
-  pill.classList.remove('peek');
-  pill.classList.add('notice');
-  const face = avatarCss(av);
-  $('#disc').style.backgroundImage = face || coverCss();
-  pill.classList.toggle('face', !!face);
-  pill.style.width = '';
-  document.body.classList.remove('hidden');
-  const title = $('#p-title');
-  title.innerHTML = emo(text);
-  title.dataset.key = ''; // после уведомления renderLabel перепишет название заново
-  $('#p-sub').textContent = NOTICE_FROM[kind] || 'авеон';
-  clearTimeout(noticeTimer);
-  noticeTimer = setTimeout(() => {
-    pill.classList.remove('notice', 'face');
-    $('#disc').style.backgroundImage = coverCss();
-    if (!st?.hasTrack) document.body.classList.add('hidden');
-    renderLabel();
-  }, 3800);
-}
 
 // Позиция между сообщениями — сами, по часам
 // Заливка по буквам (richsync): сколько букв текущей строки уже спето — по времени слов
@@ -285,7 +263,32 @@ function letterFill() {
   return total ? done / total : 0;
 }
 
+// Силуэты для слоя .goo: каждый кадр повторяют капсулу и капли (размер, скругление, прозрачность),
+// пишем в стиль, только если что-то поменялось — в покое фильтр не пересчитывается
+const goo = { pill: $('#g-pill'), ev: $('#g-ev'), side: $('#g-side') };
+function gooPlace(g, el, radius, op) {
+  const r = el.getBoundingClientRect();
+  const key = `${r.left.toFixed(1)},${r.top.toFixed(1)},${r.width.toFixed(1)},${r.height.toFixed(1)},${radius},${op.toFixed(2)}`;
+  if (g._key === key) return;
+  g._key = key;
+  g.style.transform = `translate(${r.left}px, ${r.top}px)`;
+  g.style.width = `${r.width}px`;
+  g.style.height = `${r.height}px`;
+  g.style.borderRadius = radius;
+  g.style.opacity = op;
+}
+function syncGoo() {
+  const cs = getComputedStyle(pill);
+  gooPlace(goo.pill, pill, cs.borderRadius, +cs.opacity);
+  // капля — полностью чёрная, как только появилась хоть на полкапли: иначе не слипается с капсулой
+  for (const [g, el] of [[goo.ev, $('#side-ev')], [goo.side, $('#side')]]) {
+    const w = el.getBoundingClientRect().width;
+    gooPlace(g, el, '50%', Math.min(1, w / 14));
+  }
+}
+
 function tick() {
+  syncGoo();
   const drops = !!st?.hasTrack && !expanded() && !document.body.classList.contains('hidden');
   $('#side').classList.toggle('on', drops && is('friend-live'));
   $('#side-ev').classList.toggle('on', drops && unseen().length > 0);
@@ -329,10 +332,6 @@ function pointerOut() {
   pill.classList.remove('open');
   sideZone = null;
   renderLabel();
-  // уведомление, пришедшее под курсором, — сейчас, если ещё свежее
-  const p = pendingNotice;
-  pendingNotice = null;
-  if (p && Date.now() - p.at < 8000) notice(p.text, p.av, p.kind);
 }
 // Раскрывается по нажатию, как в iOS; наведение только подсвечивает капсулу
 pill.addEventListener('pointerdown', (e) => {
@@ -348,7 +347,6 @@ api.island.onPointer((on) => {
     clearTimeout(leaveTimer);
     pill.classList.remove('open');
     sideZone = null;
-    pendingNotice = null;
     renderLabel();
     return;
   }
