@@ -67,7 +67,7 @@ function fsLoop() {
     if ($('#fs-dur').textContent !== dur) $('#fs-dur').textContent = dur;
     if (fs.paused !== audio.paused) {
       fs.paused = audio.paused;
-      $('#fs-play use').setAttribute('href', audio.paused ? '#i-play' : '#i-pause');
+      setIcon($('#fs-play'), audio.paused ? '#i-play' : '#i-pause');
       $('#fs-play').setAttribute('aria-label', audio.paused ? 'Играть' : 'Пауза');
     }
     fs.raf = requestAnimationFrame(tick);
@@ -84,6 +84,7 @@ function fsWake() {
 }
 
 makeSlider(fsProg, {
+  fine: true,
   onInput: (f) => {
     fs.seeking = true;
     const d = audio.duration || state.track?.duration || 0;

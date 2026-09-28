@@ -192,26 +192,85 @@ function ask({ title, text = '', value = '', ok, input = true, danger = false, p
   });
 }
 
-// Слайдер на pointer-событиях: onInput во время перетаскивания, onChange по отпусканию
-function makeSlider(el, { onInput, onChange }) {
-  const frac = (e) => {
+// Слайдер на pointer-событиях: onInput во время перетаскивания, onChange по отпусканию.
+// Как в iOS: пока держишь, полоса толще (styles.css → .slider.drag); тянешь за край — полоса
+// вытягивается резинкой, тем туже, чем дальше, а отпустишь — пружинит обратно.
+// fine — точная перемотка: уводишь курсор вниз или вверх от полосы, и она едет медленнее
+const RUBBER = 16; // px: на сколько полоса может вытянуться за край
+const FINE = [
+  { dy: 150, speed: 1 / 8, label: 'точно' },
+  { dy: 100, speed: 1 / 4, label: '¼ скорости' },
+  { dy: 50, speed: 1 / 2, label: '½ скорости' },
+];
+function makeSlider(el, { onInput, onChange, fine = false }) {
+  const clamp = (f) => Math.min(1, Math.max(0, f));
+  let speed = 1, anchorX = 0, anchorF = 0;
+  const value = (ev) => {
     const r = el.getBoundingClientRect();
-    return Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+    if (fine) {
+      const dy = Math.abs(ev.clientY - (r.top + r.height / 2));
+      const lv = FINE.find((x) => dy >= x.dy);
+      const s = lv?.speed || 1;
+      if (s !== speed) {
+        anchorF = el._value ?? clamp((ev.clientX - r.left) / r.width);
+        anchorX = ev.clientX;
+        speed = s;
+        if (lv) el.dataset.speed = lv.label; else delete el.dataset.speed;
+      }
+    }
+    el._value = speed === 1 && anchorX === 0
+      ? clamp((ev.clientX - r.left) / r.width)
+      : clamp(anchorF + ((ev.clientX - anchorX) / r.width) * speed);
+    // резинка: курсор за краем, а значение уже упёрлось
+    const over = speed !== 1 ? 0 : ev.clientX > r.right ? ev.clientX - r.right : ev.clientX < r.left ? ev.clientX - r.left : 0;
+    const zoom = r.width / (el.offsetWidth || r.width); // размер интерфейса: CSS-пиксели не равны экранным
+    const a = (Math.sign(over) * RUBBER * (1 - 1 / ((Math.abs(over) / zoom / RUBBER) * 0.55 + 1)));
+    stretch(el, a);
+    return el._value;
   };
   el.addEventListener('pointerdown', (e) => {
     el.setPointerCapture(e.pointerId);
     el.classList.add('drag');
-    onInput?.(frac(e));
-    const move = (ev) => onInput?.(frac(ev));
+    speed = 1; anchorX = 0; el._value = undefined;
+    onInput?.(value(e));
+    const move = (ev) => onInput?.(value(ev));
     const up = (ev) => {
+      const v = value(ev);
       el.classList.remove('drag');
+      stretch(el, 0);
+      delete el.dataset.speed;
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
-      onChange?.(frac(ev));
+      el.removeEventListener('pointercancel', up);
+      onChange?.(v);
     };
     el.addEventListener('pointermove', move);
     el.addEventListener('pointerup', up);
+    el.addEventListener('pointercancel', up);
   });
+}
+// a — на сколько CSS-пикселей полоса вылезла за край: > 0 — за правый, < 0 — за левый
+function stretch(el, a) {
+  const w = el.offsetWidth || 1;
+  el.style.setProperty('--sx', String(1 + Math.abs(a) / w));
+  el.style.setProperty('--tx', `${Math.min(0, a)}px`);
+  el.style.setProperty('--kx', `${a}px`);
+}
+
+// Значки оживают, как SF Symbols в iOS (styles.css → .sym-*): swap — новый значок проявляется
+// из размытия, bounce — подпрыгивает, next/prev — стрелки проезжают вперёд или назад
+function symFx(el, kind) {
+  const svg = el?.querySelector('svg');
+  if (!svg) return;
+  svg.classList.remove('sym-swap', 'sym-bounce', 'sym-next', 'sym-prev');
+  void svg.getBoundingClientRect();
+  svg.classList.add(`sym-${kind}`);
+}
+function setIcon(btn, href) {
+  const use = btn?.querySelector('use');
+  if (!use || use.getAttribute('href') === href) return;
+  use.setAttribute('href', href);
+  symFx(btn, 'swap');
 }
 
 function setSlider(el, f) {
@@ -431,7 +490,7 @@ function externalLevel(m) {
 function applyVolume() {
   const v = state.muted ? 0 : state.cfg.volume;
   setSlider($('#volume'), v);
-  $('#btn-mute use').setAttribute('href', v === 0 ? '#i-mute' : '#i-vol');
+  setIcon($('#btn-mute'), v === 0 ? '#i-mute' : '#i-vol');
   if (fx.vol) fx.vol.gain.setTargetAtTime(v * v, ctx.currentTime, 0.02); // квадрат ближе к восприятию громкости
 }
 
@@ -726,7 +785,7 @@ function renderProgress() {
 
 function updatePlayState() {
   const playing = !audio.paused;
-  $('#btn-play use').setAttribute('href', playing ? '#i-pause' : '#i-play');
+  setIcon($('#btn-play'), playing ? '#i-pause' : '#i-play');
   $('#btn-play').setAttribute('aria-label', playing ? 'Пауза' : 'Играть');
   document.body.classList.toggle('paused', !playing);
   if ('mediaSession' in navigator) navigator.mediaSession.playbackState = playing ? 'playing' : 'paused';
@@ -1417,24 +1476,38 @@ $('#btn-now-album').onclick = (e) => {
 
 // У названия (дизайн «Стекло»): «нравится» — в лайки Яндекс Музыки, «ещё» — альбом, SoundCloud,
 // во весь экран и режимы (modes.js), то есть всё, что в других дизайнах лежит кнопками у громкости
-// Лайкнутые за эту сессию (API лайк ставит, снять его отсюда нельзя). Множество живёт на самой функции:
+// Лайкнут ли трек: за эту сессию (API лайк ставит, снять его отсюда нельзя) или раньше — по списку
+// «Мне нравится» аккаунта (раз в минуту, main.js → ym:liked). Без списка уже лайкнутый трек выглядел
+// не лайкнутым, и его можно было добавить второй раз. Всё живёт на самой функции:
 // showNow может позвать её раньше, чем интерпретатор дойдёт до этих строк
 function renderNowLike() {
   const likedNow = (renderNowLike.liked ||= new Set());
   const b = $('#btn-like');
   const t = state.track;
   b.hidden = !t || t.source !== 'ym';
-  const on = !!t && likedNow.has(t.id);
+  if (t?.source === 'ym' && Date.now() - (renderNowLike.loadedAt || 0) > 60 * 1000) loadAccountLikes();
+  const on = !!t && (likedNow.has(t.id) || !!renderNowLike.account?.has(t.id));
   b.setAttribute('aria-pressed', String(on));
   b.setAttribute('aria-label', on ? 'Уже в «Мне нравится»' : 'Нравится');
   $('use', b).setAttribute('href', on ? '#i-heart-fill' : '#i-heart');
 }
+renderNowLike.has = (id) => !!(renderNowLike.liked?.has(id) || renderNowLike.account?.has(id));
+function loadAccountLikes() {
+  renderNowLike.loadedAt = Date.now();
+  const req = api.wave?.liked?.();
+  if (!req) return;
+  req.then((ids) => {
+    renderNowLike.account = new Set(ids || []);
+    renderNowLike();
+  }).catch(() => { renderNowLike.loadedAt = 0; });
+}
 $('#btn-like').onclick = async () => {
   const t = state.track;
   const likedNow = (renderNowLike.liked ||= new Set());
-  if (!t || likedNow.has(t.id)) return;
+  if (!t || renderNowLike.has(t.id)) return;
   likedNow.add(t.id);
   renderNowLike();
+  symFx($('#btn-like'), 'bounce');
   await api.wave.feedback('like', t).catch(() => {});
   toast(`«${t.title}» — в «Мне нравится»`);
 };
@@ -2768,13 +2841,14 @@ function toggleMute() {
 }
 
 $('#btn-play').onclick = togglePlay;
-$('#btn-next').onclick = () => next();
-$('#btn-prev').onclick = prev;
-$('#btn-shuffle').onclick = toggleShuffle;
-$('#btn-repeat').onclick = cycleRepeat;
+$('#btn-next').onclick = () => { symFx($('#btn-next'), 'next'); next(); };
+$('#btn-prev').onclick = () => { symFx($('#btn-prev'), 'prev'); prev(); };
+$('#btn-shuffle').onclick = () => { toggleShuffle(); symFx($('#btn-shuffle'), 'bounce'); };
+$('#btn-repeat').onclick = () => { cycleRepeat(); symFx($('#btn-repeat'), 'bounce'); };
 $('#btn-mute').onclick = toggleMute;
 
 makeSlider($('#progress'), {
+  fine: true,
   onInput: (f) => {
     seeking = true;
     const d = audio.duration || state.track?.duration || 0;
@@ -2789,15 +2863,18 @@ makeSlider($('#progress'), {
 });
 makeSlider($('#volume'), { onInput: (f) => setVolume(f, false), onChange: (f) => setVolume(f, true) });
 
-// Над полосой прогресса — время в точке под курсором
+// Над полосой прогресса — время в точке под курсором; пока тянешь — куда перемотается
+// (при точной перемотке оно отстаёт от курсора) и с какой скоростью
 $('#progress').addEventListener('pointermove', (e) => {
   const el = $('#progress');
   const r = el.getBoundingClientRect();
-  const f = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  const dragging = el.classList.contains('drag') && el._value != null;
+  const f = dragging ? el._value : Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
   const d = audio.duration || state.track?.duration || 0;
   const tip = $('#seek-tip');
-  tip.textContent = fmt(f * d);
-  tip.style.left = `${Math.min(r.width - tip.offsetWidth / 2, Math.max(tip.offsetWidth / 2, f * r.width))}px`;
+  tip.textContent = fmt(f * d) + (dragging && el.dataset.speed ? ` · ${el.dataset.speed}` : '');
+  const w = el.offsetWidth;
+  tip.style.left = `${Math.min(w - tip.offsetWidth / 2, Math.max(tip.offsetWidth / 2, f * w))}px`;
 });
 $('#volume').addEventListener('wheel', (e) => {
   e.preventDefault();

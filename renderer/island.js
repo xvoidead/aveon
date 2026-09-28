@@ -53,11 +53,11 @@ api.island.onState((s) => {
   // а прочитать его — в ленте раскрытого острова
   document.body.classList.toggle('hidden', !s.hasTrack && !previewing);
   if (!s.hasTrack) return;
-  const root = document.documentElement.style;
-  if (s.amber) root.setProperty('--amber', s.amber);
-  if (s.voice) root.setProperty('--voice', s.voice);
-  root.setProperty('--m', String(s.m || 0));
-  root.setProperty('--bass', String(s.playing ? s.bars?.[0] || 0 : 0));
+  if (s.amber) setVar('--amber', s.amber);
+  if (s.voice) setVar('--voice', s.voice);
+  setVar('--m', String(s.m || 0));
+  // басы нужны только пульсу — без него переменную 15 раз в секунду не трогаем
+  setVar('--bass', String(s.playing && s.opts?.pulse ? s.bars?.[0] || 0 : 0));
 
   if (s.id !== lastId) {
     const first = lastId === null;
@@ -85,17 +85,61 @@ api.island.onState((s) => {
   renderFriends(s.friends);
   renderEvents(s.events || []);
   renderLabel();
-  $('#b-play use').setAttribute('href', s.playing ? '#i-pause' : '#i-play');
+  setIcon($('#b-play'), s.playing ? '#i-pause' : '#i-play');
+  if (s.device && s.device.at !== devAt) {
+    // первое состояние после запуска острова — старую смену устройства не показываем
+    const fresh = devAt !== null && Date.now() - s.device.at < 4000;
+    devAt = s.device.at;
+    if (fresh) showDevice(s.device);
+  } else if (devAt === null) devAt = s.device?.at ?? 0;
   pill.classList.toggle('can-like', !!s.likeable);
   renderLike(!!s.liked);
   $('#b-barrel').classList.toggle('on', !!s.manual);
   // пять уровней спектра → семь полосок волной от центра, как в iOS: басы посередине, верха по краям
   const lv = s.bars || [];
-  bars.forEach((el, i) => { el.style.height = `${Math.round(18 + (lv[WAVE[i]] || 0) * 82)}%`; });
+  bars.forEach((el, i) => {
+    const v = `scaleY(${((18 + (lv[WAVE[i]] || 0) * 82) / 100).toFixed(2)})`;
+    if (el.style.transform !== v) el.style.transform = v;
+  });
   renderSide(s.friends);
   renderSideEv();
+  if (pill.className !== lastClass) { lastClass = pill.className; wakeGoo(); }
 });
+let lastClass = '';
 const WAVE = [4, 2, 1, 0, 1, 3, 4];
+
+// Смена значка — новый проявляется из размытия, как SF Symbols в iOS
+function setIcon(btn, href) {
+  const use = btn.querySelector('use');
+  if (use.getAttribute('href') === href) return;
+  use.setAttribute('href', href);
+  const svg = btn.querySelector('svg');
+  svg.classList.remove('sym-swap');
+  void svg.getBoundingClientRect();
+  svg.classList.add('sym-swap');
+}
+
+// Сменилось устройство вывода — свёрнутый остров на три секунды показывает значок и название,
+// как при подключении AirPods. Раскрытый не трогаем: там кнопки
+let devAt = null;
+let devName = '';
+let devTimer = 0;
+function showDevice(d) {
+  if (is('open')) return;
+  devName = d.name;
+  $('#disc .dev-ico use').setAttribute('href', d.kind === 'headphones' ? '#i-headphones' : '#i-speaker');
+  pill.classList.remove('peek');
+  pill.classList.add('dev');
+  renderLabel();
+  clearTimeout(devTimer);
+  devTimer = setTimeout(() => { pill.classList.remove('dev'); renderLabel(); }, 3000);
+}
+const vars = {};
+function setVar(k, v) {
+  if (vars[k] === v) return;
+  vars[k] = v;
+  document.documentElement.style.setProperty(k, v);
+}
 
 // Капли справа от свёрнутой капсулы, как вторая активность в iOS: друг слушает — его аватарка,
 // есть уведомления — последнее (аватарка или значок) и сколько их. Видны ли — решает tick
@@ -131,9 +175,15 @@ const MIN_W = 200, MAX_W = 660; // окно 780: справа ещё место 
 const measure = document.createElement('span');
 measure.className = 'measure';
 document.body.appendChild(measure);
+// шрифт догрузился — ширина, замеренная по запасному шрифту, уже неверна
+document.fonts?.ready.then(() => { fitKey = ''; renderLabel(); });
 
+let fitKey = '';
 function fitWidth() {
   const b = $('#p-title');
+  const key = `${pill.className}|${b.innerHTML}`;
+  if (key === fitKey) return;
+  fitKey = key;
   if (expanded()) { pill.style.width = ''; b.style.fontSize = ''; return; }
   const extra = 6 + 26 + 10 + 10 + (pill.classList.contains('no-bars') ? 0 : 30) + 16; // поля, обложка, отступы, 7 полосок
   measure.style.font = getComputedStyle(b).font;
@@ -152,12 +202,13 @@ function renderLabel() {
   if (!st || is('notice')) return;
   const title = $('#p-title');
   let text;
-  if (expanded()) text = st.title || '';
+  if (is('dev') && !expanded()) text = devName;
+  else if (expanded()) text = st.title || '';
   else if (is('lyric')) text = st.lyric?.gap ? '♪ ♪ ♪' : st.lyric?.cur || '';
   else if ((st.m || 0) > 0.5) text = st.manual ? 'в бочке' : 'говорят — в бочке';
   else text = st.title || '';
   // текста песни нет — в свёрнутом острове название и исполнитель
-  const credit = !expanded() && !is('lyric') && (st.m || 0) <= 0.5 && st.artist;
+  const credit = !expanded() && !is('dev') && !is('lyric') && (st.m || 0) <= 0.5 && st.artist;
   const key = credit ? `${text}|${st.artist}` : text;
   if (title.dataset.key !== key) {
     title.dataset.key = key;
@@ -263,32 +314,60 @@ function letterFill() {
   return total ? done / total : 0;
 }
 
-// Силуэты для слоя .goo: каждый кадр повторяют капсулу и капли (размер, скругление, прозрачность),
-// пишем в стиль, только если что-то поменялось — в покое фильтр не пересчитывается
-const goo = { pill: $('#g-pill'), ev: $('#g-ev'), side: $('#g-side') };
-function gooPlace(g, el, radius, op) {
-  const r = el.getBoundingClientRect();
-  const key = `${r.left.toFixed(1)},${r.top.toFixed(1)},${r.width.toFixed(1)},${r.height.toFixed(1)},${radius},${op.toFixed(2)}`;
+// Силуэты для слоя .goo повторяют капсулу и капли (размер, скругление, прозрачность).
+// Замерять их каждый кадр дорого (пересчёт стилей и раскладки 60–144 раза в секунду, даже когда остров
+// спрятан), а каждая правка силуэта заново прогоняет SVG-фильтр. Поэтому следим покадрово, только пока
+// капсула или капли движутся (идёт их transition или анимация), а в покое — раз в полсекунды.
+// Сам слой .goo — не во всё окно 780×420, а по капсуле и каплям с полями под размытие и тень:
+// фильтр считает в разы меньше пикселей
+const goo = { box: $('.goo'), pill: $('#g-pill'), ev: $('#g-ev'), side: $('#g-side') };
+const GOO_PAD = 28; // размытие (stdDeviation 6 → ~18 px) и тень (смещение 4 + размытие 12)
+let gooAwake = 0;
+let gooSynced = 0;
+const wakeGoo = () => { gooAwake = performance.now() + 700; };
+for (const ev of ['transitionrun', 'transitionend', 'transitioncancel', 'animationstart', 'animationiteration', 'animationend']) {
+  document.addEventListener(ev, (e) => {
+    const t = e.target;
+    if (t === pill || t === document.body || t.classList?.contains('side')) wakeGoo();
+  });
+}
+function gooPlace(g, r, origin, radius, op) {
+  const key = `${(r.left - origin.x).toFixed(1)},${(r.top - origin.y).toFixed(1)},${r.width.toFixed(1)},${r.height.toFixed(1)},${radius},${op.toFixed(2)}`;
   if (g._key === key) return;
   g._key = key;
-  g.style.transform = `translate(${r.left}px, ${r.top}px)`;
+  g.style.transform = `translate(${r.left - origin.x}px, ${r.top - origin.y}px)`;
   g.style.width = `${r.width}px`;
   g.style.height = `${r.height}px`;
   g.style.borderRadius = radius;
   g.style.opacity = op;
 }
 function syncGoo() {
+  gooSynced = performance.now();
   const cs = getComputedStyle(pill);
-  gooPlace(goo.pill, pill, cs.borderRadius, +cs.opacity);
+  const parts = [[goo.pill, pill.getBoundingClientRect(), cs.borderRadius, +cs.opacity]];
   // капля — полностью чёрная, как только появилась хоть на полкапли: иначе не слипается с капсулой
   for (const [g, el] of [[goo.ev, $('#side-ev')], [goo.side, $('#side')]]) {
-    const w = el.getBoundingClientRect().width;
-    gooPlace(g, el, '50%', Math.min(1, w / 14));
+    const r = el.getBoundingClientRect();
+    parts.push([g, r, '50%', Math.min(1, r.width / 14)]);
   }
+  const vis = parts.filter(([, r]) => r.width > 0 && r.height > 0);
+  const x = Math.floor(Math.min(...vis.map(([, r]) => r.left), 1e6) - GOO_PAD);
+  const y = Math.floor(Math.min(...vis.map(([, r]) => r.top), 1e6) - GOO_PAD);
+  const w = Math.ceil(Math.max(...vis.map(([, r]) => r.right), 0) + GOO_PAD) - x;
+  const h = Math.ceil(Math.max(...vis.map(([, r]) => r.bottom), 0) + GOO_PAD) - y;
+  const boxKey = vis.length ? `${x},${y},${w},${h}` : 'none';
+  if (goo.box._key !== boxKey) {
+    goo.box._key = boxKey;
+    goo.box.style.transform = vis.length ? `translate(${x}px, ${y}px)` : '';
+    goo.box.style.width = vis.length ? `${w}px` : '0';
+    goo.box.style.height = vis.length ? `${h}px` : '0';
+  }
+  for (const [g, r, radius, op] of parts) gooPlace(g, r, { x, y }, radius, op);
 }
 
 function tick() {
-  syncGoo();
+  const now = performance.now();
+  if (now < gooAwake || now - gooSynced > 500) syncGoo();
   const drops = !!st?.hasTrack && !expanded() && !document.body.classList.contains('hidden');
   $('#side').classList.toggle('on', drops && is('friend-live'));
   $('#side-ev').classList.toggle('on', drops && unseen().length > 0);
@@ -316,7 +395,7 @@ function pointerIn() {
   api.island.log?.('pointerIn', pill.className);
   clearTimeout(leaveTimer);
   if (is('open')) { api.island.hover(true); return; } // уже раскрыт — но ловить мышь напомнить (вдруг сбросили)
-  pill.classList.remove('peek', 'notice');
+  pill.classList.remove('peek', 'notice', 'dev');
   pill.classList.add('open');
   seenAt = Date.now(); // раскрыли — уведомления видны в ленте, капля больше не нужна
   renderSideEv();

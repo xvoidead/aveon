@@ -12,7 +12,8 @@ svg { width: 18px; height: 18px; }
 /* как Dynamic Island: чистый чёрный без обводки; лёгкая тень — только чтобы капсулу было видно на тёмных окнах */
 /* Чёрный силуэт капсулы и капель рисует слой .goo под ними (ниже): там они склеиваются, как жидкость.
    Сами капсула и капли прозрачные — поверх только их содержимое, оно остаётся чётким */
-.goo { position: fixed; inset: 0; pointer-events: none; filter: url(#goo) drop-shadow(0 4px 12px rgb(0 0 0 / .3)); }
+/* размер и место слоя задаёт island.js (syncGoo): по капсуле и каплям с полями под размытие */
+.goo { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: none; filter: url(#goo) drop-shadow(0 4px 12px rgb(0 0 0 / .3)); }
 .goo i { position: absolute; left: 0; top: 0; width: 0; height: 0; background: #000; opacity: 0; will-change: transform; }
 .pill {
   position: relative; flex: none; width: 280px; height: 36px; border-radius: 22px; background: transparent; overflow: hidden;
@@ -47,9 +48,10 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 
 /* волна как в iOS: тонкие полоски от центра, цвет обложки приглушён */
 .bars { display: flex; align-items: center; gap: 2px; height: 18px; flex: none; }
-.bars i { width: 2.5px; height: 20%; border-radius: 2px; background: color-mix(in srgb, var(--amber) 72%, #7a7a7a); transition: height .09s linear, background .3s ease; }
+/* высоту полоски задаёт transform (island.js), а не height: transform анимирует композитор, без пересчёта раскладки каждый кадр */
+.bars i { width: 2.5px; height: 100%; transform: scaleY(.2); border-radius: 2px; background: color-mix(in srgb, var(--amber) 72%, #7a7a7a); transition: transform .09s linear, background .3s ease; }
 .pill.barrel .bars i { background: var(--voice); }
-.pill:not(.playing) .bars i { height: 12% !important; opacity: .5; }
+.pill:not(.playing) .bars i { transform: scaleY(.12) !important; opacity: .5; }
 
 /* смена трека: капсула на пару секунд — как живая активность iOS, полностью круглая */
 .pill.peek { width: 360px; height: 64px; border-radius: 32px; }
@@ -190,14 +192,14 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 /* движение от музыки */
 .pill.no-bars .bars { display: none; }
 .pill.no-spin .disc { animation: none !important; }
-.pill.m-calm .bars i { transition: height .45s ease; }
+.pill.m-calm .bars i { transition: transform .45s ease; }
 .pill.m-static .bars i { transition: none; }
-.pill.m-static .bars i:nth-child(1), .pill.m-static .bars i:nth-child(7) { height: 30% !important; }
-.pill.m-static .bars i:nth-child(2) { height: 60% !important; }
-.pill.m-static .bars i:nth-child(3) { height: 80% !important; }
-.pill.m-static .bars i:nth-child(4) { height: 100% !important; }
-.pill.m-static .bars i:nth-child(5) { height: 70% !important; }
-.pill.m-static .bars i:nth-child(6) { height: 45% !important; }
+.pill.m-static .bars i:nth-child(1), .pill.m-static .bars i:nth-child(7) { transform: scaleY(.3) !important; }
+.pill.m-static .bars i:nth-child(2) { transform: scaleY(.6) !important; }
+.pill.m-static .bars i:nth-child(3) { transform: scaleY(.8) !important; }
+.pill.m-static .bars i:nth-child(4) { transform: none !important; }
+.pill.m-static .bars i:nth-child(5) { transform: scaleY(.7) !important; }
+.pill.m-static .bars i:nth-child(6) { transform: scaleY(.45) !important; }
 .pill.m-static { transform: none !important; }
 .pill.m-static .ring { animation-play-state: paused; }
 .pill.m-static .glow { opacity: 0; }
@@ -254,3 +256,16 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 .pill.open.has-lyr.has-friends { height: calc(302px + var(--lx, 0px)); }
 .pill.open.has-events { height: calc(200px + var(--ev) * 30px); }
 .pill.open.has-events.has-lyr { height: calc(280px + var(--ev) * 30px + var(--lx, 0px)); }
+
+/* ---- смена устройства вывода: вместо обложки — значок наушников или колонки (island.js → showDevice) ---- */
+.dev-ico { display: none; }
+.pill.dev .disc { background-image: none !important; background-color: rgb(255 255 255 / .12); animation: none !important; border-radius: 50%; }
+.pill.dev .dev-ico { display: grid; place-items: center; width: 100%; height: 100%; color: #fff; }
+.pill.dev .dev-ico svg { width: 16px; height: 16px; animation: sym-swap .4s cubic-bezier(.3, 1.4, .5, 1); }
+.pill.dev .bars { opacity: 0; }
+.pill.dev .label b { animation: swap .35s ease; }
+
+/* ---- значки оживают, как SF Symbols ---- */
+svg.sym-swap { animation: sym-swap .34s cubic-bezier(.3, 1.4, .5, 1); }
+@keyframes sym-swap { from { opacity: 0; transform: scale(.45); filter: blur(4px); } }
+@media (prefers-reduced-motion: reduce) { svg.sym-swap, .pill.dev .dev-ico svg { animation: none; } }

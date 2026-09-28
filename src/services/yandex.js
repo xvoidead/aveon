@@ -223,7 +223,18 @@ async function album(id) {
   return { ...mapAlbum(a), tracks: (a.volumes || []).flat().map(mapTrack).filter(Boolean) };
 }
 
-function reset() { uidCache = null; }
+function reset() { uidCache = null; likedCache = { at: 0, ids: null }; }
+
+// id треков из «Мне нравится» ('ym:123') — только список, без данных самих треков: по нему сердечко
+// у названия и в острове знает, что трек уже лайкнут (и лайкнут не в этой сессии). Держим минуту
+let likedCache = { at: 0, ids: null };
+async function likedIds(fresh = false) {
+  if (!fresh && likedCache.ids && Date.now() - likedCache.at < 60 * 1000) return likedCache.ids;
+  const res = await api(`/users/${await uid()}/likes/tracks`);
+  const ids = (res.library?.tracks || []).map((t) => `ym:${t.id}`);
+  likedCache = { at: Date.now(), ids };
+  return ids;
+}
 
 
 // ---------- «Моя волна» (rotor) ----------
@@ -297,6 +308,7 @@ async function waveFeedback(type, track, played = 0) {
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({ 'track-ids': waveTrackId(track) }).toString(),
       });
+      if (type === 'like' && likedCache.ids && !likedCache.ids.includes(track.id)) likedCache.ids.push(track.id);
     } catch {}
   }
   return true;
@@ -312,4 +324,4 @@ async function searchArtists(q) {
   }));
 }
 
-module.exports = { searchArtists, search, collections, collection, stream, reset, artistByName, album, waveStart, waveMore, waveFeedback };
+module.exports = { searchArtists, search, collections, collection, stream, reset, artistByName, album, waveStart, waveMore, waveFeedback, likedIds };

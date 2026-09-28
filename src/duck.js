@@ -58,7 +58,9 @@ async function start(onMeter, onStatus) {
 }
 
 function launch(exe) {
-  child = spawn(exe, [], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
+  // --self: звук самого плеера всегда вычитается из звука Discord (native/DuckMon.cs → Mirrors)
+  const self = path.basename(process.execPath, path.extname(process.execPath));
+  child = spawn(exe, ['--self', self], { windowsHide: true, stdio: ['pipe', 'pipe', 'pipe'] });
   statusListener({ ok: true });
   const rl = readline.createInterface({ input: child.stdout });
   rl.on('line', (line) => {

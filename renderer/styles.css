@@ -3165,3 +3165,35 @@ html:not(.skin-form) .library.tabs-mini .source:not(.active), html:not(.skin-for
 #tracklist.zoom-in > .row:nth-child(n + 5) { animation-delay: .28s; }
 @keyframes zoom-rise { from { opacity: 0; transform: translateY(10px); } }
 @media (prefers-reduced-motion: reduce) { #tracklist.zoom-in > * { animation: none !important; } }
+
+/* ---------- ползунки как в iOS (app.js → makeSlider) ----------
+   Держишь — полоса толще, время под ней ярче. За краем полоса тянется резинкой (--sx, --tx; ручка
+   едет за ней на --kx) и по отпусканию пружинит обратно. Правила с html — чтобы перебить дизайны */
+.slider { --sx: 1; --tx: 0px; --kx: 0px; }
+html .slider.slider::before, html .slider.slider :is(.slider-fill, .slider-buf) {
+  transform-origin: left center; transform: translateX(var(--tx)) scaleX(var(--sx));
+  transition: transform .55s cubic-bezier(.25, 1.6, .45, 1), height .28s cubic-bezier(.3, 1.5, .5, 1), border-radius .28s ease;
+}
+html .slider.slider .slider-knob { translate: var(--kx) 0; transition: opacity .15s, translate .55s cubic-bezier(.25, 1.6, .45, 1); }
+html .slider.slider.drag::before, html .slider.slider.drag :is(.slider-fill, .slider-buf) { transition: height .28s cubic-bezier(.3, 1.5, .5, 1), border-radius .28s ease; }
+html .slider.slider.drag .slider-knob { transition: opacity .15s; }
+html .slider.slider.drag::before, html .slider.slider.drag :is(.slider-fill, .slider-buf) { height: 8px; border-radius: 4px; }
+html.skin-zen .slider.drag::before, html.skin-zen .slider.drag :is(.slider-fill, .slider-buf) { height: 3px; border-radius: 0; }
+/* «Стекло» — совсем как в iOS: полоса заметно толще, ручка прячется, заливка белеет */
+html.skin-glass .slider.drag::before, html.skin-glass .slider.drag :is(.slider-fill, .slider-buf) { height: 11px; border-radius: 6px; }
+html.skin-glass .slider.drag .slider-knob { opacity: 0; }
+html.skin-glass .volume.drag .slider-fill { background: var(--text); }
+.progress-row:has(.slider.drag) .time, .fs-seek:has(.slider.drag) .time { color: var(--text); transition: color .2s ease; }
+html.look-still .slider.slider::before, html.look-still .slider.slider :is(.slider-fill, .slider-buf) { transition: none; }
+
+/* ---------- значки оживают, как SF Symbols (app.js → symFx, setIcon) ---------- */
+svg.sym-swap { animation: sym-swap .34s cubic-bezier(.3, 1.4, .5, 1); }
+@keyframes sym-swap { from { opacity: 0; transform: scale(.45); filter: blur(4px); } }
+svg.sym-bounce { animation: sym-bounce .5s cubic-bezier(.3, 1.6, .5, 1); }
+@keyframes sym-bounce { 0% { transform: scale(1); } 35% { transform: scale(1.3); } 65% { transform: scale(.9); } 100% { transform: none; } }
+svg.sym-next { animation: sym-next .38s cubic-bezier(.4, 0, .2, 1); }
+@keyframes sym-next { 40% { transform: translateX(8px); opacity: 0; } 41% { transform: translateX(-8px); opacity: 0; } 100% { transform: none; opacity: 1; } }
+svg.sym-prev { animation: sym-prev .38s cubic-bezier(.4, 0, .2, 1); }
+@keyframes sym-prev { 40% { transform: translateX(-8px); opacity: 0; } 41% { transform: translateX(8px); opacity: 0; } 100% { transform: none; opacity: 1; } }
+html.look-still svg:is(.sym-swap, .sym-bounce, .sym-next, .sym-prev) { animation: none; }
+@media (prefers-reduced-motion: reduce) { svg:is(.sym-swap, .sym-bounce, .sym-next, .sym-prev) { animation: none; } }

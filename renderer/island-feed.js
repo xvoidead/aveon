@@ -162,6 +162,34 @@ function islandNotify(text, kind = 'info', person = null, actions = []) {
     };
   }
 
+  // ---- устройство вывода: сменилось (надел наушники) — остров на пару секунд показывает, куда теперь
+  // идёт звук, как при подключении AirPods. Плеер играет в устройство по умолчанию: его и смотрим
+  let output = null; // { id, name, kind, at } — at: когда сменилось (0 — таким был при запуске)
+  function describe(label) {
+    const clean = String(label || '').replace(/^(по умолчанию|default|связь|communications)\s*-\s*/i, '').trim();
+    // «Наушники (WH-1000XM4 Stereo)» → «WH-1000XM4 Stereo»; «Динамики (Realtek(R) Audio)» → «Realtek(R) Audio»
+    const m = clean.match(/^([^(]+?)\s*\((.+)\)$/);
+    const name = (m && /^(динамики|наушники|гарнитура|speakers?|headphones|headset|earphones)$/i.test(m[1]) ? m[2] : clean).trim();
+    const kind = /науш|гарнитур|headphone|headset|earphone|airpods|buds|hands-free|wh-|wf-/i.test(clean) ? 'headphones' : 'speaker';
+    return { name, kind };
+  }
+  async function checkOutput() {
+    try {
+      const list = await navigator.mediaDevices.enumerateDevices();
+      const d = list.find((x) => x.kind === 'audiooutput' && x.deviceId === 'default') || list.find((x) => x.kind === 'audiooutput');
+      if (!d) return;
+      const id = `${d.groupId}|${d.label}`;
+      if (output?.id === id) return;
+      const first = !output;
+      output = { id, ...describe(d.label), at: first ? 0 : Date.now() };
+      if (first || !output.name) return;
+      if (document.hasFocus()) toast(`Звук — в «${output.name}»`); // остров при открытом плеере не виден
+      push();
+    } catch {}
+  }
+  navigator.mediaDevices?.addEventListener('devicechange', () => setTimeout(checkOutput, 300)); // Windows меняет «по умолчанию» чуть позже
+  checkOutput();
+
   function snapshot(wall) {
     const t = state.track;
     const n = islandNotices[0];
@@ -173,7 +201,8 @@ function islandNotify(text, kind = 'info', person = null, actions = []) {
       av: e.person ? avatarKey(e.person) : '', letter: e.person ? (e.person.name || '?').trim()[0]?.toUpperCase() : '',
       acts: e.actions.map((a, i) => ({ i, label: a.label, primary: !!a.primary })),
     }));
-    const base = { events, notice: n ? { id: n.id, text: n.text, kind: n.kind, av: n.person ? avatarKey(n.person) : '' } : null };
+    const base = { events, notice: n ? { id: n.id, text: n.text, kind: n.kind, av: n.person ? avatarKey(n.person) : '' } : null,
+      device: output?.at ? { name: output.name, kind: output.kind, at: output.at } : null };
     if (!t) return { ...base, hasTrack: false };
     let bars = [0, 0, 0, 0, 0];
     let full = null;
@@ -204,7 +233,7 @@ function islandNotify(text, kind = 'info', person = null, actions = []) {
       friends: friendsNow(),
       // «нравится» — только у треков Яндекс Музыки, и снять отсюда нельзя (app.js → renderNowLike)
       likeable: t.source === 'ym',
-      liked: !!renderNowLike.liked?.has(t.id),
+      liked: renderNowLike.has(t.id),
       opts: { motion: islandOpt('motion'), bars: islandOpt('bars'), spin: islandOpt('spin'), pulse: islandOpt('pulse'), rainbow: islandOpt('rainbow'), lyrics: islandOpt('lyrics'), miniLyrics: state.cfg?.mini?.lyrics !== false },
     };
   }

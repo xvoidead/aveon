@@ -301,6 +301,7 @@ const api = {
     start: call((settings) => ym.waveStart(settings)),
     more: call((queue) => ym.waveMore(queue)),
     feedback: call((type, track, played) => ym.waveFeedback(type, track, played)),
+    liked: call((fresh) => (config.getSecret('ym.token') ? ym.likedIds(!!fresh) : [])),
     related: call((track) => (track?.source === 'sc' ? sc.related(track) : [])),
     speak: (text, opts) => Aveon.speak({ text, rate: opts?.rate || 1, pitch: opts?.pitch || 1 }),
     stopSpeak: () => Aveon.stopSpeak().catch(() => {}),

@@ -34,7 +34,14 @@ api.island.onState((s) => {
   $('#artist').textContent = s.artist;
   setLine(s.opts?.miniLyrics === false ? '' : s.line || '');
   card.classList.toggle('barrel', (s.m || 0) > 0.5);
-  $('#b-play use').setAttribute('href', s.playing ? '#i-pause' : '#i-play');
+  const play = $('#b-play use'), href = s.playing ? '#i-pause' : '#i-play';
+  if (play.getAttribute('href') !== href) {
+    play.setAttribute('href', href);
+    const svg = $('#b-play svg'); // новый значок проявляется из размытия, как SF Symbols в iOS
+    svg.classList.remove('sym-swap');
+    void svg.getBoundingClientRect();
+    svg.classList.add('sym-swap');
+  }
   $('#b-barrel').classList.toggle('on', !!s.manual);
 });
 

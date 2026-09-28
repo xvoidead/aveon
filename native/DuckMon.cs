@@ -12,6 +12,9 @@
 //   targets spotify,chrome   — какие процессы приглушать (без .exe)
 //   duck 0.35                — множитель громкости для них (1 = не трогать)
 //   quit                     — вернуть громкость и выйти
+// аргументы:
+//   --self aveon             — имя процесса самого плеера: его звук всегда вычитается, зеркалом он быть не может
+//   --debug                  — раз в полсекунды все сессии в stderr
 
 using System;
 using System.Collections.Generic;
@@ -123,25 +126,46 @@ namespace Tishe
     // Программы, которые пишут весь звук системы (NVIDIA Instant Replay, OBS, Medal…), Windows показывает
     // так же, как Discord: пик их сессии — это пик всего микса, вместе с голосами. Если сложить их
     // с остальными программами, вычитание съедает голоса целиком. Такие «зеркала» узнаём по поведению:
-    // пик совпадает с пиком Discord, когда рядом звучит программа с заметно другим уровнем
-    // (настоящая программа совпасть с миксом в этот момент не может), и не вычитаем их.
+    // пик совпадает с пиком Discord, когда рядом звучит программа с заметно другим уровнем, и не вычитаем их.
+    //
+    // Та же картина бывает и у настоящей программы: пока никто не говорит, пик Discord — это почти
+    // целиком её звук (плеер громче всех). Если принять её за зеркало, её музыка перестаёт вычитаться
+    // и считается голосом — музыка уходит в бочку сама по себе. Поэтому: зеркало совпадает с Discord
+    // всегда, и когда говорят тоже; программа, которая заметно разошлась с Discord, будучи слышной, —
+    // не зеркало, и очки она теряет быстро. Сам плеер зеркалом не бывает никогда.
     static class Mirrors
     {
-        const int Need = 8, Max = 40;
+        const int Need = 15, Max = 60;
         static readonly Dictionary<string, int> score = new Dictionary<string, int>();
-        // Известные записыватели звука считаем зеркалами сразу: пока звучит только музыка,
+        // Известные записыватели звука — зеркала сразу и навсегда: пока звучит только музыка,
         // по поведению их не отличить от самого плеера, а голос съедался бы с первой фразы
-        static readonly HashSet<string> Known = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "nvcontainer" };
+        static readonly HashSet<string> Known = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
+            { "nvcontainer", "bcastdvr", "amdrsserv", "medal", "medalencoder" };
+        public static readonly HashSet<string> Never = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        static readonly HashSet<string> pinnedMirror = new HashSet<string>();
+        static readonly HashSet<string> pinnedReal = new HashSet<string>();
 
         public static void Seed(string key, string proc)
         {
-            if (proc != null && Known.Contains(proc) && !score.ContainsKey(key)) score[key] = Max;
+            if (proc == null) return;
+            if (Never.Contains(proc)) pinnedReal.Add(key);
+            else if (Known.Contains(proc)) pinnedMirror.Add(key);
         }
 
         public static bool Is(string key)
         {
+            if (pinnedMirror.Contains(key)) return true;
+            if (pinnedReal.Contains(key)) return false;
             int s;
             return score.TryGetValue(key, out s) && s >= Need;
+        }
+
+        // Сессии, которых больше нет, забываем — иначе словари растут весь день
+        public static void Keep(HashSet<string> alive)
+        {
+            foreach (var k in new List<string>(score.Keys)) if (!alive.Contains(k)) score.Remove(k);
+            pinnedMirror.RemoveWhere(k => !alive.Contains(k));
+            pinnedReal.RemoveWhere(k => !alive.Contains(k));
         }
 
         static bool Same(float a, float d) { return Math.Abs(a - d) <= Math.Max(0.0002f, d * 0.01f); }
@@ -158,9 +182,12 @@ namespace Tishe
                     if (p.Value >= Math.Max(0.002f, d * 0.25f) && !Same(p.Value, d)) { otherSound = true; break; }
                 foreach (var p in peaks)
                 {
+                    if (pinnedMirror.Contains(p.Key) || pinnedReal.Contains(p.Key)) continue;
                     int s;
                     score.TryGetValue(p.Key, out s);
                     if (Same(p.Value, d)) { if (otherSound) s = Math.Min(Max, s + 1); }
+                    // слышна, но не равна миксу — настоящая программа: зеркало с миксом не расходится
+                    else if (p.Value >= d * 0.3f) s = Math.Max(0, s - 4);
                     else if (Math.Abs(p.Value - d) > d * 0.2f) s = Math.Max(0, s - 1);
                     score[p.Key] = s;
                 }
@@ -168,6 +195,30 @@ namespace Tishe
             float sum = 0;
             foreach (var p in peaks) if (!Is(p.Key)) sum += p.Value;
             return sum;
+        }
+    }
+
+    // Имя процесса по pid. Process.GetProcessById каждый раз снимает список всех процессов системы
+    // (миллисекунды на вызов) — QueryFullProcessImageName спрашивает только нужный
+    static class Proc
+    {
+        [DllImport("kernel32.dll")] static extern IntPtr OpenProcess(uint access, bool inherit, uint pid);
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern bool QueryFullProcessImageName(IntPtr h, int flags, StringBuilder name, ref int size);
+        [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
+        const uint PROCESS_QUERY_LIMITED_INFORMATION = 0x1000;
+
+        public static string Name(uint pid)
+        {
+            IntPtr h = OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid);
+            if (h == IntPtr.Zero) return null;
+            try
+            {
+                var sb = new StringBuilder(1024);
+                int size = sb.Capacity;
+                if (!QueryFullProcessImageName(h, 0, sb, ref size)) return null;
+                return System.IO.Path.GetFileNameWithoutExtension(sb.ToString(0, size));
+            }
+            finally { CloseHandle(h); }
         }
     }
 
@@ -191,7 +242,7 @@ namespace Tishe
                 if (pid != lastPid)
                 {
                     lastPid = pid;
-                    try { using (var p = Process.GetProcessById((int)pid)) lastName = p.ProcessName; } catch { lastName = ""; }
+                    lastName = Proc.Name(pid) ?? "";
                 }
                 return lastName;
             }
@@ -235,6 +286,8 @@ namespace Tishe
         static int Main(string[] args)
         {
             debug = Array.IndexOf(args, "--debug") >= 0;
+            int self = Array.IndexOf(args, "--self");
+            if (self >= 0 && self + 1 < args.Length) Mirrors.Never.Add(args[self + 1]);
             Console.OutputEncoding = new UTF8Encoding(false);
             var reader = new Thread(ReadStdin);
             reader.IsBackground = true;
@@ -251,8 +304,10 @@ namespace Tishe
 
             while (!quit)
             {
+                bool scanned = false;
                 if (rescanRequested || sw.ElapsedMilliseconds - lastScan > 1500)
                 {
+                    scanned = true;
                     rescanRequested = false;
                     lastScan = sw.ElapsedMilliseconds;
                     try { Rescan(enumerator); } catch (Exception e) { Console.Error.WriteLine("scan: " + e.Message); }
@@ -324,6 +379,15 @@ namespace Tishe
                     outPeak = Math.Max(outPeak, kv.Value - others * 1.1f);
                 }
                 if (outPeak < 0) outPeak = 0;
+
+                // Голос? Сначала убедимся, что это не программа, которая начала играть после прошлого
+                // обхода сессий: её звука ещё нет в сумме, и до следующего обхода (до 1,5 с) он считался бы
+                // голосом. Обходим заново сразу, не чаще раза в 250 мс, и считаем кадр ещё раз
+                if (outPeak > 0.004f && !scanned && sw.ElapsedMilliseconds - lastScan > 250)
+                {
+                    rescanRequested = true;
+                    continue;
+                }
 
                 if (debug && sw.ElapsedMilliseconds / 500 != lastDebug)
                 {
@@ -410,7 +474,7 @@ namespace Tishe
         {
             string name;
             if (procNames.TryGetValue(pid, out name)) return name;
-            try { name = Process.GetProcessById((int)pid).ProcessName; }
+            try { name = Proc.Name(pid); }
             catch { name = null; }
             procNames[pid] = name;
             return name;
@@ -420,9 +484,13 @@ namespace Tishe
         {
             var found = new List<Session>();
             var seen = new HashSet<string>();
-            procNames.Clear();
             ScanFlow(enumerator, eRender, found, seen);
             ScanFlow(enumerator, eCapture, found, seen);
+            // имена процессов помним, пока их pid есть в сессиях: обход бывает до 4 раз в секунду
+            var pids = new HashSet<uint>();
+            foreach (var n in found) pids.Add(n.Pid);
+            foreach (var pid in new List<uint>(procNames.Keys)) if (!pids.Contains(pid)) procNames.Remove(pid);
+            Mirrors.Keep(seen);
 
             // Сессии, которые мы приглушили, но они пропали из новой выборки (перестали быть целью) — вернуть громкость
             foreach (var old in sessions)
