@@ -1,43 +1,44 @@
 # сервер аккаунтов авеона
 
-Небольшое API на FastAPI + SQLite: регистрация, вход и синхронизация альбомов, настроек бочки
-и статистики между компьютерами. Музыку и токены сервисов сервер не видит.
+Один бинарник на Go + SQLite: регистрация, вход, синхронизация альбомов, настроек бочки и статистики
+между компьютерами, друзья, сообщения, совместные плейлисты и «Слушать вместе». Музыку и токены сервисов
+сервер не видит.
 
 ## запуск
 
+Нужен Go 1.27+ (cgo не нужен: SQLite на чистом Go).
+
 ```bash
 cd server
-python -m venv .venv
-.venv/bin/pip install -r requirements.txt      # Windows: .venv\Scripts\pip
-.venv/bin/python run.py
+go build -o aveon .        # Windows: -o aveon.exe
+./aveon
 ```
 
-По умолчанию слушает `127.0.0.1:8787`, база — `server/aveon.db`. Настраивается переменными:
+Для Linux-сервера можно собрать прямо с Windows: `GOOS=linux GOARCH=amd64 CGO_ENABLED=0 go build -o aveon .`
+
+По умолчанию слушает `127.0.0.1:8787`, база — `aveon.db` в текущей папке. Настраивается переменными:
 
 | переменная | по умолчанию | что это |
 |---|---|---|
-| `AVEON_HOST` | `127.0.0.1` | адрес; `0.0.0.0`, если без nginx |
+| `AVEON_HOST` | `127.0.0.1` | адрес; `0.0.0.0` — в Docker |
 | `AVEON_PORT` | `8787` | порт |
-| `AVEON_DB` | `server/aveon.db` | путь к базе |
+| `AVEON_DB` | `aveon.db` | путь к базе |
+| `AVEON_ADMINS` | — | логины админов через запятую; без неё админки нет ни у кого |
+| `AVEON_PROXIES` | `127.0.0.1,::1` | от кого верить `X-Forwarded-For` (адреса и подсети через запятую, `*` — от всех). Нужно, чтобы лимит попыток входа считал настоящие IP, а не адрес nginx |
+| `AVEON_BACKUPS` | `backups` рядом с базой | куда класть ежедневные копии базы; пустая строка — не делать |
+| `AVEON_BACKUP_KEEP` | `7` | сколько копий хранить |
 
-Документация API: `http://<сервер>:8787/api/docs`.
+Сервер держит румы и приглашения в памяти, поэтому запускается **одним процессом**; после перезапуска румы
+пропадают (плееры переподключаются сами). Раз в час он удаляет истёкшие сессии и раз в сутки делает копию
+базы (`VACUUM INTO`, безопасно на живой базе). Копии лежат на том же диске — для защиты от потери сервера
+их стоит забирать куда-то ещё.
 
-## вместе с telegram-ботом (один процесс)
+База совместима с версией на Python: те же таблицы, пароли в том же формате scrypt. Достаточно подложить
+старый `aveon.db`.
 
-Если хостинг даёт одну команду запуска, API можно поднять прямо внутри бота на aiogram:
+## на сервере
 
-1. Скопируй папку `aveon_api/` в папку бота.
-2. Положи туда `services/api.py` (запускает uvicorn в том же asyncio-цикле, сигналы оставляет aiogram)
-   и вызови его в `bot.py`: `stop_api = await aveon_api.start()` перед поллингом, `await stop_api()` в `finally`.
-3. Добавь `fastapi` и `uvicorn` в `requirements.txt` бота.
-
-Команда запуска остаётся `python bot.py`. Настройки — секция `"api"` в `config.json` бота:
-`{"enabled": true, "host": "0.0.0.0", "port": null, "db": "aveon.db"}`. При `port: null` берётся
-порт, который выдала панель (`SERVER_PORT`), иначе 8787. Если API не стартовало, бот работает дальше.
-
-## отдельным сервисом рядом с ботом
-
-API — отдельный процесс со своим venv, портом и базой, бот он не трогает. На сервере с systemd:
+В Docker — см. [DOCKER.md](DOCKER.md). Без Docker, через systemd:
 
 ```ini
 # /etc/systemd/system/aveon-api.service
@@ -46,9 +47,9 @@ Description=aveon accounts API
 After=network.target
 
 [Service]
-WorkingDirectory=/opt/aveon/server
-ExecStart=/opt/aveon/server/.venv/bin/python run.py
+ExecStart=/opt/aveon/server/aveon
 Environment=AVEON_DB=/opt/aveon/data/aveon.db
+Environment=AVEON_ADMINS=логин1,логин2
 Restart=always
 User=aveon
 
@@ -65,19 +66,26 @@ sudo systemctl enable --now aveon-api
 ```nginx
 server {
     server_name aveon.example.ru;
+    client_max_body_size 6m;
     # /t/ — публичная страница трека: из неё Discord берёт превью ссылки
     location /t/ {
         proxy_pass http://127.0.0.1:8787;
         proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
     }
     location /api/ {
         proxy_pass http://127.0.0.1:8787;
+        proxy_http_version 1.1;                  # для WebSocket «Слушать вместе»
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection $connection_upgrade;
+        proxy_read_timeout 1h;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        client_max_body_size 6m;
     }
 }
+# в блоке http {}:
+map $http_upgrade $connection_upgrade { default upgrade; '' close; }
 ```
 
 В плеере: настройки → «Аккаунт» → сервер `https://aveon.example.ru`.
@@ -89,7 +97,7 @@ server {
 
 | метод | путь | что делает |
 |---|---|---|
-| `POST` | `/api/auth/register` | `{login, password, name?, device?}` → `{token, user}` |
+| `POST` | `/api/auth/register` | `{login, password, name?, device?}` → `{token, user}`; больше 10 аккаунтов с одного IP в час — 429 |
 | `POST` | `/api/auth/login` | `{login, password, device?}` → `{token, user}`; 10 неудачных попыток за 15 минут — 429 |
 | `POST` | `/api/auth/logout` | закрыть текущую сессию |
 | `POST` | `/api/auth/logout-all` | закрыть все сессии, кроме текущей |
@@ -98,7 +106,7 @@ server {
 | `POST` | `/api/me/password` | `{old, new}`; остальные сессии закрываются |
 | `POST` | `/api/me/delete` | `{password}`; удаляет аккаунт и все данные |
 | `GET` | `/api/sync` | все документы пользователя |
-| `PUT` | `/api/sync/{kind}/{key}` | `{data, base_rev}`; `kind` — `albums`, `settings` или `stats`. Если на сервере ревизия уже другая, ответ 409 с текущими данными |
+| `PUT` | `/api/sync/{kind}/{key}` | `{data, base_rev}`; `kind` — `albums`, `settings`, `stats` или `keys`. Если на сервере ревизия уже другая, ответ 409 с текущими данными. Документ до 5 МБ, у пользователя до 32 документов и 40 МБ всего — иначе 413 |
 
 ## друзья
 
@@ -123,7 +131,7 @@ server {
 
 Живой плейлист по коду из 8 символов: несколько человек добавляют треки, правки видны всем. До 20 участников
 и 2000 треков, снимок трека — до 8 КБ. Клиент опрашивает `GET /api/collab/{code}` раз в 15 с и перерисовывает
-список, когда меняется `rev`. Подробности — в начале `aveon_api/collab.py`.
+список, когда меняется `rev`. Подробности — в начале `collab.go`.
 
 | метод | путь | что делает |
 |---|---|---|
@@ -149,13 +157,17 @@ server {
 WebSocket `/api/together`: румы с кодом из 6 символов, до 10 человек. Сервер пересылает состояние
 (трек, играет/пауза, позиция и серверное время) и отдаёт его тем, кто вошёл позже. Звук сервер не передаёт:
 каждый плеер играет трек сам. Румы живут в памяти и исчезают, когда из них вышли все.
-Протокол описан в начале `aveon_api/together.py`. Реакции: `react {e}` — одна из 🔥 😍 😂 🎉 👏 💀 🥁 🛢, не чаще раза в 300 мс; сервер рассылает всем в руме. Нужен пакет `websockets` (есть в requirements.txt).
+Протокол описан в начале `together.go`. Реакции: `react {e}` — одна из 🔥 😍 😂 🎉 👏 💀 🥁 🛢, не чаще раза в 300 мс; сервер рассылает всем в руме. Больше 20 неверных кодов за 10 минут — пауза, чтобы коды не подбирали перебором.
 
 Пароли хранятся как scrypt-хеши, токены — как sha256, сессия живёт 90 дней с последнего запроса.
 
 ## тесты
 
+Тесты на Python проверяют сервер снаружи, как это делает плеер: каждый тест запускает собранный бинарник
+на чистой базе и ходит в него по HTTP и WebSocket.
+
 ```bash
-.venv/bin/pip install pytest httpx
-.venv/bin/python -m pytest test_app.py
+go build -o aveon.exe .          # на Linux/macOS: -o aveon
+pip install pytest httpx websockets
+python -m pytest tests
 ```

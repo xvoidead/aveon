@@ -1,0 +1,17 @@
+services:
+  aveon-api:
+    build: .
+    ports:
+      # только для nginx на этом же сервере: снаружи API доступно лишь по https
+      - "127.0.0.1:8787:8787"
+    volumes:
+      - aveon-data:/data
+    environment:
+      - AVEON_ADMINS=xvoidead,htdealwme
+      # порт закрыт от интернета, поэтому X-Forwarded-For от nginx принимаем с любого адреса docker-сети
+      - AVEON_PROXIES=*
+    stop_grace_period: 15s
+    restart: unless-stopped
+
+volumes:
+  aveon-data:

@@ -1,4 +1,4 @@
-// «Слушать вместе»: рума на сервере авеона (server/aveon_api/together.py) через WebSocket.
+// «Слушать вместе»: рума на сервере авеона (server/together.go) через WebSocket.
 // Здесь только связь: соединение, вход в руму, сверка часов и переподключение.
 // Что и когда играть, решает окно (renderer/together.js).
 const config = require('./config');

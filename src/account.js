@@ -177,7 +177,7 @@ async function sharePublic(code) {
   }
 }
 
-// ---- совместные плейлисты: живой список по коду, правки видны всем (server/aveon_api/collab.py) ----
+// ---- совместные плейлисты: живой список по коду, правки видны всем (server/collab.go) ----
 
 const COLLAB_OPS = {
   list: ['GET', ''], get: ['GET', ''], create: ['POST', ''], join: ['POST', '/join'], add: ['POST', '/tracks'],
@@ -492,7 +492,7 @@ async function syncKeys(remote, changed) {
 // Поменяли ключ сервиса (настройки, вход в Spotify) — синхронизировать поскорее
 function keysChanged() { schedule(); }
 
-// ---- админка (server/aveon_api/admin.py) и объявление для всех ----
+// ---- админка (server/admin.go) и объявление для всех ----
 
 const adminApi = {
   overview: () => api('GET', '/api/admin/overview'),

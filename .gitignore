@@ -11,3 +11,6 @@ server/*.db
 server/*.db-*
 mobile/www/
 *.apk
+server/aveon
+server/backups/
+.pytest_cache/
