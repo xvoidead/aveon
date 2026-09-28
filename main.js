@@ -461,7 +461,10 @@ function registerIpc() {
   ipcMain.on('island:hover', (e, on) => island.hover(!!on));
   ipcMain.on('mini:hover', (e, on) => mini.hover(!!on));
   // где у всплывающего окна панель — по ней src/hover.js сам решает, ловить ли мышь
-  ipcMain.on('popup:rect', (e, r) => require('./src/hover').setRect(BrowserWindow.fromWebContents(e.sender), r));
+  ipcMain.on('popup:rect', (e, r) => {
+    require('./src/hover').setRect(BrowserWindow.fromWebContents(e.sender), r);
+    island.editRect(); // открыт редактор места — он узнает, что капсула выросла или раскрылась
+  });
   ipcMain.on('island:log', (e, ...parts) => require('./src/islandlog').log('island:', ...parts)); // временно
   ipcMain.on('island:action', (e, a) => {
     require('./src/islandlog').log('main.action', a);
@@ -475,6 +478,13 @@ function registerIpc() {
   handle('mini:toggle', () => { mini.toggle(); return mini.isOpen(); });
   handle('island:screen', () => island.screenInfo());
   ipcMain.on('island:preview', () => island.preview());
+  // редактор места острова (src/islandedit.js): «Выйти» — сохраняем край и сдвиг, как сохранили бы настройки
+  ipcMain.on('island:edit', () => require('./src/islandedit').open((place) => {
+    config.set({ island: place });
+    account.settingsChanged({ island: place });
+    island.settingsChanged();
+    send('desk:changed');
+  }));
 
   // Discord: что сейчас играет
   ipcMain.on('discord:update', (e, p) => discord.update(p));

@@ -53,6 +53,11 @@ function load() {
 let fgName = null;
 let needed = () => false;
 
+// «Ножницы»: оверлей выделения (Win+Shift+S) и само приложение — пока они перед глазами, остров прячется,
+// чтобы не висеть поверх и не попадать в снимок (src/island.js → wanted)
+const SNIP = new Set(['screenclippinghost', 'snippingtool', 'screensketch']);
+let snipping = false;
+
 function evaluate() {
   const exe = needed() && names && fgName ? `${fgName}.exe` : '';
   const found = exe && names[exe] ? { exe, name: names[exe] } : null;
@@ -65,6 +70,8 @@ function foreground(name) {
   name = String(name || '').toLowerCase();
   if (name === fgName) return;
   fgName = name;
+  const snip = SNIP.has(name);
+  if (snip !== snipping) { snipping = snip; onChange(current); }
   evaluate();
 }
 
@@ -80,4 +87,4 @@ function start(isNeeded, cb) {
   }, 5000);
 }
 
-module.exports = { start, foreground, current: () => current };
+module.exports = { start, foreground, current: () => current, snipping: () => snipping };

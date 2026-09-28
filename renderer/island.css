@@ -3,9 +3,10 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: transparent; overflow: hidden; user-select: none; }
 body { display: flex; justify-content: center; align-items: flex-start; padding-top: 8px; font: 500 13px/1.3 "Onest", "Segoe UI", sans-serif; color: #f4f1ec; }
-body.pos-bottom { align-items: flex-end; padding: 0 0 10px; }
-body.pos-left { justify-content: flex-start; padding-left: 8px; }
-body.pos-right { justify-content: flex-end; padding-right: 8px; }
+/* угол капсулы (island.js → onConfig): снизу — растёт вверх, слева — вправо, справа — влево */
+body.v-bottom { align-items: flex-end; padding: 0 0 10px; }
+body.h-left { justify-content: flex-start; padding-left: 8px; }
+body.h-right { justify-content: flex-end; padding-right: 8px; }
 button { font: inherit; color: inherit; background: none; border: 0; padding: 0; cursor: pointer; }
 svg { width: 18px; height: 18px; }
 
@@ -22,7 +23,7 @@ svg { width: 18px; height: 18px; }
 /* курсор над свёрнутой капсулой: чуть больше — «нажми, раскроется» */
 .pill.hover:not(.open) { transform: scale(1.04); cursor: pointer; }
 body.hidden .pill { opacity: 0; transform: scale(.8) translateY(-10px); }
-body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
+body.v-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 /* бочка: обводка цветом голосов, как индикатор звонка */
 .pill.barrel { box-shadow: 0 0 0 1.5px var(--voice), 0 0 18px -2px var(--voice); }
 .glow { position: absolute; inset: 0; pointer-events: none; opacity: calc(var(--m) * .35); background: radial-gradient(120% 140% at 50% 120%, var(--voice), transparent 60%); }
@@ -93,10 +94,12 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 .ctl button:hover { opacity: .75; }
 .ctl button:active { transform: scale(.86); }
 .ctl .play svg { width: 34px; height: 34px; }
-#b-barrel, #b-open { width: 32px; height: 32px; color: rgb(244 241 236 / .55); }
-#b-barrel svg, #b-open svg { width: 22px; height: 22px; }
+#b-barrel, #b-sc { width: 32px; height: 32px; color: rgb(244 241 236 / .55); }
+#b-barrel svg, #b-sc svg { width: 22px; height: 22px; }
 #b-barrel { justify-self: start; }
-#b-open { justify-self: end; }
+#b-sc { justify-self: end; }
+/* трек и так из SoundCloud — искать там нечего; место держим, чтобы кнопки не разъезжались */
+.pill.src-sc #b-sc { visibility: hidden; }
 #b-barrel.on { color: var(--voice); }
 
 /* ---- строка текста песни в свёрнутом острове ---- */
@@ -141,6 +144,15 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 .side svg { width: 18px; height: 18px; color: var(--voice); display: block; }
 .side.on > svg { transform: translate(.5px, -.5px); } /* у пузыря хвостик слева снизу — на глаз центр чуть выше и правее */
 .side.left.on { overflow: visible; } /* счётчик на краю капли, как бейдж в iOS */
+/* капсула у левого края — обе капли справа от неё, у правого — обе слева: у края им нет места,
+   и прижатая к краю капсула не должна от них сдвигаться */
+body.h-left .side.left { order: 1; transform: translateX(-26px) scale(.35); }
+body.h-left .side.left.on { margin-left: 8px; margin-right: 0; transform: none; }
+/* order меняет и порядок отрисовки: без z-index капля рисовалась бы раньше слоя .goo и пряталась под ним */
+body.h-right #side { order: -1; z-index: 1; transform: translateX(26px) scale(.35); }
+body.h-right #side.on { margin-left: 0; margin-right: 8px; transform: none; }
+body.h-left .side.left.on:hover, body.h-right #side.on:hover { transform: scale(1.1); }
+body.h-left .side.left.on:active, body.h-right #side.on:active { transform: scale(.94); }
 /* пришло новое уведомление — капля подпрыгивает; силуэт в слое .goo повторяет её, и она «булькает» у капсулы */
 .side.left.on.bump { animation: drop-bump .6s cubic-bezier(.3, 1.6, .5, 1); }
 @keyframes drop-bump { 0% { transform: scale(1); } 30% { transform: scale(1.28); } 60% { transform: scale(.94); } 100% { transform: scale(1); } }
@@ -269,3 +281,11 @@ body.pos-bottom.hidden .pill { transform: scale(.8) translateY(10px); }
 svg.sym-swap { animation: sym-swap .34s cubic-bezier(.3, 1.4, .5, 1); }
 @keyframes sym-swap { from { opacity: 0; transform: scale(.45); filter: blur(4px); } }
 @media (prefers-reduced-motion: reduce) { svg.sym-swap, .pill.dev .dev-ico svg { animation: none; } }
+
+/* ---- перемотка как в iOS: толще под пальцем, резинка за краем (island.js → seekAt) ---- */
+.bar { --sx: 1; --tx: 0px; }
+.bar::before, .bar i { transform-origin: left center; transform: translateX(var(--tx)) scaleX(var(--sx));
+  transition: transform .55s cubic-bezier(.25, 1.6, .45, 1), height .28s cubic-bezier(.3, 1.5, .5, 1), border-radius .28s ease; }
+.bar.drag::before, .bar.drag i { height: 12px; border-radius: 6px; transition: height .28s cubic-bezier(.3, 1.5, .5, 1), border-radius .28s ease; }
+.seek:has(.bar.drag) span { color: #fff; transition: color .2s ease; }
+@media (prefers-reduced-motion: reduce) { .bar::before, .bar i { transition: none; } }

@@ -25,8 +25,15 @@ const plural = (n, one, few, many) => {
   return a === 1 && b !== 11 ? one : a >= 2 && a <= 4 && (b < 10 || b >= 20) ? few : many;
 };
 
+// Угол, к которому прижата капсула (src/island.js → anchor): снизу — раскрывается вверх, слева —
+// вправо, справа — влево; капли встают со стороны экрана, а не у края (island.css)
 api.island.onConfig((c) => {
-  for (const p of ['top', 'left', 'right', 'bottom']) document.body.classList.toggle(`pos-${p}`, (c.pos || 'top') === p);
+  const pos = c.pos || 'top';
+  const cl = document.body.classList;
+  cl.toggle('v-bottom', pos.startsWith('bottom'));
+  cl.toggle('h-left', pos.endsWith('left'));
+  cl.toggle('h-right', pos.endsWith('right'));
+  wakeGoo();
 });
 
 // аватарки друзей: плеер присылает каждую один раз (s.avatars), дальше — только ключ
@@ -93,6 +100,7 @@ api.island.onState((s) => {
     if (fresh) showDevice(s.device);
   } else if (devAt === null) devAt = s.device?.at ?? 0;
   pill.classList.toggle('can-like', !!s.likeable);
+  pill.classList.toggle('src-sc', s.source === 'sc');
   renderLike(!!s.liked);
   $('#b-barrel').classList.toggle('on', !!s.manual);
   // пять уровней спектра → семь полосок волной от центра, как в iOS: басы посередине, верха по краям
@@ -378,8 +386,9 @@ function tick() {
     $('#l-cur').style.setProperty('--fill', v);
   }
   if (st?.hasTrack && is('open')) {
-    const pos = st.playing ? st.pos + (Date.now() - st.at) / 1000 : st.pos;
     const dur = st.duration || 0;
+    // тянут полосу — показываем, куда перемотается, а не где играет
+    const pos = seekDrag ? seekDrag.f * dur : st.playing ? st.pos + (Date.now() - st.at) / 1000 : st.pos;
     $('#t-cur').textContent = fmt(dur ? Math.min(pos, dur) : pos);
     $('#t-dur').textContent = dur ? `-${fmt(dur - Math.min(pos, dur))}` : '0:00'; // справа — сколько осталось, как в iOS
     $('#seek-fill').style.width = dur ? `${Math.min(100, (pos / dur) * 100)}%` : '0';
@@ -418,6 +427,21 @@ pill.addEventListener('pointerdown', (e) => {
   e.preventDefault();
   pointerIn();
 });
+// Редактор места (src/islandedit.js) просит показать остров раскрытым — видно, куда он откроется.
+// Мышь в это время у редактора, так что наведение и уход курсора сюда не приходят
+api.island.onDemo?.((on) => {
+  clearTimeout(leaveTimer);
+  if (on) {
+    pill.classList.remove('peek', 'notice', 'dev');
+    pill.classList.add('open');
+    requestAnimationFrame(fitLyricLine);
+  } else pill.classList.remove('open');
+  sideZone = null;
+  renderLabel();
+  fitWidth();
+  window.sendPillRect?.();
+});
+
 // главный процесс: курсор над капсулой — подсветка; ушёл (уже с задержкой) — свернуть
 api.island.onPointer((on) => {
   api.island.log?.('onPointer', on);
@@ -429,6 +453,7 @@ api.island.onPointer((on) => {
     renderLabel();
     return;
   }
+  if (!on && seekDrag) { outWhileDrag = true; return; } // тянут перемотку — свернёмся, когда отпустят
   if (!on) pointerOut();
 });
 
@@ -437,7 +462,7 @@ $('#b-play').onclick = () => act('thumb', { action: 'toggle' });
 $('#b-prev').onclick = () => act('thumb', { action: 'prev' });
 $('#b-next').onclick = () => act('thumb', { action: 'next' });
 $('#b-barrel').onclick = () => act('barrel');
-$('#b-open').onclick = () => act('focus');
+$('#b-sc').onclick = () => act('sc'); // найти этот трек в SoundCloud — в окне плеера (island-feed.js)
 
 // «нравится»: сердечко сразу красное (плеер пришлёт liked чуть позже), убрать лайк отсюда нельзя
 function renderLike(on) {
@@ -467,11 +492,48 @@ for (const el of document.querySelectorAll('.side')) {
     pointerIn();
   });
 }
-$('#seek').onclick = (e) => {
-  if (!st?.duration) return;
-  const r = e.currentTarget.getBoundingClientRect();
-  act('seek', { pos: ((e.clientX - r.left) / r.width) * st.duration });
-};
+// Перемотка как в iOS (и как в плеере, app.js → makeSlider): держишь — полоса толще, тянешь за
+// край — вытягивается резинкой и по отпусканию пружинит обратно; перематываем по отпусканию
+const RUBBER = 16;
+let seekDrag = null; // { f } — пока тянут
+let outWhileDrag = false; // курсор ушёл с капсулы посреди перемотки — свернём, когда отпустят
+function seekAt(e) {
+  const bar = $('#seek');
+  const r = bar.getBoundingClientRect();
+  seekDrag.f = Math.min(1, Math.max(0, (e.clientX - r.left) / r.width));
+  const over = e.clientX > r.right ? e.clientX - r.right : e.clientX < r.left ? e.clientX - r.left : 0;
+  const a = Math.sign(over) * RUBBER * (1 - 1 / ((Math.abs(over) / RUBBER) * 0.55 + 1));
+  bar.style.setProperty('--sx', String(1 + Math.abs(a) / (bar.offsetWidth || 1)));
+  bar.style.setProperty('--tx', `${Math.min(0, a)}px`);
+}
+$('#seek').addEventListener('pointerdown', (e) => {
+  if (e.button !== 0 || !st?.duration) return;
+  const bar = e.currentTarget;
+  bar.setPointerCapture(e.pointerId);
+  bar.classList.add('drag');
+  seekDrag = { f: 0 };
+  outWhileDrag = false;
+  seekAt(e);
+  const move = (ev) => seekAt(ev);
+  const up = (ev) => {
+    if (ev.type === 'pointerup') seekAt(ev);
+    const pos = seekDrag.f * st.duration;
+    act('seek', { pos });
+    bar.classList.remove('drag');
+    bar.style.setProperty('--sx', '1');
+    bar.style.setProperty('--tx', '0px');
+    bar.removeEventListener('pointermove', move);
+    bar.removeEventListener('pointerup', up);
+    bar.removeEventListener('pointercancel', up);
+    // плеер пришлёт новую позицию чуть позже — до тех пор держим ту, куда отпустили
+    st = { ...st, pos, at: Date.now() };
+    seekDrag = null;
+    if (outWhileDrag) pointerOut();
+  };
+  bar.addEventListener('pointermove', move);
+  bar.addEventListener('pointerup', up);
+  bar.addEventListener('pointercancel', up);
+});
 // колесо над островом — громкость
 pill.addEventListener('wheel', (e) => { e.preventDefault(); act('volume', { delta: e.deltaY < 0 ? 0.05 : -0.05 }); }, { passive: false });
 

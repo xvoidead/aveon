@@ -232,6 +232,7 @@ function islandNotify(text, kind = 'info', person = null, actions = []) {
       ...(() => { const l = lyricNow(); return { line: l.cur, lyric: l }; })(),
       friends: friendsNow(),
       // «нравится» — только у треков Яндекс Музыки, и снять отсюда нельзя (app.js → renderNowLike)
+      source: t.source,
       likeable: t.source === 'ym',
       liked: renderNowLike.has(t.id),
       opts: { motion: islandOpt('motion'), bars: islandOpt('bars'), spin: islandOpt('spin'), pulse: islandOpt('pulse'), rainbow: islandOpt('rainbow'), lyrics: islandOpt('lyrics'), miniLyrics: state.cfg?.mini?.lyrics !== false },
@@ -289,6 +290,10 @@ function islandNotify(text, kind = 'info', person = null, actions = []) {
       if (a.action === 'toggle') togglePlay();
       else if (a.action === 'next') next();
       else if (a.action === 'prev') prev();
+    } else if (a.type === 'sc') {
+      // «Найти в SoundCloud» из острова — как одноимённая кнопка у плеера: окно вперёд и поиск
+      api.island.action({ type: 'focus' });
+      $('#btn-now-sc').click();
     } else if (a.type === 'like') {
       $('#btn-like').click(); // тот же лайк, что у названия в плеере
     } else if (a.type === 'barrel') {

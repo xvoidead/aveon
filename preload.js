@@ -116,9 +116,20 @@ contextBridge.exposeInMainWorld('tishe', {
     onConfig: (cb) => on('island:config', cb),
     onWallConfig: (cb) => on('livewall:config', cb),
     onPreview: (cb) => on('island:preview', cb),
+    onDemo: (cb) => on('island:demo', cb), // редактор места: показать раскрытым (src/island.js → editOpen)
     screen: () => call('island:screen'),
     preview: () => ipcRenderer.send('island:preview'),
+    edit: () => ipcRenderer.send('island:edit'), // редактор места острова (src/islandedit.js)
     miniHover: (on) => ipcRenderer.send('mini:hover', on),
+  },
+  // Редактор места острова (renderer/islandedit.html): где капсула сейчас, и «выйти» с новым местом или без
+  islandEdit: {
+    onInit: (cb) => on('isledit:init', cb),
+    onRect: (cb) => on('isledit:rect', cb), // где настоящая капсула на экране (раскрылась, выросла)
+    move: (x, y) => ipcRenderer.send('isledit:move', { x, y }),
+    open: (on) => ipcRenderer.send('isledit:open', on), // показать остров раскрытым
+    raise: () => ipcRenderer.send('isledit:raise'),
+    finish: (place) => ipcRenderer.send('isledit:finish', place),
   },
   // Раздел «Остров и окна»: мини-плеер, горячие клавиши, живые обои
   desk: {

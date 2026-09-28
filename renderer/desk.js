@@ -40,14 +40,12 @@ const HK_DEFAULTS = {
 };
 
 let desk = null; // ответ desk:status
-let islScreen = null; // экран острова: размер и где стоит капсула без сдвига (src/island.js → screenInfo)
 
 const dcfg = (k) => ({ ...DESK_DEFAULTS[k], ...(state.cfg?.[k] || {}) });
 
 async function refreshDesk() {
   if (IS_MOBILE) return;
   try { desk = await api.desk.status(); } catch {}
-  try { islScreen = await api.island.screen(); } catch {}
 }
 
 // Ctrl+Alt+Right → «Ctrl + Alt + →»
@@ -86,8 +84,7 @@ function deskSection() {
     <p class="sec-desc">Чёрная капсула поверх всех окон и рабочего стола, как на айфоне. Наведи — раскроется: перемотка, кнопки, друзья. Колесо мыши над ней — громкость.</p>
     ${dSw('island', 'enabled', 'Остров поверх всех окон', i.enabled)}
     <div class="sub-fields" ${i.enabled ? '' : 'data-off'}>
-      <div class="field"><label>Где</label><div class="ctl">${dSeg('island', 'pos', [['top', 'Сверху'], ['left', 'Слева сверху'], ['right', 'Справа сверху'], ['bottom', 'Снизу']], i.pos)}</div></div>
-      ${islPlaceHtml(i)}
+      <div class="field"><label>Место на экране</label><div class="ctl"><button class="btn" id="isl-edit">Редактировать место острова</button></div></div>
       ${dSw('island', 'onlyAway', 'Только когда плеер свёрнут или не в фокусе', i.onlyAway)}
       ${dSw('island', 'hideInGames', 'Прятать, когда на экране игра', i.hideInGames)}
       ${dSw('island', 'lyrics', 'Строка текста песни, пока играет', i.lyrics)}
@@ -145,104 +142,10 @@ function deskSection() {
   </section>`;
 }
 
-// ---- положение острова: мини-экран с капсулой, которую можно тащить, и точные сдвиги X/Y ----
-
-function islRanges(i) {
-  const s = islScreen, b = s.bases[i.pos] || s.bases.top;
-  return { b, xMin: -b.x, xMax: s.width - s.pill.w - b.x, yMin: -b.y, yMax: s.height - s.pill.h - b.y };
-}
-const signed = (n) => (n > 0 ? `+${n}` : n < 0 ? `−${-n}` : '0');
-
-function islPlaceHtml(i) {
-  if (!islScreen) return '';
-  const s = islScreen, r = islRanges(i);
-  const x = Math.max(r.xMin, Math.min(r.xMax, i.x || 0)), y = Math.max(r.yMin, Math.min(r.yMax, i.y || 0));
-  return `<div class="isl-place">
-    <div class="isl-screen" id="isl-screen" style="aspect-ratio:${s.width} / ${s.height}" title="Тащи капсулу мышью">
-      <i class="isl-guide v"></i><i class="isl-guide h"></i>
-      <div class="isl-pill" id="isl-pill" style="left:${((r.b.x + x) / s.width) * 100}%;top:${((r.b.y + y) / s.height) * 100}%;width:${(s.pill.w / s.width) * 100}%;height:${(s.pill.h / s.height) * 100}%"></div>
-      <span class="isl-size">${s.width}×${s.height}</span>
-    </div>
-    <div class="isl-ctl">
-      <label>По горизонтали<span class="val" id="isl-xv">${signed(x)} px</span></label>
-      <input type="range" id="isl-x" min="${Math.round(r.xMin)}" max="${Math.round(r.xMax)}" step="1" value="${x}">
-      <label>По вертикали<span class="val" id="isl-yv">${signed(y)} px</span></label>
-      <input type="range" id="isl-y" min="${Math.round(r.yMin)}" max="${Math.round(r.yMax)}" step="1" value="${y}">
-      <div class="row-actions">
-        <button class="btn" id="isl-center">По центру</button>
-        <button class="btn" id="isl-reset">Сбросить</button>
-      </div>
-      <p class="isl-hint">Тащи капсулу на мини-экране или двигай ползунки — настоящий остров покажется и поедет следом. Стрелки на ползунке — по пикселю.</p>
-    </div>
-  </div>`;
-}
-
+// ---- место острова: редактор на весь экран с сеткой (src/islandedit.js); новое место придёт через desk:changed ----
 function bindIslPlace(body) {
-  const scr = $('#isl-screen', body);
-  if (!scr || !islScreen) return;
-  const s = islScreen;
-  const r = islRanges(dcfg('island'));
-  const pillEl = $('#isl-pill', scr), xs = $('#isl-x', body), ys = $('#isl-y', body);
-  let x = +xs.value, y = +ys.value, saveTimer = 0;
-
-  const show = (snap) => {
-    pillEl.style.left = `${((r.b.x + x) / s.width) * 100}%`;
-    pillEl.style.top = `${((r.b.y + y) / s.height) * 100}%`;
-    xs.value = x;
-    ys.value = y;
-    $('#isl-xv', body).textContent = `${signed(x)} px`;
-    $('#isl-yv', body).textContent = `${signed(y)} px`;
-    scr.classList.toggle('snap-v', !!snap?.v);
-    scr.classList.toggle('snap-h', !!snap?.h);
-  };
-  // сохраняем не чаще раза в 60 мс — остров едет плавно, а конфиг не дёргается на каждый пиксель
-  const save = () => {
-    clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => { saveCfg({ island: { x, y } }); api.island.preview(); }, 60);
-  };
-  const set = (nx, ny, snap) => {
-    x = Math.round(Math.max(r.xMin, Math.min(r.xMax, nx)));
-    y = Math.round(Math.max(r.yMin, Math.min(r.yMax, ny)));
-    show(snap);
-    save();
-  };
-
-  xs.oninput = () => set(+xs.value, y);
-  ys.oninput = () => set(x, +ys.value);
-  $('#isl-center', body).onclick = () => set(s.width / 2 - s.pill.w / 2 - r.b.x, y);
-  $('#isl-reset', body).onclick = () => set(0, 0);
-
-  // перетаскивание: капсула за мышью; возле центра экрана прилипает к линии
-  scr.onpointerdown = (e) => {
-    e.preventDefault();
-    scr.setPointerCapture(e.pointerId);
-    const rect = scr.getBoundingClientRect();
-    const k = s.width / rect.width;
-    const pr = pillEl.getBoundingClientRect();
-    const grab = e.target === pillEl
-      ? { dx: (e.clientX - pr.left) * k, dy: (e.clientY - pr.top) * k }
-      : { dx: s.pill.w / 2, dy: s.pill.h / 2 };
-    scr.classList.add('dragging');
-    const move = (ev) => {
-      let px = (ev.clientX - rect.left) * k - grab.dx;
-      let py = (ev.clientY - rect.top) * k - grab.dy;
-      const snap = {};
-      const cx = s.width / 2 - s.pill.w / 2, cy = s.height / 2 - s.pill.h / 2;
-      if (Math.abs(px - cx) < 14 * k) { px = cx; snap.v = true; }
-      if (Math.abs(py - cy) < 14 * k) { py = cy; snap.h = true; }
-      set(px - r.b.x, py - r.b.y, snap);
-    };
-    move(e);
-    const up = () => {
-      scr.classList.remove('dragging', 'snap-v', 'snap-h');
-      scr.removeEventListener('pointermove', move);
-      scr.removeEventListener('pointerup', up);
-      scr.removeEventListener('pointercancel', up);
-    };
-    scr.addEventListener('pointermove', move);
-    scr.addEventListener('pointerup', up);
-    scr.addEventListener('pointercancel', up);
-  };
+  const b = $('#isl-edit', body);
+  if (b) b.onclick = () => api.island.edit();
 }
 
 async function rerenderDesk() {
@@ -277,11 +180,7 @@ function bindDesk(body) {
   $$('[data-desk-seg]', body).forEach((segEl) => {
     const [g, k] = segEl.dataset.deskSeg.split('.');
     $$('button', segEl).forEach((b) => {
-      b.onclick = async () => {
-        // другой край экрана — сдвиг начинаем заново и сразу показываем остров на новом месте
-        if (g === 'island' && k === 'pos') { await saveDesk(g, { pos: b.dataset.v, x: 0, y: 0 }); api.island.preview(); return; }
-        saveDesk(g, { [k]: b.dataset.v });
-      };
+      b.onclick = () => saveDesk(g, { [k]: b.dataset.v });
     });
   });
   bindIslPlace(body);

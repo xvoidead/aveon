@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'">
+  <title>место острова</title>
+  <link rel="stylesheet" href="../node_modules/@fontsource/onest/500.css">
+  <link rel="stylesheet" href="../node_modules/@fontsource/onest/600.css">
+  <style>
+    /* Редактор места острова (src/islandedit.js, renderer/islandedit.js): затемнённый экран с сеткой
+       и панель с кнопками. Сам остров — настоящий, он поверх этого окна; здесь под ним только ручка
+       #grip его размера: за неё берут, и она подсвечивается */
+    :root { --amber: #f0a63a; color-scheme: dark; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; user-select: none; background: rgb(0 0 0 / .45);
+      font: 500 13px/1.3 "Onest", "Segoe UI", sans-serif; color: #f4f1ec; }
+    body { opacity: 0; transition: opacity .25s ease; cursor: crosshair; }
+    body.ready { opacity: 1; }
+    canvas { position: fixed; inset: 0; width: 100%; height: 100%; }
+    .grip { position: fixed; left: 0; top: 0; width: 280px; height: 36px; border-radius: 22px; cursor: grab;
+      outline: 1.5px dashed rgb(255 255 255 / .3); outline-offset: 5px; transition: outline-color .15s ease; }
+    .grip:hover { outline-color: rgb(255 255 255 / .6); }
+    body.dragging, body.dragging .grip { cursor: grabbing; }
+    body.dragging .grip { outline: 2px solid var(--amber); }
+    body.snapping .grip { outline: 2px solid #7dd3a8; }
+    .coords { position: fixed; transform: translate(-50%, 0); padding: 3px 8px; border-radius: 7px; background: rgb(0 0 0 / .7);
+      font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; pointer-events: none; }
+    .bar { position: fixed; left: 50%; bottom: 40px; transform: translateX(-50%); display: flex; align-items: center; gap: 8px;
+      padding: 8px 8px 8px 16px; border-radius: 20px; background: rgb(28 28 30 / .92); box-shadow: 0 0 0 1px rgb(255 255 255 / .08), 0 12px 40px rgb(0 0 0 / .5);
+      cursor: default; transition: bottom .3s ease, top .3s ease; }
+    .bar.top { bottom: auto; top: 40px; }
+    .bar .hint { color: rgb(244 241 236 / .6); margin-right: 8px; white-space: nowrap; }
+    .bar kbd { font: 600 11px "Onest", sans-serif; padding: 1px 5px; border-radius: 4px; background: rgb(255 255 255 / .1); color: #f4f1ec; }
+    button { font: 600 13px "Onest", "Segoe UI", sans-serif; color: #f4f1ec; background: rgb(255 255 255 / .1); border: 0; border-radius: 12px;
+      padding: 9px 14px; cursor: pointer; white-space: nowrap; transition: background .12s ease, transform .1s ease; }
+    button:hover { background: rgb(255 255 255 / .16); }
+    button:active { transform: scale(.96); }
+    button.primary { background: var(--amber); color: #1b1411; }
+    button.primary:hover { background: #f5b85c; }
+    button.on { background: rgb(255 255 255 / .22); }
+  </style>
+</head>
+<body>
+  <canvas id="grid"></canvas>
+  <div class="grip" id="grip" title="Тащи остров"></div>
+  <span class="coords" id="coords"></span>
+  <div class="bar" id="bar">
+    <span class="hint">Тащи остров · <kbd>Shift</kbd> — по сетке · стрелки — по пикселю</span>
+    <button id="open" title="Пробел">Раскрыть</button>
+    <button id="center">По центру</button>
+    <button id="reset">Сбросить</button>
+    <button id="cancel" title="Esc">Отменить</button>
+    <button id="done" class="primary" title="Enter">Выйти</button>
+  </div>
+  <script src="islandedit.js"></script>
+</body>
+</html>

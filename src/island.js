@@ -25,22 +25,32 @@ function display() {
 }
 let placedOn = null; // id экрана, на котором остров сейчас
 
+// Край (pos) — угол, к которому прижата капсула и от которого она раскрывается: top, left, right
+// (верх: по центру, слева, справа) и bottom, bottom-left, bottom-right. Раскрытый остров растёт
+// от этого угла внутрь экрана (renderer/island.css: body.v-bottom, h-left, h-right)
+const anchor = (pos = 'top') => ({
+  v: pos.startsWith('bottom') ? 'bottom' : 'top',
+  h: pos.endsWith('left') ? 'left' : pos.endsWith('right') ? 'right' : 'center',
+});
+
 // Капсула внутри прозрачного окна (renderer/island.css: свёрнутая 280×36, поля 8 px, снизу 10)
 const PILL = { w: 280, h: 36 };
 function pillIn(pos) {
-  const x = pos === 'left' ? 8 : pos === 'right' ? SIZE.width - PILL.w - 8 : (SIZE.width - PILL.w) / 2;
-  const y = pos === 'bottom' ? SIZE.height - PILL.h - 10 : 8;
+  const a = anchor(pos);
+  const x = a.h === 'left' ? 8 : a.h === 'right' ? SIZE.width - PILL.w - 8 : (SIZE.width - PILL.w) / 2;
+  const y = a.v === 'bottom' ? SIZE.height - PILL.h - 10 : 8;
   return { x, y };
 }
 
 // Где окно острова без сдвига — относительно экрана
 function baseWindow(pos, d) {
   const wa = d.workArea, b = d.bounds;
+  const a = anchor(pos);
   let x = wa.x - b.x + (wa.width - SIZE.width) / 2;
   let y = 0;
-  if (pos === 'left') x = wa.x - b.x + 12;
-  if (pos === 'right') x = wa.x - b.x + wa.width - SIZE.width - 12;
-  if (pos === 'bottom') y = wa.y - b.y + wa.height - SIZE.height;
+  if (a.h === 'left') x = wa.x - b.x + 12;
+  if (a.h === 'right') x = wa.x - b.x + wa.width - SIZE.width - 12;
+  if (a.v === 'bottom') y = wa.y - b.y + wa.height - SIZE.height;
   return { x, y };
 }
 
@@ -48,8 +58,8 @@ function baseWindow(pos, d) {
 // так её можно поставить вплотную к любому краю
 function place() {
   if (!win || win.isDestroyed()) return;
-  const c = cfg();
-  const d = display();
+  const c = placeCfg();
+  const d = editing ? edit.display : display();
   placedOn = d.id;
   const b = d.bounds;
   const base = baseWindow(c.pos, d);
@@ -59,6 +69,89 @@ function place() {
   px = Math.max(0, Math.min(px, b.width - PILL.w));
   py = Math.max(0, Math.min(py, b.height - PILL.h));
   win.setBounds({ x: Math.round(b.x + px - inner.x), y: Math.round(b.y + py - inner.y), ...SIZE });
+}
+
+// ---- редактор места (src/islandedit.js) ----
+// Пока редактор открыт, настоящий остров виден и едет за мышью: место берём из edit.place, а не из
+// настроек; мышь остров не ловит — нажатия проходят в окно редактора под ним
+let editing = false;
+const edit = { display: null, place: null, onRect: null };
+const placeCfg = () => (editing && edit.place ? { ...cfg(), ...edit.place } : cfg());
+
+function sendConfig() {
+  if (win && !win.isDestroyed() && ready) win.webContents.send('island:config', placeCfg());
+}
+
+// opts.display — экран редактора; opts.onRect(r) — где капсула на нём сейчас (раскрылась, выросла
+// под длинное название), чтобы редактор знал, за что её можно взять
+function setEditing(on, opts = {}) {
+  editing = on;
+  edit.display = on ? opts.display : null;
+  edit.place = null;
+  edit.onRect = on ? opts.onRect : null;
+  if (win && !win.isDestroyed() && ready) {
+    win.webContents.send('island:preview', on); // ничего не играет — капсула всё равно видна
+    win.webContents.send('island:demo', false);
+  }
+  sendConfig();
+  update();
+  place();
+  if (win && !win.isDestroyed()) hoverWatch.setOff(win, on || !shown);
+}
+
+// Капсулу в редакторе передвинули: px, py — левый верхний угол капсулы 280×36 на экране
+function editMove(px, py) {
+  if (!editing) return;
+  const p = placement(px, py, edit.display);
+  const posChanged = p.pos !== edit.place?.pos;
+  edit.place = p;
+  if (posChanged) sendConfig();
+  place();
+  editRaise();
+  editRect();
+}
+
+// Окно редактора с тем же уровнем «поверх всех» по нажатию встаёт выше острова — поднимаем остров
+function editRaise() {
+  if (editing && win && !win.isDestroyed()) win.moveTop();
+}
+
+// Показать остров раскрытым — видно, в какую сторону он откроется
+function editOpen(on) {
+  if (editing && win && !win.isDestroyed() && ready) win.webContents.send('island:demo', !!on);
+}
+
+// Где капсула на экране редактора — по тому, что прислало окно острова (popup:rect → src/hover.js)
+function editRect() {
+  if (!editing || !edit.onRect || !win || win.isDestroyed()) return;
+  const r = hoverWatch.rect(win);
+  if (!r) return;
+  const wb = win.getContentBounds(), db = edit.display.bounds;
+  edit.onRect({ x: wb.x - db.x + r.x, y: wb.y - db.y + r.y, w: r.w, h: r.h });
+}
+
+// Где сейчас капсула на экране острова (левый верхний угол, от края экрана) и где она по умолчанию
+function editInfo() {
+  const c = cfg();
+  const d = display();
+  const b = d.bounds;
+  const base = baseWindow(c.pos, d), inner = pillIn(c.pos);
+  const px = Math.max(0, Math.min(base.x + inner.x + (c.x || 0), b.width - PILL.w));
+  const py = Math.max(0, Math.min(base.y + inner.y + (c.y || 0), b.height - PILL.h));
+  const home = baseWindow('top', d), homeIn = pillIn('top');
+  return { display: d, pill: PILL, px, py, home: { x: home.x + homeIn.x, y: home.y + homeIn.y } };
+}
+
+// Точка на экране → угол (pos) и сдвиг от него. Угол выбираем по месту: верхняя или нижняя половина
+// экрана, левая, средняя или правая треть. От угла зависит, куда раскрывается капсула (снизу — вверх,
+// слева — вправо, справа — влево), чтобы раскрытый остров не уезжал за экран
+function placement(px, py, d) {
+  const b = d.bounds;
+  const cx = px + PILL.w / 2, cy = py + PILL.h / 2;
+  const h = cx < b.width / 3 ? 'left' : cx > (b.width * 2) / 3 ? 'right' : '';
+  const pos = cy > b.height / 2 ? (h ? `bottom-${h}` : 'bottom') : h || 'top';
+  const base = baseWindow(pos, d), inner = pillIn(pos);
+  return { pos, x: Math.round(px - base.x - inner.x), y: Math.round(py - base.y - inner.y) };
 }
 
 // Для мини-экрана в настройках: размер экрана и где стоит капсула без сдвига при каждом pos
@@ -122,7 +215,8 @@ function ensure() {
   win.loadFile(path.join(__dirname, '..', 'renderer', 'island.html'));
   win.webContents.once('did-finish-load', () => {
     ready = true;
-    win.webContents.send('island:config', cfg());
+    win.webContents.send('island:config', placeCfg());
+    if (editing) win.webContents.send('island:preview', true);
     if (last) win.webContents.send('island:state', last);
     update();
   });
@@ -142,7 +236,7 @@ function level() {
 setInterval(() => {
   if (!win || win.isDestroyed() || !shown) return;
   if (hoverWatch.isInside(win)) return; // курсор на острове — не трогаем окно, чтобы не сорвать клик
-  if (display().id !== placedOn) place(); // курсор ушёл на другой монитор — остров за ним
+  if (!editing && display().id !== placedOn) place(); // курсор ушёл на другой монитор — остров за ним
   win.setAlwaysOnTop(true, 'screen-saver');
   win.moveTop();
 }, 1500);
@@ -150,8 +244,10 @@ setInterval(() => {
 // Когда показывать: включён, есть трек и (если так настроено) окно плеера не перед глазами
 function wanted() {
   const c = cfg();
+  if (editing) return true; // в редакторе остров виден всегда — его и двигают
   if (Date.now() < previewUntil) return true;
   if (!c.enabled || !last?.hasTrack) return false; // уведомления остров не раскрывают (капля слева) — без трека показывать нечего
+  if (games.snipping()) return false; // открыты «Ножницы» — не лезем в снимок (src/games.js)
   if (c.hideInGames && games.current()) return false; // идёт игра — остров не мешает (src/games.js)
   if (!c.onlyAway || !main || main.isDestroyed()) return true;
   return main.isMinimized() || !main.isVisible() || !main.isFocused();
@@ -177,7 +273,7 @@ function update() {
   shown = true;
   place();
   win.setOpacity(1);
-  hoverWatch.setOff(win, false);
+  hoverWatch.setOff(win, editing); // в редакторе мышь не ловим: нажатия — редактору
   if (!win.isVisible()) win.showInactive(); // только в первый раз — дальше окно не прячется
 }
 
@@ -205,7 +301,7 @@ function settingsChanged() {
   if (win && !win.isDestroyed()) {
     level();
     place();
-    if (ready) win.webContents.send('island:config', cfg());
+    sendConfig();
   }
   update();
 }
@@ -214,4 +310,4 @@ function destroy() {
   if (win && !win.isDestroyed()) win.destroy();
 }
 
-module.exports = { init, state, hover, settingsChanged, destroy, preview, screenInfo };
+module.exports = { init, state, hover, settingsChanged, destroy, preview, screenInfo, editInfo, placement, setEditing, editMove, editOpen, editRect, editRaise };

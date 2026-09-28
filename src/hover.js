@@ -114,9 +114,14 @@ function setOff(win, off) {
   if (off) reset(win);
 }
 
+// Где панель в окне — как её прислало само окно ({x, y, w, h} или null)
+function rect(win) {
+  return watched.get(win)?.rect || null;
+}
+
 function isInside(win) {
   const s = win && watched.get(win);
   return !!s && (s.inside || s.hovered);
 }
 
-module.exports = { watch, setHover, setRect, reset, setOff, isInside };
+module.exports = { watch, setHover, setRect, reset, setOff, isInside, rect };
