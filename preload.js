@@ -126,6 +126,7 @@ contextBridge.exposeInMainWorld('tishe', {
   islandEdit: {
     onInit: (cb) => on('isledit:init', cb),
     onRect: (cb) => on('isledit:rect', cb), // где настоящая капсула на экране (раскрылась, выросла)
+    onAccent: (cb) => on('isledit:accent', cb), // акцент играющего трека — им рисуется сетка
     move: (x, y) => ipcRenderer.send('isledit:move', { x, y }),
     open: (on) => ipcRenderer.send('isledit:open', on), // показать остров раскрытым
     raise: () => ipcRenderer.send('isledit:raise'),

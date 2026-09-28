@@ -15,6 +15,14 @@ let real = null; // где настоящая капсула на экране (
 let grab = null; // { dx, dy } — где взяли капсулу, пока тащат
 let lastPointer = null;
 let opened = false;
+let accent = '#f0a63a'; // акцент играющего трека (как у острова); ничего не играет — янтарный
+
+function setAccent(c) {
+  if (!c) return;
+  accent = c;
+  document.documentElement.style.setProperty('--amber', c);
+  if (scr) render();
+}
 
 const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
 
@@ -92,7 +100,10 @@ function drawGrid(a) {
   g.clearRect(0, 0, w, h);
   const cx = w / 2;
   g.lineWidth = 1;
-  g.strokeStyle = 'rgba(255,255,255,0.07)';
+  // всё цветом акцента, насыщенность — прозрачностью
+  g.strokeStyle = accent;
+  g.fillStyle = accent;
+  g.globalAlpha = 0.12;
   g.beginPath();
   for (let x = cx % GRID; x < w; x += GRID) { g.moveTo(Math.round(x) + 0.5, 0); g.lineTo(Math.round(x) + 0.5, h); }
   for (let y = 0; y < h; y += GRID) { g.moveTo(0, y + 0.5); g.lineTo(w, y + 0.5); }
@@ -100,10 +111,10 @@ function drawGrid(a) {
   // где меняется угол (трети по ширине, половина по высоте) — пунктиром; текущая зона чуть светлее
   if (scr && a) {
     const zx = { left: 0, center: w / 3, right: (w * 2) / 3 }[a.h], zy = a.v === 'top' ? 0 : h / 2;
-    g.fillStyle = 'rgba(240,166,58,0.05)';
+    g.globalAlpha = 0.07;
     g.fillRect(zx, zy, w / 3, h / 2);
     g.setLineDash([6, 6]);
-    g.strokeStyle = 'rgba(255,255,255,0.18)';
+    g.globalAlpha = 0.3;
     g.beginPath();
     for (const x of [w / 3, (w * 2) / 3]) { g.moveTo(Math.round(x) + 0.5, 0); g.lineTo(Math.round(x) + 0.5, h); }
     g.moveTo(0, Math.round(h / 2) + 0.5); g.lineTo(w, Math.round(h / 2) + 0.5);
@@ -113,10 +124,11 @@ function drawGrid(a) {
   // оси через центр экрана; подсвечиваются, когда капсула на них
   const onV = scr && pos.x + scr.pill.w / 2 === cx;
   const onH = scr && pos.y + scr.pill.h / 2 === Math.round(h / 2);
-  g.strokeStyle = onV ? 'rgba(240,166,58,0.9)' : 'rgba(240,166,58,0.35)';
+  g.globalAlpha = onV ? 0.9 : 0.4;
   g.beginPath(); g.moveTo(Math.round(cx) + 0.5, 0); g.lineTo(Math.round(cx) + 0.5, h); g.stroke();
-  g.strokeStyle = onH ? 'rgba(240,166,58,0.9)' : 'rgba(240,166,58,0.35)';
+  g.globalAlpha = onH ? 0.9 : 0.4;
   g.beginPath(); g.moveTo(0, Math.round(h / 2) + 0.5); g.lineTo(w, Math.round(h / 2) + 0.5); g.stroke();
+  g.globalAlpha = 1;
 }
 window.addEventListener('resize', () => { if (scr) render(); });
 
@@ -185,8 +197,11 @@ api.islandEdit.onRect((r) => {
   if (scr) render();
 });
 
+api.islandEdit.onAccent?.(setAccent);
+
 api.islandEdit.onInit((s) => {
   scr = s;
+  setAccent(s.accent);
   pos = { x: s.x, y: s.y };
   render();
   requestAnimationFrame(() => document.body.classList.add('ready'));

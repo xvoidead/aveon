@@ -31,11 +31,12 @@ function open(save) {
   win.setAlwaysOnTop(true, 'screen-saver'); // поверх всего, как сам остров
   win.setBounds(b); // на экране с другим масштабом размер в конструкторе может встать неточно
   const w = win;
-  island.setEditing(true, { display, onRect: (r) => { if (!w.isDestroyed()) w.webContents.send('isledit:rect', r); } });
+  const to = (ch) => (v) => { if (!w.isDestroyed()) w.webContents.send(ch, v); };
+  island.setEditing(true, { display, onRect: to('isledit:rect'), onAccent: to('isledit:accent') });
   win.loadFile(path.join(__dirname, '..', 'renderer', 'islandedit.html'));
   win.webContents.once('did-finish-load', () => {
     win.webContents.send('isledit:init', {
-      width: b.width, height: b.height, pill: info.pill, x: info.px, y: info.py, home: info.home,
+      width: b.width, height: b.height, pill: info.pill, x: info.px, y: info.py, home: info.home, accent: info.accent,
     });
     win.show();
     win.focus();

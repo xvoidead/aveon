@@ -75,7 +75,7 @@ function place() {
 // Пока редактор открыт, настоящий остров виден и едет за мышью: место берём из edit.place, а не из
 // настроек; мышь остров не ловит — нажатия проходят в окно редактора под ним
 let editing = false;
-const edit = { display: null, place: null, onRect: null };
+const edit = { display: null, place: null, onRect: null, onAccent: null };
 const placeCfg = () => (editing && edit.place ? { ...cfg(), ...edit.place } : cfg());
 
 function sendConfig() {
@@ -83,12 +83,14 @@ function sendConfig() {
 }
 
 // opts.display — экран редактора; opts.onRect(r) — где капсула на нём сейчас (раскрылась, выросла
-// под длинное название), чтобы редактор знал, за что её можно взять
+// под длинное название), чтобы редактор знал, за что её можно взять; opts.onAccent(c) — сменился
+// акцент играющего трека (им рисуется сетка)
 function setEditing(on, opts = {}) {
   editing = on;
   edit.display = on ? opts.display : null;
   edit.place = null;
   edit.onRect = on ? opts.onRect : null;
+  edit.onAccent = on ? opts.onAccent : null;
   if (win && !win.isDestroyed() && ready) {
     win.webContents.send('island:preview', on); // ничего не играет — капсула всё равно видна
     win.webContents.send('island:demo', false);
@@ -139,7 +141,7 @@ function editInfo() {
   const px = Math.max(0, Math.min(base.x + inner.x + (c.x || 0), b.width - PILL.w));
   const py = Math.max(0, Math.min(base.y + inner.y + (c.y || 0), b.height - PILL.h));
   const home = baseWindow('top', d), homeIn = pillIn('top');
-  return { display: d, pill: PILL, px, py, home: { x: home.x + homeIn.x, y: home.y + homeIn.y } };
+  return { display: d, pill: PILL, px, py, home: { x: home.x + homeIn.x, y: home.y + homeIn.y }, accent: last?.amber || null };
 }
 
 // Точка на экране → угол (pos) и сдвиг от него. Угол выбираем по месту: верхняя или нижняя половина
@@ -287,6 +289,7 @@ function init(mainWindow) {
 }
 
 function state(s) {
+  if (editing && s.amber && s.amber !== last?.amber) edit.onAccent?.(s.amber);
   last = s;
   if (win && !win.isDestroyed() && ready) win.webContents.send('island:state', s);
   update();
