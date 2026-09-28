@@ -98,7 +98,9 @@ func routes() *http.ServeMux {
 	h("PUT /api/admin/announce", adminOnly(adminAnnounce))
 	h("GET /api/announce", authed(announceGet))
 
-	h("/", func(w http.ResponseWriter, r *http.Request) { writeJSON(w, 404, M{"error": "Нет такого адреса"}) })
+	h("/", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, 404, M{"error": "Нет такого адреса"})
+	})
 	return mux
 }
 

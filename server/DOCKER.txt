@@ -1,0 +1,84 @@
+Docker — управление сервером aveon
+==================================
+
+Подключение к серверу
+----------------------
+ssh root@166.1.144.61
+
+
+Основные команды
+----------------
+
+Перейти в папку проекта:
+  cd /opt/aveon/server
+
+Запуск / остановка / перезапуск:
+  docker compose up -d          # запустить в фоне
+  docker compose down           # остановить и удалить контейнер
+  docker compose restart        # перезапуск
+  docker compose up -d --build  # пересобрать и запустить
+
+Логи:
+  docker compose logs -f              # все логи в реальном времени
+  docker compose logs -f --tail=100   # последние 100 строк
+  docker logs server-aveon-api-1      # логи контейнера напрямую
+
+Зайти внутрь контейнера:
+  docker exec -it server-aveon-api-1 /bin/sh
+
+Внутри контейнера:
+  код — /app
+  база — /data/aveon.db
+
+Статус:
+  docker ps                     # запущенные контейнеры
+  docker compose ps             # статус сервисов проекта
+  docker stats                  # потребление ресурсов
+
+
+База данных
+-----------
+
+Файл базы на хосте:
+  /var/lib/docker/volumes/server_aveon-data/_data/aveon.db
+
+Замена базы:
+  cd /opt/aveon/server
+  docker compose down
+  cp /путь/к/новому/aveon.db /var/lib/docker/volumes/server_aveon-data/_data/aveon.db
+  docker compose up -d
+
+
+Обновление кода
+---------------
+
+  cd /opt/aveon/server
+  # скопировать новые файлы на сервер (scp или git pull)
+  docker compose up -d --build
+
+
+Nginx (HTTPS)
+-------------
+
+Конфиг: /etc/nginx/sites-available/api.music.aveon.su
+
+  nginx -t                                  # проверить конфиг
+  systemctl reload nginx                    # перезагрузить
+  certbot --nginx -d api.music.aveon.su     # обновить сертификат
+
+
+Переменные окружения
+--------------------
+
+  AVEON_HOST     — адрес внутри контейнера (по умолчанию 0.0.0.0)
+  AVEON_PORT     — порт (по умолчанию 8787)
+  AVEON_DB       — путь к базе внутри контейнера (по умолчанию /data/aveon.db)
+  AVEON_ADMINS   — логины админов через запятую
+
+
+Порты
+-----
+
+  8787  — API (наружу, для nginx)
+  80    — nginx (HTTP -> HTTPS)
+  443   — nginx (HTTPS)
