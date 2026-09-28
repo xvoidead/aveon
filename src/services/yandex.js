@@ -314,6 +314,18 @@ async function waveFeedback(type, track, played = 0) {
   return true;
 }
 
+// Убрать из «Мне нравится» — второе нажатие на сердечко. Ошибку отдаём наверх: плеер вернёт сердечко
+async function unlike(track) {
+  const u = await uid();
+  await api(`/users/${u}/likes/tracks/remove`, {}, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ 'track-ids': waveTrackId(track) }).toString(),
+  });
+  if (likedCache.ids) likedCache.ids = likedCache.ids.filter((id) => id !== track.id);
+  return true;
+}
+
 // Артисты по запросу — для поиска (строка артистов над треками)
 async function searchArtists(q) {
   const res = await api('/search', { text: q, type: 'artist', page: 0, nocorrect: 'false' });
@@ -324,4 +336,4 @@ async function searchArtists(q) {
   }));
 }
 
-module.exports = { searchArtists, search, collections, collection, stream, reset, artistByName, album, waveStart, waveMore, waveFeedback, likedIds };
+module.exports = { searchArtists, search, collections, collection, stream, reset, artistByName, album, waveStart, waveMore, waveFeedback, likedIds, unlike };

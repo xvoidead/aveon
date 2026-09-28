@@ -231,7 +231,7 @@ function islandNotify(text, kind = 'info', person = null, actions = []) {
       spec: full,
       ...(() => { const l = lyricNow(); return { line: l.cur, lyric: l }; })(),
       friends: friendsNow(),
-      // «нравится» — только у треков Яндекс Музыки, и снять отсюда нельзя (app.js → renderNowLike)
+      // «нравится» — только у треков Яндекс Музыки; второе нажатие снимает лайк (app.js → renderNowLike)
       source: t.source,
       likeable: t.source === 'ym',
       liked: renderNowLike.has(t.id),

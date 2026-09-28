@@ -144,6 +144,7 @@ contextBridge.exposeInMainWorld('tishe', {
     more: (queue) => call('wave:more', queue),
     feedback: (type, track, played) => call('wave:feedback', type, track, played),
     liked: (fresh) => call('ym:liked', fresh), // id треков из «Мне нравится» Яндекса
+    unlike: (track) => call('ym:unlike', track), // убрать из «Мне нравится»
     related: (track) => call('wave:related', track),
   },
   // Скачанные для офлайна: треки лежат на диске вместе с обложкой и текстом

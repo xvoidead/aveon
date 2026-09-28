@@ -1476,9 +1476,9 @@ $('#btn-now-album').onclick = (e) => {
 
 // У названия (дизайн «Стекло»): «нравится» — в лайки Яндекс Музыки, «ещё» — альбом, SoundCloud,
 // во весь экран и режимы (modes.js), то есть всё, что в других дизайнах лежит кнопками у громкости
-// Лайкнут ли трек: за эту сессию (API лайк ставит, снять его отсюда нельзя) или раньше — по списку
-// «Мне нравится» аккаунта (раз в минуту, main.js → ym:liked). Без списка уже лайкнутый трек выглядел
-// не лайкнутым, и его можно было добавить второй раз. Всё живёт на самой функции:
+// Лайкнут ли трек: за эту сессию или раньше — по списку «Мне нравится» аккаунта (раз в минуту,
+// main.js → ym:liked). Без списка уже лайкнутый трек выглядел не лайкнутым, и его можно было добавить
+// второй раз. Второе нажатие убирает из «Мне нравится» (ym:unlike). Всё живёт на самой функции:
 // showNow может позвать её раньше, чем интерпретатор дойдёт до этих строк
 function renderNowLike() {
   const likedNow = (renderNowLike.liked ||= new Set());
@@ -1488,7 +1488,7 @@ function renderNowLike() {
   if (t?.source === 'ym' && Date.now() - (renderNowLike.loadedAt || 0) > 60 * 1000) loadAccountLikes();
   const on = !!t && (likedNow.has(t.id) || !!renderNowLike.account?.has(t.id));
   b.setAttribute('aria-pressed', String(on));
-  b.setAttribute('aria-label', on ? 'Уже в «Мне нравится»' : 'Нравится');
+  b.setAttribute('aria-label', on ? 'Убрать из «Мне нравится»' : 'Нравится');
   $('use', b).setAttribute('href', on ? '#i-heart-fill' : '#i-heart');
 }
 renderNowLike.has = (id) => !!(renderNowLike.liked?.has(id) || renderNowLike.account?.has(id));
@@ -1501,15 +1501,31 @@ function loadAccountLikes() {
     renderNowLike();
   }).catch(() => { renderNowLike.loadedAt = 0; });
 }
+const setLiked = (id, on) => {
+  const likedNow = (renderNowLike.liked ||= new Set());
+  if (on) likedNow.add(id);
+  else { likedNow.delete(id); renderNowLike.account?.delete(id); }
+  renderNowLike();
+};
 $('#btn-like').onclick = async () => {
   const t = state.track;
-  const likedNow = (renderNowLike.liked ||= new Set());
-  if (!t || renderNowLike.has(t.id)) return;
-  likedNow.add(t.id);
-  renderNowLike();
+  if (!t || t.source !== 'ym') return;
   symFx($('#btn-like'), 'bounce');
-  await api.wave.feedback('like', t).catch(() => {});
-  toast(`«${t.title}» — в «Мне нравится»`);
+  if (!renderNowLike.has(t.id)) {
+    setLiked(t.id, true);
+    await api.wave.feedback('like', t).catch(() => {});
+    toast(`«${t.title}» — в «Мне нравится»`);
+    return;
+  }
+  // уже лайкнут — убираем; сердечко пустеет сразу, не вышло — возвращаем
+  setLiked(t.id, false);
+  try {
+    await api.wave.unlike(t);
+    toast(`«${t.title}» убран из «Мне нравится»`);
+  } catch {
+    setLiked(t.id, true);
+    toast('Не получилось убрать из «Мне нравится»');
+  }
 };
 $('#btn-now-more').onclick = (e) => {
   e.stopPropagation();

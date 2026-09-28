@@ -439,6 +439,7 @@ function registerIpc() {
   handle('wave:more', (queue) => ym.waveMore(queue));
   handle('wave:feedback', (type, track, played) => ym.waveFeedback(type, track, played));
   handle('ym:liked', (fresh) => (config.getSecret('ym.token') ? ym.likedIds(!!fresh) : []));
+  handle('ym:unlike', (track) => ym.unlike(track));
   handle('wave:related', (track) => (track?.source === 'sc' ? sc.related(track) : []));
 
   // Кэш треков и текстов: сколько занимает, очистка

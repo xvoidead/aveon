@@ -464,18 +464,17 @@ $('#b-next').onclick = () => act('thumb', { action: 'next' });
 $('#b-barrel').onclick = () => act('barrel');
 $('#b-sc').onclick = () => act('sc'); // найти этот трек в SoundCloud — в окне плеера (island-feed.js)
 
-// «нравится»: сердечко сразу красное (плеер пришлёт liked чуть позже), убрать лайк отсюда нельзя
+// «нравится»: сердечко меняется сразу (плеер пришлёт liked чуть позже); второе нажатие — убрать лайк
 function renderLike(on) {
   const b = $('#b-like');
   if (b.classList.contains('on') === on) return;
   b.classList.toggle('on', on);
-  b.title = on ? 'Уже в «Мне нравится»' : 'Нравится';
+  b.title = on ? 'Убрать из «Мне нравится»' : 'Нравится';
   b.querySelector('use').setAttribute('href', on ? '#i-heart-fill' : '#i-heart');
 }
 $('#b-like').onclick = () => {
   const b = $('#b-like');
-  if (b.classList.contains('on')) return;
-  renderLike(true);
+  renderLike(!b.classList.contains('on'));
   b.classList.remove('pop');
   void b.offsetWidth;
   b.classList.add('pop');
