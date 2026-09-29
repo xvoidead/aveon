@@ -3292,6 +3292,9 @@ html.dz-open body { padding-right: 384px; }
 
 /* выбор части кликом: всё кликабельно (без областей перетаскивания окна), рамка над частью под курсором */
 html.dz-picking :not(.dz, .dz *) { -webkit-app-region: no-drag !important; cursor: crosshair !important; }
+html.dz-dragging, html.dz-dragging * { cursor: grabbing !important; user-select: none !important; }
+.dz-tip { margin: 10px 0 0; }
+.dz-move { color: var(--text-2); font-size: 12.5px; font-variant-numeric: tabular-nums; }
 .dz-hi {
   position: fixed; z-index: 29; pointer-events: none; border-radius: 8px;
   outline: 2px solid var(--amber); outline-offset: 2px; background: color-mix(in srgb, var(--amber) 14%, transparent);

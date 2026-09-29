@@ -82,6 +82,7 @@
     shadow: { label: 'Тень', type: 'enum', options: [['none', 'Нет'], ['soft', 'Мягкая'], ['strong', 'Сильная'], ['glow', 'Свечение']] },
     border: { label: 'Рамка', type: 'border' },
     hidden: { label: 'Скрыть', type: 'bool' },
+    move: { label: 'Сдвиг', type: 'move' }, // { x, y } в px — тянут саму часть на плеере (designer.js)
   };
 
   const GROUPS = [
@@ -139,6 +140,8 @@
     { id: 'rartist', group: 'library', parent: 'list', name: 'Артист в строке', sel: '.row .t-artist', props: ['color', 'size'] },
     { id: 'rtime', group: 'library', parent: 'list', name: 'Длительность', sel: '.row .col-time', props: ['color', 'hidden'] },
   ];
+  // Сдвинуть можно любую часть, кроме фонов окна (это целые колонки) и состояний вроде «строка под курсором»
+  for (const p of PARTS) if (p.group !== 'window' && p.pick !== false && !p.sel.includes(':hover')) p.props.push('move');
   const PART_BY_ID = new Map(PARTS.map((p) => [p.id, p]));
 
   const isObj = (v) => v != null && typeof v === 'object' && !Array.isArray(v);
@@ -173,6 +176,11 @@
         if (!isObj(v)) return undefined;
         const w = num(v.w, 0, 4), c = cleanColor(v.c);
         return w && c ? { w, c } : undefined;
+      }
+      case 'move': {
+        if (!isObj(v)) return undefined;
+        const x = num(v.x, -3000, 3000) || 0, y = num(v.y, -3000, 3000) || 0;
+        return x || y ? { x, y } : undefined;
       }
       default: return undefined;
     }
@@ -261,6 +269,7 @@
       case 'shadow': return [['', part.text ? `text-shadow: ${TEXT_SHADOWS[v]}` : `box-shadow: ${SHADOWS[v]}`]];
       case 'border': return [['', `outline: ${v.w}px solid ${colorCss(v.c)}; outline-offset: -${v.w}px`]];
       case 'hidden': return [['', 'display: none']];
+      case 'move': return [['', `translate: ${v.x}px ${v.y}px`]];
       default: return []; // opacity — внутри fill
     }
   }

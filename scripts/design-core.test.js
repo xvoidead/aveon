@@ -113,3 +113,17 @@ test('paletteVars и fixesBg', () => {
   assert.equal(D.fixesBg(D.cleanDesign({ palette: { amber: '#ff0000' } })), false);
   assert.equal(D.fixesBg(D.cleanDesign({ palette: { text: '#ffffff' } })), true);
 });
+
+test('сдвиг части: целые px в пределах, ноль — не сдвиг, фоны окна не двигаются', () => {
+  const d = D.cleanDesign({ parts: {
+    play: { move: { x: 12.4, y: -99999 } },
+    title: { move: { x: 0, y: 0 } },
+    cover: { move: { x: 'left', y: 5 } },
+    stagebg: { move: { x: 10, y: 10 } },
+  } });
+  assert.deepEqual(d.parts.play, { move: { x: 12, y: -3000 } });
+  assert.equal(d.parts.title, undefined);
+  assert.deepEqual(d.parts.cover, { move: { x: 0, y: 5 } });
+  assert.equal(d.parts.stagebg, undefined);
+  assert.ok(D.designCss(d).includes(`${SCOPE}.controls .play-btn { translate: 12px -3000px; }`));
+});

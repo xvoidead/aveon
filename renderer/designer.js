@@ -113,6 +113,7 @@ function openDesigner(id) {
   dzEl.hidden = false;
   document.documentElement.classList.add('dz-open');
   renderDz(false);
+  setPicking(true); // сразу можно нажать на часть плеера или потащить её
   previewDz();
   $('#dz-name', dzEl).focus();
 }
@@ -188,15 +189,6 @@ function dzSet(key, v) {
   previewDz();
 }
 
-function moveBlock(group, id, dir) {
-  const ids = DesignCore.orderedBlocks(dz.draft, group).map((p) => p.id);
-  const i = ids.indexOf(id), j = i + dir;
-  if (i < 0 || j < 0 || j >= ids.length) return;
-  [ids[i], ids[j]] = [ids[j], ids[i]];
-  dz.draft.order[group] = ids;
-  previewDz();
-}
-
 // ---------- разметка панели ----------
 
 const dzField = (label, ctl) => `<div class="dz-field"><label>${esc(label)}</label><div class="dz-ctl">${ctl}</div></div>`;
@@ -234,26 +226,23 @@ function commonBody(d) {
     <section class="dz-sec"><h4>Скругления</h4>${dzField('Все углы', `<input type="range" data-dz-range="top:radius" data-unit="%" min="0" max="250" step="10" value="${d.radius}" aria-label="Скругления"><span class="val" data-dz-val="top:radius">${d.radius}%</span>`)}</section>`;
 }
 
-function dzNode(d, p, move) {
+function dzNode(d, p) {
   const vals = d.parts[p.id];
   const hidden = !!vals?.hidden;
   const seen = hidden || partVisible(p);
   const eye = p.props.includes('hidden')
     ? `<button class="icon-btn small" data-dz-eye="${p.id}" aria-pressed="${!hidden}" title="${hidden ? 'Показать' : 'Скрыть'}" aria-label="${hidden ? 'Показать' : 'Скрыть'} «${esc(p.name)}»"><svg><use href="#i-${hidden ? 'eye-off' : 'eye'}"/></svg></button>` : '';
-  const arrows = move
-    ? `<button class="icon-btn small" data-dz-move="${p.id}" data-group="${move.group}" data-dir="-1" ${move.i === 0 ? 'disabled' : ''} aria-label="Выше"><svg style="transform:rotate(90deg)"><use href="#i-chevron-l"/></svg></button>
-      <button class="icon-btn small" data-dz-move="${p.id}" data-group="${move.group}" data-dir="1" ${move.i === move.n - 1 ? 'disabled' : ''} aria-label="Ниже"><svg style="transform:rotate(90deg)"><use href="#i-chevron-r"/></svg></button>` : '';
   return `<li class="dz-node${p.parent ? ' child' : ''}${hidden ? ' off' : ''}${seen ? '' : ' missing'}">
-    <button class="dz-node-name" data-dz-part="${p.id}"${seen ? '' : ' title="Сейчас не видно в плеере"'}>${esc(p.name)}${vals ? '<i class="dz-dot"></i>' : ''}</button>${eye}${arrows}</li>`;
+    <button class="dz-node-name" data-dz-part="${p.id}"${seen ? '' : ' title="Сейчас не видно в плеере"'}>${esc(p.name)}${vals ? '<i class="dz-dot"></i>' : ''}</button>${eye}</li>`;
 }
 
 function treeBody(d) {
-  return DesignCore.GROUPS.map((g) => {
+  return `<p class="dz-hint dz-tip">На плеере: нажми на часть — откроются её настройки, зажми и тяни — сдвинешь куда угодно.</p>${DesignCore.GROUPS.map((g) => {
     const tops = g.sel ? DesignCore.orderedBlocks(d, g.id) : DesignCore.PARTS.filter((p) => p.group === g.id && !p.parent);
-    const items = tops.map((p, i) => dzNode(d, p, g.sel ? { i, n: tops.length, group: g.id } : null)
+    const items = tops.map((p) => dzNode(d, p)
       + DesignCore.PARTS.filter((c) => c.parent === p.id).map((c) => dzNode(d, c)).join('')).join('');
     return `<section class="dz-sec"><h4>${g.name}</h4><ol class="dz-tree">${items}</ol></section>`;
-  }).join('');
+  }).join('')}`;
 }
 
 function propRow(part, prop, v) {
@@ -279,6 +268,8 @@ function propRow(part, prop, v) {
     case 'border':
       return dzField(label, `<input type="range" data-dz-range="${key}.w" data-unit=" px" min="0" max="4" step="1" value="${v?.w ?? 0}" aria-label="Толщина рамки"><span class="val" data-dz-val="${key}.w">${v ? `${v.w} px` : '—'}</span>${dzClear(key, !!v)}`)
         + (v ? dzField('Цвет рамки', dzColor(`${key}.c`, v.c, '--amber', false)) : '');
+    case 'move':
+      return dzField(label, `<span class="dz-move">${v ? `${v.x < 0 ? '←' : '→'} ${Math.abs(v.x)} · ${v.y < 0 ? '↑' : '↓'} ${Math.abs(v.y)} px` : 'на месте — тяни часть на плеере'}</span>${dzClear(key, !!v)}`);
     default: return '';
   }
 }
@@ -301,7 +292,7 @@ function renderDz(keepScroll = true) {
   const d = dz.draft;
   dzEl.innerHTML = `<div class="dz-head">
       <input class="input dz-name" id="dz-name" maxlength="40" spellcheck="false" value="${esc(d.name)}" aria-label="Название дизайна">
-      <button class="icon-btn${dz.picking ? ' on' : ''}" id="dz-pick" aria-pressed="${dz.picking}" title="Выбрать часть на плеере" aria-label="Выбрать часть на плеере"><svg><use href="#i-focus"/></svg></button>
+      <button class="icon-btn${dz.picking ? ' on' : ''}" id="dz-pick" aria-pressed="${dz.picking}" title="Выбирать и двигать части на плеере" aria-label="Выбирать и двигать части на плеере"><svg><use href="#i-focus"/></svg></button>
       <button class="icon-btn" id="dz-close" title="Закрыть" aria-label="Закрыть"><svg><use href="#i-close"/></svg></button>
     </div>
     <div class="seg dz-tabs">${[['common', 'Общее'], ['parts', 'Части']].map(([id, name]) => `<button data-dz-tab="${id}" class="${dz.tab === id ? 'on' : ''}">${name}</button>`).join('')}</div>
@@ -328,7 +319,6 @@ dzEl.addEventListener('click', (e) => {
   if (ds.dzSet) dzSet(ds.dzSet, ds.v);
   else if (ds.dzClear) dzSet(ds.dzClear, null);
   else if (ds.dzEye) dzSet(`part:${ds.dzEye}:hidden`, dz.draft.parts[ds.dzEye]?.hidden ? null : true);
-  else if (ds.dzMove) moveBlock(ds.group, ds.dzMove, +ds.dir);
   else if (ds.dzReset) { delete dz.draft.parts[ds.dzReset]; previewDz(); }
   else return;
   renderDz();
@@ -396,7 +386,7 @@ function partAt(target) {
 }
 
 document.addEventListener('pointermove', (e) => {
-  if (!dz?.picking) return;
+  if (!dz?.picking || drag?.moved) return;
   const hit = partAt(e.target);
   if (!hit) { dzHi.hidden = true; return; }
   // координаты экранные, а стиль — внутри zoom на <html> (look.js → размер интерфейса), как в showMenu (app.js)
@@ -417,9 +407,66 @@ document.addEventListener('click', (e) => {
   if (!hit) return;
   dz.tab = 'parts';
   dz.part = hit.part.id;
-  setPicking(false);
   renderDz(false);
 }, true);
+
+// ---------- перетаскивание частей на плеере ----------
+// Зажал часть и повёл (дальше 4 px) — она едет за курсором; отпустил — сдвиг в черновике и открыты её настройки.
+// Пока тянут, сдвиг — во временном <style>, а не через applyLook: тот обходит все правила и дёргал бы кадры
+
+const dragStyle = document.createElement('style');
+document.head.append(dragStyle);
+let drag = null; // { part, el, x0, y0, start, scale, moved, x, y }
+
+function hiOver(el, name) {
+  const r = el.getBoundingClientRect(), z = parseFloat(document.documentElement.style.zoom) || 1;
+  Object.assign(dzHi.style, { left: `${r.left / z}px`, top: `${r.top / z}px`, width: `${r.width / z}px`, height: `${r.height / z}px` });
+  dzHi.classList.toggle('low', r.top / z < 34);
+  dzHi.firstChild.textContent = name;
+  dzHi.hidden = false;
+}
+
+// на window, а не на document: там раньше, чем dzSwallow гасит нажатия режима выбора
+addEventListener('pointerdown', (e) => {
+  if (!dz?.picking || e.button !== 0 || inDz(e.target)) return;
+  const hit = partAt(e.target);
+  if (!hit || !hit.part.props.includes('move')) return;
+  const start = dz.draft.parts[hit.part.id]?.move || { x: 0, y: 0 };
+  // экранных px на один px стиля: zoom интерфейса, размер части и всё прочее разом
+  const scale = hit.el.getBoundingClientRect().width / (hit.el.offsetWidth || 1) || 1;
+  drag = { part: hit.part, el: hit.el, x0: e.clientX, y0: e.clientY, start, scale, moved: false, x: start.x, y: start.y };
+}, true);
+
+addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  const dx = e.clientX - drag.x0, dy = e.clientY - drag.y0;
+  if (!drag.moved && Math.hypot(dx, dy) < 4) return;
+  if (!drag.moved) { drag.moved = true; document.documentElement.classList.add('dz-dragging'); }
+  drag.x = Math.round(drag.start.x + dx / drag.scale);
+  drag.y = Math.round(drag.start.y + dy / drag.scale);
+  dragStyle.textContent = `${drag.part.sel.replace(/:hover/g, '')} { translate: ${drag.x}px ${drag.y}px !important; }`;
+  hiOver(drag.el, `${drag.part.name} · ${drag.x}, ${drag.y}`);
+}, true);
+
+function endDrag() {
+  if (!drag) return;
+  const d = drag;
+  drag = null;
+  document.documentElement.classList.remove('dz-dragging');
+  if (!d.moved || !dz) { dragStyle.textContent = ''; return; }
+  dzHi.hidden = true;
+  dzSet(`part:${d.part.id}:move`, d.x || d.y ? { x: d.x, y: d.y } : null);
+  requestAnimationFrame(() => { dragStyle.textContent = ''; }); // после кадра превью: сдвиг уже в стилях дизайна
+  dz.tab = 'parts';
+  dz.part = d.part.id;
+  renderDz(false);
+  // клик после отпускания — это конец перетаскивания, а не выбор
+  const eat = (ev) => { ev.preventDefault(); ev.stopImmediatePropagation(); };
+  addEventListener('click', eat, { capture: true, once: true });
+  setTimeout(() => removeEventListener('click', eat, true), 0);
+}
+addEventListener('pointerup', endDrag, true);
+addEventListener('pointercancel', endDrag, true);
 
 // ---------- всплывашки: пипетка цвета и выбор шрифта ----------
 // Живут вне панели (у неё overflow: hidden) и слева от неё — над плеером, который тут же показывает результат
