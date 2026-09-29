@@ -505,12 +505,42 @@ function renderCp() {
       <p class="cp-note">Меняются вместе с обложкой и основой</p>` : ''}
     <h5>Готовые</h5><div class="cp-grid">${CP_PRESETS.map((c) => sw(c)).join('')}</div>
     ${recent.length ? `<h5>Недавние</h5><div class="cp-grid">${recent.map((c) => sw(c)).join('')}</div>` : ''}
-    <h5>Свой</h5><div class="cp-row"><input type="color" data-cp-pick value="${hex}" aria-label="Свой цвет"><input class="input" data-cp-hex value="${hex}" maxlength="7" spellcheck="false" aria-label="Код цвета"></div>
+    <h5>Свой</h5>
+    <div class="cp-sv" data-cp-drag="sv" aria-label="Насыщенность и яркость"><i></i></div>
+    <div class="cp-row">${window.EyeDropper ? `<button class="icon-btn small cp-drop" data-cp-drop title="Взять цвет с экрана" aria-label="Взять цвет с экрана"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m2 22 1-1h3l9-9"/><path d="M3 21v-3l9-9"/><path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z"/></svg></button>` : ''}
+      <div class="cp-hue" data-cp-drag="hue" aria-label="Оттенок"><i></i></div></div>
+    <div class="cp-row"><i class="cp-now"></i><input class="input" data-cp-hex value="${hex}" maxlength="7" spellcheck="false" aria-label="Код цвета"></div>
     ${pop.reset ? `<button class="btn cp-reset" data-cp-reset${v == null ? ' disabled' : ''}>Как в основе</button>` : ''}`;
+  pop.hsv = hexToHsv(hex);
+  cpThumbs(hex);
 }
 
-// Выбрали цвет — черновик и кнопка в панели меняются сразу; саму панель перерисуем при закрытии
-function cpSet(v) {
+// HSV ⇄ #rrggbb. Оттенок держим в pop.hsv сами: у серого он теряется, и полоса прыгала бы в красный
+function hexToHsv(hex) {
+  const [r, g, b] = [1, 3, 5].map((i) => parseInt(hex.slice(i, i + 2), 16) / 255);
+  const max = Math.max(r, g, b), d = max - Math.min(r, g, b);
+  const h = !d ? 0 : max === r ? ((g - b) / d + 6) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return { h: h * 60, s: max ? d / max : 0, v: max };
+}
+function hsvToHex({ h, s, v }) {
+  const f = (n) => { const k = (n + h / 60) % 6; return v - v * s * Math.max(0, Math.min(k, 4 - k, 1)); };
+  return `#${[5, 3, 1].map((n) => Math.round(f(n) * 255).toString(16).padStart(2, '0')).join('')}`;
+}
+// Ползунки пипетки — по pop.hsv, образец и поле — по цвету
+function cpThumbs(hex) {
+  const { h, s, v } = pop.hsv;
+  const sv = $('.cp-sv', popEl);
+  sv.style.setProperty('--h', h.toFixed(1));
+  $('i', sv).style.cssText = `left: ${s * 100}%; top: ${(1 - v) * 100}%; background: ${hex}`;
+  $('.cp-hue i', popEl).style.cssText = `left: ${(h / 360) * 100}%; background: hsl(${h.toFixed(1)} 100% 50%)`;
+  $('.cp-now', popEl).style.setProperty('--c', hex);
+  const inp = $('[data-cp-hex]', popEl);
+  if (inp !== document.activeElement) inp.value = hex;
+}
+
+// Выбрали цвет — черновик и кнопка в панели меняются сразу; саму панель перерисуем при закрытии.
+// keepHsv — цвет пришёл с ползунков пипетки: их положение уже верное, пересчёт из hex его бы сбил
+function cpSet(v, keepHsv = false) {
   dzSet(pop.key, v);
   const hex = cpHex(v);
   pop.anchor.style.setProperty('--c', hex);
@@ -518,7 +548,8 @@ function cpSet(v) {
   const name = $('span', pop.anchor);
   if (name) name.textContent = v.startsWith('#') ? v : DesignCore.TOKENS.find(([t]) => t === v)[1];
   for (const b of $$('.cp-sw', popEl)) b.classList.toggle('on', b.dataset.cpV === v);
-  for (const inp of $$('[data-cp-pick], [data-cp-hex]', popEl)) if (inp !== document.activeElement) inp.value = hex;
+  if (!keepHsv) pop.hsv = hexToHsv(hex);
+  cpThumbs(hex);
   const reset = $('[data-cp-reset]', popEl);
   if (reset) reset.disabled = false;
 }
@@ -542,14 +573,18 @@ popEl.addEventListener('click', (e) => {
   const b = e.target.closest('button');
   if (!b || !pop) return;
   if (b.dataset.cpV) cpSet(b.dataset.cpV);
+  else if (b.hasAttribute('data-cp-drop')) {
+    // пипетка с экрана (Chromium EyeDropper): ткнуть в любое место, хоть в обложку
+    const key = pop.key;
+    new EyeDropper().open().then((r) => { if (pop?.key === key) cpSet(r.sRGBHex.toLowerCase()); }).catch(() => {});
+  }
   else if (b.hasAttribute('data-cp-reset')) { dzSet(pop.key, null); closePop(); }
   else if (b.dataset.fpV !== undefined) { dzSet(pop.key, b.dataset.fpV || null); closePop(); }
 });
 popEl.addEventListener('input', (e) => {
   const t = e.target;
   if (!pop) return;
-  if (t.hasAttribute('data-cp-pick')) cpSet(t.value.toLowerCase());
-  else if (t.hasAttribute('data-cp-hex')) {
+  if (t.hasAttribute('data-cp-hex')) {
     const m = t.value.trim().match(/^#?([0-9a-f]{6}|[0-9a-f]{3})$/i);
     if (!m) return;
     const h = m[1].length === 3 ? m[1].replace(/./g, '$&$&') : m[1];
@@ -557,3 +592,23 @@ popEl.addEventListener('input', (e) => {
   }
 });
 addEventListener('resize', () => { if (pop) closePop(); });
+// Квадрат (насыщенность × яркость) и полоса оттенка: тянешь — цвет меняется на лету
+popEl.addEventListener('pointerdown', (e) => {
+  const area = e.target.closest('[data-cp-drag]');
+  if (!area || !pop || e.button !== 0) return;
+  e.preventDefault();
+  area.setPointerCapture(e.pointerId);
+  const move = (ev) => {
+    const r = area.getBoundingClientRect();
+    const x = Math.min(1, Math.max(0, (ev.clientX - r.left) / r.width));
+    const y = Math.min(1, Math.max(0, (ev.clientY - r.top) / r.height));
+    if (area.dataset.cpDrag === 'hue') pop.hsv.h = x * 360;
+    else { pop.hsv.s = x; pop.hsv.v = 1 - y; }
+    cpSet(hsvToHex(pop.hsv), true);
+  };
+  const up = () => { area.removeEventListener('pointermove', move); area.removeEventListener('pointerup', up); area.removeEventListener('pointercancel', up); };
+  area.addEventListener('pointermove', move);
+  area.addEventListener('pointerup', up);
+  area.addEventListener('pointercancel', up);
+  move(e);
+});

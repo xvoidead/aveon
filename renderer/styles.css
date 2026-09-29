@@ -268,8 +268,9 @@ body.win-autohide.win-reveal .win-buttons, body.win-autohide .win-buttons:focus-
 .chip .count { color: inherit; opacity: .6; font-size: 12px; }
 .chip svg { width: 15px; height: 15px; margin-left: -4px; }
 
-.lib-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; margin: 26px 0 10px; }
-.lib-head > div:first-child { flex: 1; min-width: 0; }
+/* узко (открыт конструктор, маленькое окно) — кнопки уходят под название, а не сжимают его в столбик по букве */
+.lib-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 10px 16px; margin: 26px 0 10px; }
+.lib-head > div:first-child { flex: 1 1 220px; min-width: 0; }
 .head-actions { flex-wrap: nowrap !important; flex: none; }
 .lib-head h1 { margin: 0; font: 700 28px/1.1 var(--display); letter-spacing: -0.025em; overflow-wrap: anywhere; }
 .lib-head p { margin: 6px 0 0; min-height: 20px; font-size: 13px; }
@@ -3247,8 +3248,25 @@ html.dz-open body { padding-right: 384px; }
 .cp-sw:hover { transform: scale(1.15); }
 .cp-sw.on { box-shadow: 0 0 0 2px var(--oak-2), 0 0 0 3.5px var(--text); }
 .cp-note { margin: 6px 0 2px; font-size: 11.5px; color: var(--text-3); }
-.cp-row { display: flex; align-items: center; gap: 8px; }
-.cp-row input[type="color"] { width: 36px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: none; cursor: pointer; flex: none; }
+.cp-row { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+/* квадрат: слева направо — насыщенность, сверху вниз — яркость; --h — оттенок с полосы */
+.cp-sv {
+  position: relative; height: 150px; border-radius: 10px; cursor: crosshair; touch-action: none;
+  background: linear-gradient(to top, #000, transparent), linear-gradient(to right, #fff, hsl(var(--h, 0) 100% 50%));
+  box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08);
+}
+.cp-sv i, .cp-hue i {
+  position: absolute; width: 16px; height: 16px; border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none;
+  box-shadow: 0 0 0 2.5px #fff, 0 1px 6px rgb(0 0 0 / .5);
+}
+.cp-hue {
+  position: relative; flex: 1; height: 12px; border-radius: 6px; cursor: pointer; touch-action: none;
+  background: linear-gradient(to right, #f00, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00);
+}
+.cp-hue i { top: 50%; }
+.cp-drop { flex: none; width: 30px; height: 30px; color: var(--text-2); }
+.cp-drop svg { width: 17px; height: 17px; }
+.cp-now { flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .18); }
 .cp-row .input { flex: 1; min-width: 0; height: 32px; font-family: "Cascadia Mono", Consolas, monospace; text-transform: lowercase; }
 .cp-reset { width: 100%; margin-top: 10px; }
 .fp-list { margin: -2px -4px; }
