@@ -220,6 +220,8 @@ function applyLook() {
   const cls = {
     ...Object.fromEntries(Object.keys(SKINS).filter((id) => id !== 'barrel').map((id) => [`skin-${id}`, skinId === id])),
     'skin-design': !!design,
+    // что-то сдвинуто или увеличено: области перетаскивания окна считаются без translate/scale — styles.css
+    'design-moved': !!design && Object.entries(design.parts || {}).some(([id, v]) => v.move || (v.size && DesignCore.PARTS.find((p) => p.id === id)?.scaleSize)),
     'glass-light': mode === 'light', 'glass-dark': mode === 'dark',
     'look-compact': look.density === 'compact', 'look-cozy': look.density === 'cozy',
     'look-no-covers': !look.covers, 'look-no-album': !look.albumCol, 'look-no-time': !look.timeCol,

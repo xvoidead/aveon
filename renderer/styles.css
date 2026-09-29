@@ -72,6 +72,10 @@ body.win-autohide.win-reveal .win-buttons, body.win-autohide .win-buttons:focus-
   border-right: 1px solid var(--rivet-2);
 }
 .stage > *:not(.brand, .stage-foot) { -webkit-app-region: no-drag; }
+/* Свой дизайн сдвинул или увеличил части (translate/scale): Chromium считает области перетаскивания окна по месту
+   части до сдвига, и там, куда она уехала, клик забирало перетаскивание — кнопки не нажимались. Тогда окно тянем
+   только за верхнюю полосу (.drag-strip) */
+html.design-moved :is(.stage, .lib-top) { -webkit-app-region: no-drag; }
 
 /* ---------- низ сцены: дальше, звонок, аккаунт ---------- */
 .stage-foot { margin-top: auto; width: 100%; display: flex; flex-direction: column; gap: 10px; }
