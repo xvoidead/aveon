@@ -143,3 +143,15 @@ test('кнопка «Друзья» — отдельная часть: свой 
   assert.ok(css.includes(`${SCOPE}#open-friends { translate: -40px 8px; }`));
   assert.ok(css.includes(`${SCOPE}#open-friends { scale: 1.2; }`));
 });
+
+test('сдвиг и размер вкладок — только самим вкладкам, кнопка «Друзья» не едет вместе с ними', () => {
+  const css = D.designCss({ parts: { tabs: { move: { x: 10, y: 0 }, size: 90 } } });
+  assert.ok(css.includes(`${SCOPE}.lib-top > .sources { translate: 10px 0px; }`));
+  assert.ok(css.includes(`${SCOPE}.lib-top > .sources { scale: 0.9; }`));
+  assert.ok(!css.includes(`${SCOPE}.lib-top { translate`));
+});
+
+test('одну вкладку не сдвинуть — только увеличить; двигается вся строка вкладок', () => {
+  const d = D.cleanDesign({ parts: { tab: { move: { x: 0, y: 40 }, size: 110 } } });
+  assert.deepEqual(d.parts.tab, { size: 110 });
+});

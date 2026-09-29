@@ -122,8 +122,10 @@
     { id: 'call', group: 'stage', parent: 'foot', name: 'Звонок Discord', sel: '.call', props: ['fill', 'opacity', 'radius', 'border', 'hidden'] },
     { id: 'account', group: 'stage', parent: 'foot', name: 'Аккаунт', sel: '.stage-account', props: ['color'] },
 
-    { id: 'tabs', group: 'library', block: true, name: 'Вкладки', sel: '.lib-top', props: [] },
-    { id: 'tab', group: 'library', parent: 'tabs', name: 'Вкладка', sel: '.source', props: ['color', 'size', 'font', 'weight', 'caps'] },
+    // сдвиг и размер вкладок — только самим вкладкам (moveSel): кнопка «Друзья» в той же строке — своя часть
+    { id: 'tabs', group: 'library', block: true, name: 'Вкладки', sel: '.lib-top', moveSel: '.lib-top > .sources', props: [] },
+    // одну вкладку не двигаем (noMove): строка вкладок обрезает всё, что из неё выходит, — тянут всю строку
+    { id: 'tab', group: 'library', parent: 'tabs', name: 'Вкладка', sel: '.source', props: ['color', 'size', 'font', 'weight', 'caps'], noMove: true },
     { id: 'friends', group: 'library', parent: 'tabs', name: 'Кнопка «Друзья»', sel: '#open-friends', props: ['color', 'fill', 'opacity', 'radius', 'border', 'hidden'], round: 'pct' },
     { id: 'tabon', group: 'library', parent: 'tabs', name: 'Выбранная вкладка', sel: '.source.active', props: ['color', 'fill', 'radius'], pick: false,
       map: { color: (c) => [['', `color: ${c}`], ['::after', `background: ${c}`]] } },
@@ -142,12 +144,12 @@
     { id: 'rtime', group: 'library', parent: 'list', name: 'Длительность', sel: '.row .col-time', props: ['color', 'hidden'] },
   ];
   // Сдвинуть и увеличить (Shift + колесо на плеере) можно любую часть, кроме фонов окна (это целые колонки)
-  // и состояний вроде «строка под курсором»
+  // и состояний вроде «строка под курсором»; noMove — только увеличить
   for (const p of PARTS) {
     if (p.group === 'window' || p.pick === false || p.sel.includes(':hover')) continue;
     // добавленный размер — через scale: zoom не увеличивает то, чему размер задан в процентах (обложка и т. п.)
     if (!p.props.includes('size')) { p.props.push('size'); p.scaleSize = true; }
-    p.props.push('move');
+    if (!p.noMove) p.props.push('move');
   }
   const PART_BY_ID = new Map(PARTS.map((p) => [p.id, p]));
 
@@ -294,7 +296,8 @@
       const vals = d.parts[part.id];
       if (!vals) continue;
       for (const [prop, v] of Object.entries(vals)) {
-        for (const [sub, decl] of propCss(part, prop, v, vals)) rules.push(`${SCOPE} ${part.sel}${sub} { ${decl}; }`);
+        const sel = part.moveSel && (prop === 'move' || prop === 'size') ? part.moveSel : part.sel;
+        for (const [sub, decl] of propCss(part, prop, v, vals)) rules.push(`${SCOPE} ${sel}${sub} { ${decl}; }`);
       }
     }
     return rules.join('\n');

@@ -414,6 +414,15 @@ document.addEventListener('click', (e) => {
 // Зажал часть и повёл (дальше 4 px) — она едет за курсором; отпустил — сдвиг в черновике и открыты её настройки.
 // Пока тянут, сдвиг — во временном <style>, а не через applyLook: тот обходит все правила и дёргал бы кадры
 
+// Экранных px на один px сдвига — произведение zoom по цепочке предков (интерфейс, размер части).
+// Не по getBoundingClientRect: его искажают transform нажатия (:active { scale(.95) }) и scale размера,
+// а translate от них не растёт — часть уезжала не туда, куда тянули
+function zoomOf(el) {
+  let z = 1;
+  for (let n = el; n; n = n.parentElement) z *= parseFloat(getComputedStyle(n).zoom) || 1;
+  return z;
+}
+
 const dragStyle = document.createElement('style');
 document.head.append(dragStyle);
 let drag = null; // { part, el, x0, y0, start, scale, moved, x, y }
@@ -430,13 +439,14 @@ function hiOver(el, name) {
 addEventListener('pointerdown', (e) => {
   if (!dz?.picking || e.button !== 0 || inDz(e.target)) return;
   const hit = partAt(e.target);
-  if (!hit || !hit.part.props.includes('move')) return;
-  const start = dz.draft.parts[hit.part.id]?.move || { x: 0, y: 0 };
-  // экранных px на один px стиля: zoom интерфейса, размер части и всё прочее разом
-  // (размер через scale сдвиг не увеличивает, в отличие от zoom, — его из пересчёта убираем)
-  const own = hit.part.scaleSize ? (dz.draft.parts[hit.part.id]?.size ?? 100) / 100 : 1;
-  const scale = hit.el.getBoundingClientRect().width / (hit.el.offsetWidth || 1) / own || 1;
-  drag = { part: hit.part, el: hit.el, x0: e.clientX, y0: e.clientY, start, scale, moved: false, x: start.x, y: start.y };
+  if (!hit) return;
+  // саму часть двигать нельзя (вкладка) — тянем ту, в которой она лежит (строку вкладок)
+  let part = hit.part;
+  while (part && !part.props.includes('move')) part = part.parent ? dzPart(part.parent) : null;
+  if (!part) return;
+  const el = (part.moveSel && document.querySelector(part.moveSel)) || hit.el.closest(part.sel.replace(/:hover/g, '')) || hit.el;
+  const start = dz.draft.parts[part.id]?.move || { x: 0, y: 0 };
+  drag = { part, el, x0: e.clientX, y0: e.clientY, start, scale: zoomOf(el), moved: false, x: start.x, y: start.y };
 }, true);
 
 addEventListener('pointermove', (e) => {
@@ -446,7 +456,7 @@ addEventListener('pointermove', (e) => {
   if (!drag.moved) { drag.moved = true; document.documentElement.classList.add('dz-dragging'); }
   drag.x = Math.round(drag.start.x + dx / drag.scale);
   drag.y = Math.round(drag.start.y + dy / drag.scale);
-  dragStyle.textContent = `${drag.part.sel.replace(/:hover/g, '')} { translate: ${drag.x}px ${drag.y}px !important; }`;
+  dragStyle.textContent = `${(drag.part.moveSel || drag.part.sel).replace(/:hover/g, '')} { translate: ${drag.x}px ${drag.y}px !important; }`;
   hiOver(drag.el, `${drag.part.name} · ${drag.x}, ${drag.y}`);
 }, true);
 
