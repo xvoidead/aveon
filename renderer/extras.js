@@ -143,7 +143,7 @@ function setTheme(p) {
     // look.js: свой акцент или цвет бочки важнее палитры обложки
     const own = (k === '--amber' && l.accentMode === 'fixed') || (k === '--voice' && l.voice);
     // look.js: у дизайна свои цвета фона или свой акцент — палитра обложки их не трогает
-    const skinOwn = (window.SKIN_FIXED && BG_VARS.includes(k)) || (window.SKIN_ACCENT && k === '--amber');
+    const skinOwn = (window.SKIN_FIXED && BG_VARS.includes(k)) || (window.SKIN_ACCENT && k === '--amber') || (window.SKIN_VOICE && k === '--voice');
     if (own || skinOwn || (!tintBg() && BG_VARS.includes(k))) root.removeProperty(k);
     else root.setProperty(k, v);
   }

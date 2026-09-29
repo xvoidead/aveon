@@ -51,6 +51,7 @@ const LOOK_DEFAULTS = {
   fsMotion: true,        // фон медленно плывёт
   fsClock: false,        // часы в углу
   fsLyrics: true,        // текст песни во весь экран
+  designs: [],           // свои дизайны (designer.js, design-core.js); выбранный — skin: 'd:<id>'
 };
 
 // Фон: [оттенок, насыщенность %] — светлоты те же, что у палитры из обложки (extras.js → setTheme)
@@ -108,15 +109,7 @@ darkQuery.addEventListener('change', () => { if (SKINS[look.skin]?.palettes && l
 
 const ACCENTS = ['#f0a63a', '#ff7b6b', '#f5d547', '#7ed49a', '#5cc8e8', '#9aa8ff', '#c792ea', '#ff8ac6', '#e8e1d5'];
 
-const FONTS = {
-  unbounded: { name: 'Unbounded', css: '"Unbounded", "Segoe UI", sans-serif' },
-  manrope: { name: 'Manrope', css: '"Manrope", "Segoe UI", sans-serif' },
-  jost: { name: 'Jost', css: '"Jost", "Segoe UI", sans-serif' },
-  onest: { name: 'Onest', css: '"Onest", "Segoe UI", sans-serif' },
-  system: { name: 'Системный', css: 'system-ui, "Segoe UI", Roboto, sans-serif' },
-  serif: { name: 'С засечками', css: 'Georgia, "Times New Roman", "Noto Serif", serif' },
-  mono: { name: 'Моноширинный', css: '"Cascadia Mono", Consolas, "Roboto Mono", monospace' },
-};
+const FONTS = DesignCore.FONTS; // общие со своими дизайнами (design-core.js)
 
 let look = { ...LOOK_DEFAULTS };
 window.LOOK = look; // спектр в app.js читает viz / vizPower
@@ -129,6 +122,27 @@ const lookHsl = (h, s, l) => `hsl(${Math.round(h)} ${Math.round(s)}% ${Math.roun
 const lookStyle = document.createElement('style');
 lookStyle.id = 'look-vars';
 document.head.appendChild(lookStyle);
+
+// Свой дизайн: правила из design-core.js → designCss. Отдельный <style>, чтобы менять его, не трогая переменные
+const designStyle = document.createElement('style');
+designStyle.id = 'look-design';
+document.head.appendChild(designStyle);
+
+// Дизайн на экране: черновик из редактора (designer.js) или сохранённый и выбранный
+let designDraft = null;
+function activeDesign(l = look) {
+  if (designDraft) return designDraft;
+  if (typeof l.skin !== 'string' || !l.skin.startsWith('d:')) return null;
+  const found = (l.designs || []).find((d) => d?.id === l.skin.slice(2));
+  return found ? DesignCore.cleanDesign(found) : null;
+}
+// Готовый дизайн под экраном: основа своего, выбранный готовый; свой удалили (например, на другом устройстве) — по умолчанию
+function baseSkinId(l = look) {
+  const d = activeDesign(l);
+  if (d) return d.base;
+  if (SKINS[l.skin]) return l.skin;
+  return String(l.skin).startsWith('d:') ? LOOK_DEFAULTS.skin : 'barrel';
+}
 
 function themeVars(l) {
   const t = THEMES[l.theme] || THEMES.oak;
@@ -148,17 +162,24 @@ function applyLook() {
   look = lookCfg();
   window.LOOK = look;
   const root = document.documentElement;
-  const skin = SKINS[look.skin] || SKINS.barrel;
+  const design = activeDesign();
+  const skinId = baseSkinId();
+  const skin = SKINS[skinId];
   const mode = skinMode(skin);
   const palette = mode ? skin.palettes[mode] : skin.palette;
   const vars = palette ? { ...palette } : themeVars(look);
-  if (look.accentMode === 'fixed') vars['--amber'] = look.accent;
-  else if (skin.accent) vars['--amber'] = skin.accent;
   if (look.voice) vars['--voice'] = look.voice;
-  // extras.js → setTheme: палитра обложки не перекрашивает фон и акцент дизайнов со своими цветами;
+  // Свой дизайн: его цвета главнее темы и основы; акцент фиксированный, только если он не «из обложки»
+  const own = design ? DesignCore.paletteVars(design) : {};
+  Object.assign(vars, own);
+  const fixedAccent = design ? (design.accentFromCover ? null : own['--amber'] || skin.accent) : skin.accent;
+  if (look.accentMode === 'fixed') vars['--amber'] = look.accent;
+  else if (fixedAccent) vars['--amber'] = fixedAccent;
+  // extras.js → setTheme: палитра обложки не перекрашивает фон, акцент и голоса дизайнов со своими цветами;
   // на светлом фоне акцент из обложки темнее, а фон сцены — готовая размытая обложка (ambientFrom)
-  window.SKIN_FIXED = !!palette;
-  window.SKIN_ACCENT = !!skin.accent;
+  window.SKIN_FIXED = !!palette || (!!design && DesignCore.fixesBg(design));
+  window.SKIN_ACCENT = !!fixedAccent;
+  window.SKIN_VOICE = !!own['--voice'];
   window.SKIN_LIGHT = mode === 'light';
   window.SKIN_AMBIENT = !!skin.ambient;
   // Спектр и вращение пластинки дизайну не нужны — выключаем в том, что читают их циклы (app.js, scratch.js),
@@ -166,20 +187,23 @@ function applyLook() {
   if (skin.noViz || skin.noVinyl) {
     window.LOOK = { ...look, ...(skin.noViz ? { viz: false } : {}), ...(skin.noVinyl ? { vinyl: false, scratch: false } : {}) };
   }
-  const display = skin.display && look.display === LOOK_DEFAULTS.display ? skin.display : look.display;
-  const text = skin.text && look.text === LOOK_DEFAULTS.text ? skin.text : look.text;
+  const display = design?.fonts.display || (skin.display && look.display === LOOK_DEFAULTS.display ? skin.display : look.display);
+  const text = design?.fonts.text || (skin.text && look.text === LOOK_DEFAULTS.text ? skin.text : look.text);
   vars['--display'] = (FONTS[display] || FONTS.unbounded).css;
   vars['--ui'] = (FONTS[text] || FONTS.onest).css;
   vars['--lyrics-scale'] = String(look.lyricsSize / 100);
   vars['--wall-blur'] = `${look.wallBlur}px`;
   vars['--wall-dim'] = String(look.wallDim / 100);
   lookStyle.textContent = `:root { ${Object.entries(vars).map(([k, v]) => `${k}: ${v};`).join(' ')} }`;
+  const css = design ? DesignCore.designCss(design) : '';
+  if (designStyle.textContent !== css) designStyle.textContent = css;
 
   // Размер интерфейса: CSS zoom масштабирует всё сразу, и раскладка остаётся живой
   root.style.zoom = look.scale === 100 ? '' : String(look.scale / 100);
   root.style.setProperty('--ui-zoom', String(look.scale / 100)); // 100vh внутри zoom — в пикселях без него (styles.css, обложка «Стекла»)
   const cls = {
-    ...Object.fromEntries(Object.keys(SKINS).filter((id) => id !== 'barrel').map((id) => [`skin-${id}`, look.skin === id])),
+    ...Object.fromEntries(Object.keys(SKINS).filter((id) => id !== 'barrel').map((id) => [`skin-${id}`, skinId === id])),
+    'skin-design': !!design,
     'glass-light': mode === 'light', 'glass-dark': mode === 'dark',
     'look-compact': look.density === 'compact', 'look-cozy': look.density === 'cozy',
     'look-no-covers': !look.covers, 'look-no-album': !look.albumCol, 'look-no-time': !look.timeCol,
@@ -196,14 +220,14 @@ function applyLook() {
     'dock-right': !IS_MOBILE && look.dock === 'right', 'dock-bottom': !IS_MOBILE && look.dock === 'bottom', 'dock-top': !IS_MOBILE && look.dock === 'top',
   };
   for (const [k, on] of Object.entries(cls)) root.classList.toggle(k, on);
-  applyRadius((look.radius / 100) * (skin.radius || 1));
+  applyRadius((look.radius / 100) * (skin.radius || 1) * (design ? design.radius / 100 : 1));
   requestAnimationFrame(() => moveSourceInk?.(true)); // app.js: вкладки то сверху, то слева
   applySources();
   reapplyTheme?.(); // extras.js: палитра из обложки знает, трогать ли акцент
 }
 
 // Скругления разбросаны по всем стилям числами, поэтому масштабируем их прямо в правилах
-const radiusOrig = new Map();
+const radiusOrig = new WeakMap(); // правила своего дизайна пересоздаются на каждое изменение — старые не держим
 function applyRadius(f) {
   for (const sheet of document.styleSheets) {
     let rules;
@@ -322,11 +346,13 @@ function lookCode() {
   return `AVL1.${btoa(unescape(encodeURIComponent(JSON.stringify(rest))))}`;
 }
 async function pasteLook() {
-  const code = await ask({ title: 'Вставить код оформления', text: 'Код начинается с AVL1. Своя картинка фона останется как есть.', ok: 'Применить', value: '' });
+  const code = await ask({ title: 'Вставить код', text: 'Код оформления начинается с AVL1., код дизайна — с AVD1. Своя картинка фона останется как есть.', ok: 'Применить', value: '' });
   if (!code) return;
+  if (code.trim().startsWith(DesignCore.CODE_PREFIX)) { await importDesign(code); return; } // designer.js
   try {
     const data = JSON.parse(decodeURIComponent(escape(atob(code.trim().replace(/^AVL1\./, '')))));
     const clean = Object.fromEntries(Object.entries(data).filter(([k]) => k in LOOK_DEFAULTS && k !== 'wallpaper'));
+    if ('designs' in clean) clean.designs = (Array.isArray(clean.designs) ? clean.designs : []).slice(0, DesignCore.MAX_DESIGNS).map((d) => DesignCore.cleanDesign(d));
     await saveLook(clean);
     rerenderLook();
     toast('Оформление применено');
@@ -352,19 +378,27 @@ function dockSection(l) {
   </section>`;
 }
 
-// Выбор дизайна: две карточки с маленьким макетом каждого
+// Выбор дизайна: карточки с маленьким макетом каждого; свои — тем же макетом в своих цветах (designer.js)
 function skinSection(l) {
-  const mock = (id) => `<span class="skin-mock is-${id}" aria-hidden="true">
+  const mock = (id, d) => `<span class="skin-mock is-${id}" aria-hidden="true"${d ? ` style="${Object.entries(DesignCore.paletteVars(d)).map(([k, v]) => `${k}:${v}`).join(';')}"` : ''}>
     <span class="sm-rail"><i></i><i></i><i></i><i></i></span>
     <span class="sm-stage"><span class="sm-cover"></span><span class="sm-t"></span><span class="sm-a"></span><span class="sm-bar"></span><span class="sm-play"></span></span>
-    <span class="sm-lib"><span class="sm-h"></span>${'<span class="sm-row"><i></i><b></b></span>'.repeat(5)}</span>
+    <span class="sm-lib"><span class="sm-h"${d ? ` data-label="${esc(d.name)}"` : ''}></span>${'<span class="sm-row"><i></i><b></b></span>'.repeat(5)}</span>
   </span>`;
+  const designs = (l.designs || []).map((d) => DesignCore.cleanDesign(d));
+  const card = (d) => `<div class="look-skin look-design${l.skin === `d:${d.id}` ? ' on' : ''}" role="button" tabindex="0" data-design="${d.id}">
+    ${mock(d.base, d)}<span class="skin-name">${esc(d.name)}</span><small>На основе «${SKINS[d.base].name}»</small>
+    <button class="icon-btn small look-design-more" data-design-more="${d.id}" aria-label="Ещё: «${esc(d.name)}»" aria-haspopup="menu" aria-expanded="false"><svg><use href="#i-more"/></svg></button></div>`;
   return `<section class="sec" data-sec="skin">
     <h3 class="sec-title">Дизайн</h3>
     <p class="sec-desc">Внешний вид всего плеера. Акцент, шрифты и остальное ниже работают во всех.</p>
     <div class="look-skins">${Object.entries(SKINS).map(([id, s]) => `<button class="look-skin${l.skin === id ? ' on' : ''}" data-skin="${id}">
       ${mock(id)}<span class="skin-name">${s.name}</span><small>${s.desc}</small></button>`).join('')}</div>
-    ${SKINS[l.skin]?.palettes ? `<div class="field"><label>Тема</label><div class="ctl">${seg('glassMode', [['auto', 'Как в системе'], ['light', 'Светлая'], ['dark', 'Тёмная']], l.glassMode)}</div></div>` : ''}
+    <h4 class="look-sub">Мои дизайны</h4>
+    <div class="look-skins">${designs.map(card).join('')}<button class="look-skin look-design-new" id="look-design-new">
+      <span class="skin-mock look-design-plus" aria-hidden="true"><svg><use href="#i-plus"/></svg></span>
+      <span class="skin-name">Создать дизайн</span><small>Цвета, шрифты и каждая часть плеера — без кода</small></button></div>
+    ${SKINS[baseSkinId(l)]?.palettes ? `<div class="field"><label>Тема</label><div class="ctl">${seg('glassMode', [['auto', 'Как в системе'], ['light', 'Светлая'], ['dark', 'Тёмная']], l.glassMode)}</div></div>` : ''}
   </section>`;
 }
 
@@ -515,6 +549,13 @@ function bindLook(body) {
     .forEach((s) => { s.dataset.lookRoot = '1'; });
 
   $$('[data-skin]', body).forEach((b) => { b.onclick = async () => { await saveLook({ skin: b.dataset.skin }); rerenderLook(); }; });
+  $$('[data-design]', body).forEach((c) => {
+    const pick = async () => { await saveLook({ skin: `d:${c.dataset.design}` }); rerenderLook(); };
+    c.onclick = (e) => { if (!e.target.closest('[data-design-more]')) pick(); };
+    c.onkeydown = (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === c) { e.preventDefault(); pick(); } };
+  });
+  $$('[data-design-more]', body).forEach((b) => { b.onclick = (e) => { e.stopPropagation(); designMenu(b.dataset.designMore, b); }; });
+  $('#look-design-new', body).onclick = () => openDesigner(null); // designer.js
   $$('[data-theme]', body).forEach((b) => { b.onclick = async () => { await saveLook({ theme: b.dataset.theme }); rerenderLook(); }; });
   $$('[data-look-seg]', body).forEach((g) => {
     $$('button', g).forEach((b) => { b.onclick = async () => { await saveLook({ [g.dataset.lookSeg]: b.dataset.v }); rerenderLook(); }; });
@@ -588,12 +629,12 @@ function bindLook(body) {
   };
   $('#look-paste', body).onclick = pasteLook;
   $('#look-reset', body).onclick = async () => {
-    const ok = await ask({ title: 'Сбросить оформление?', text: 'Тема, цвета, шрифты, размеры и вкладки вернутся как было. Картинка фона уберётся.', ok: 'Сбросить', input: false, danger: true });
+    const ok = await ask({ title: 'Сбросить оформление?', text: 'Тема, цвета, шрифты, размеры и вкладки вернутся как было. Картинка фона уберётся, свои дизайны останутся.', ok: 'Сбросить', input: false, danger: true });
     if (ok === null) return;
     await api.store.set('wallpaper', null).catch(() => {});
     wallpaperUrl = '';
     wallEl.style.backgroundImage = '';
-    await saveLook({ ...LOOK_DEFAULTS });
+    await saveLook({ ...LOOK_DEFAULTS, designs: look.designs });
     rerenderLook();
   };
 }
