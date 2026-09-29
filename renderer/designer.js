@@ -77,7 +77,23 @@ dzEl.className = 'dz';
 dzEl.hidden = true;
 dzEl.setAttribute('role', 'dialog');
 dzEl.setAttribute('aria-label', 'Конструктор дизайна');
-document.body.append(dzEl);
+// панель, рамка выбора и всплывашки — не в <body>: его на время конструктора уменьшаем (fitDz)
+document.documentElement.append(dzEl);
+
+// Плеер в конструкторе не сжимается под панель, а уменьшается целиком (zoom на <body>): раскладка та же,
+// что в полном окне, — сдвинутые части после закрытия панели стоят там же, где их поставили.
+// Раньше body сжимали отступом на 384 px, раскладка была уже — и всё уезжало, стоило панель закрыть
+const DZ_W = 384; // панель 360 + поля
+function fitDz() {
+  const b = document.body.style;
+  if (!dz) { b.zoom = b.width = b.height = ''; return; }
+  const z = parseFloat(document.documentElement.style.zoom) || 1; // размер интерфейса (look.js)
+  const k = Math.max(0.4, (innerWidth - DZ_W) / innerWidth);
+  b.zoom = String(k);
+  b.width = `${innerWidth / z}px`;
+  b.height = `${innerHeight / z}px`; // и высота та же: колонка выше — её части стояли бы иначе (снизу — пусто)
+}
+addEventListener('resize', fitDz);
 
 const hexCtx = document.createElement('canvas').getContext('2d');
 // Цвет переменной прямо сейчас — в #rrggbb для <input type="color">, пока свой цвет не задан
@@ -112,6 +128,7 @@ function openDesigner(id) {
   closeSettings();
   dzEl.hidden = false;
   document.documentElement.classList.add('dz-open');
+  fitDz();
   renderDz(false);
   setPicking(true); // сразу можно нажать на часть плеера или потащить её
   previewDz();
@@ -140,6 +157,7 @@ function endDz() {
   designDraft = null;
   dzEl.hidden = true;
   document.documentElement.classList.remove('dz-open');
+  fitDz();
   applyLook();
   openSettings('skin');
 }
@@ -364,7 +382,7 @@ const dzHi = document.createElement('div');
 dzHi.className = 'dz-hi';
 dzHi.hidden = true;
 dzHi.innerHTML = '<span></span>';
-document.body.append(dzHi);
+document.documentElement.append(dzHi);
 const PICKABLE = DesignCore.PARTS.filter((p) => p.pick !== false);
 
 function setPicking(on) {
@@ -505,7 +523,7 @@ addEventListener('wheel', (e) => {
 const popEl = document.createElement('div');
 popEl.className = 'pop';
 popEl.hidden = true;
-document.body.append(popEl);
+document.documentElement.append(popEl);
 let pop = null; // { kind: 'cp' | 'fp', key, anchor, … }
 const inDz = (t) => dzEl.contains(t) || popEl.contains(t);
 

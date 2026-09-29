@@ -3198,7 +3198,8 @@ html.look-still svg:is(.sym-swap, .sym-bounce, .sym-next, .sym-prev) { animation
   box-shadow: 0 30px 80px rgb(0 0 0 / .55); animation: rise .2s cubic-bezier(.2, .9, .3, 1.1);
   font: 400 14px/1.45 var(--ui); text-transform: none; -webkit-app-region: no-drag;
 }
-html.dz-open body { padding-right: 384px; }
+/* плеер уменьшен целиком (designer.js → fitDz), справа под панелью — фон окна */
+html.dz-open { background: var(--oak); overflow: hidden; }
 .dz-head { display: flex; align-items: center; gap: 6px; padding: 12px 12px 8px 14px; }
 .dz-name { height: 36px; font: 600 15px var(--display); }
 .dz-head .icon-btn.on { color: var(--oak); background: var(--amber); }
