@@ -131,6 +131,8 @@ function previewDz() {
 
 function endDz() {
   setPicking(false);
+  pop = null;
+  popEl.hidden = true;
   cancelAnimationFrame(dzFrame);
   dzFrame = 0;
   dz = null;
@@ -204,22 +206,28 @@ function dzRange(key, def, v) {
   return `<input type="range" data-dz-range="${key}" data-unit="${def.unit}" min="${def.min}" max="${def.max}" step="${def.step}" value="${v ?? def.def}" aria-label="${esc(def.label)}">
     <span class="val" data-dz-val="${key}">${v == null ? '—' : `${v}${def.unit}`}</span>${dzClear(key, v != null)}`;
 }
-// Цвет части: токены (меняются с темой и обложкой) или свой; clear — показывать «×»
-function dzColor(key, v, fallbackVar, clear = true) {
-  const mine = typeof v === 'string' && v.startsWith('#');
-  return `${DesignCore.TOKENS.map(([t, name, cssVar]) => `<button class="dz-token${v === t ? ' on' : ''}" data-dz-set="${key}" data-v="${t}" style="--c: var(${cssVar})" title="${name}" aria-label="${name}"></button>`).join('')}
-    <input type="color" class="${mine ? 'on' : ''}" data-dz-color="${key}" value="${mine ? v : currentHex(tokenVar(v) || fallbackVar)}" aria-label="Свой цвет">${clear ? dzClear(key, v != null) : ''}`;
+// Цвет — кнопка-образец, сам выбор во всплывающей пипетке (openCp). clear — «×» рядом; tokens — цвета темы в пипетке
+function dzColor(key, v, fallbackVar, clear = true, tokens = true) {
+  const css = typeof v === 'string' && v.startsWith('#') ? v : currentHex(tokenVar(v) || fallbackVar);
+  const name = v == null ? 'Как в основе' : v.startsWith('#') ? v : DesignCore.TOKENS.find(([t]) => t === v)[1];
+  return `<button class="cp-btn${v == null ? ' unset' : ''}" data-dz-cp="${key}" data-fallback="${fallbackVar}" data-tokens="${tokens ? 1 : 0}" data-reset="${clear ? 1 : 0}" style="--c: ${css}" aria-label="Цвет: ${esc(name)}"><i></i><span>${esc(name)}</span></button>${clear ? dzClear(key, v != null) : ''}`;
+}
+// Шрифт — кнопка с названием этим же шрифтом, список — во всплывашке (openFp)
+function dzFont(key, v, emptyLabel) {
+  const f = DesignCore.FONTS[v];
+  if (f) ensureFont(v);
+  return `<button class="fp-btn" data-dz-fp="${key}" data-empty="${esc(emptyLabel)}"${f ? ` style="font-family: ${esc(f.css)}"` : ''}>${esc(f ? f.name : emptyLabel)}<svg><use href="#i-chevron-r"/></svg></button>`;
 }
 
 function commonBody(d) {
-  const fontSel = (k) => `<select class="input" data-dz-select="font:${k}"><option value="">Как в основе</option>${Object.entries(DesignCore.FONTS).map(([id, f]) => `<option value="${id}" ${d.fonts[k] === id ? 'selected' : ''}>${f.name}</option>`).join('')}</select>`;
+  const fontSel = (k) => dzFont(`font:${k}`, d.fonts[k], 'Как в основе');
   return `<section class="dz-sec"><h4>Основа</h4>
       <p class="dz-hint">Раскладка и стиль, на которых строится дизайн.</p>
       ${dzSeg('top:base', DesignCore.BASES.map((b) => [b, SKINS[b].name]), d.base)}</section>
     <section class="dz-sec"><h4>Палитра</h4>
       <p class="dz-hint">Не заданный цвет берётся из основы и обложки.</p>
       <div class="dz-colors">${DesignCore.PALETTE.map(([k, label]) => `<div class="dz-pal${d.palette[k] ? ' set' : ''}">
-        <input type="color" data-dz-color="pal:${k}" value="${d.palette[k] || currentHex(`--${k}`)}" aria-label="${label}"><span>${label}</span>${dzClear(`pal:${k}`, !!d.palette[k])}</div>`).join('')}</div>
+        <button class="cp-btn cp-dot${d.palette[k] ? '' : ' unset'}" data-dz-cp="pal:${k}" data-fallback="--${k}" data-tokens="0" data-reset="1" style="--c: ${d.palette[k] || currentHex(`--${k}`)}" aria-label="${label}"><i></i></button><span>${label}</span>${dzClear(`pal:${k}`, !!d.palette[k])}</div>`).join('')}</div>
       ${dzField('Акцент из обложки', `<label class="switch"><input type="checkbox" data-dz-bool="top:accentFromCover" ${d.accentFromCover ? 'checked' : ''} aria-label="Акцент из обложки"><span></span></label>`)}
     </section>
     <section class="dz-sec"><h4>Шрифты</h4>${dzField('Заголовки', fontSel('display'))}${dzField('Текст', fontSel('text'))}</section>
@@ -257,7 +265,7 @@ function propRow(part, prop, v) {
     case 'range': return dzField(label, dzRange(key, def, v));
     case 'bool': return dzField(label, `<label class="switch"><input type="checkbox" data-dz-bool="${key}" ${v ? 'checked' : ''} aria-label="${esc(label)}"><span></span></label>`);
     case 'enum':
-      if (prop === 'font') return dzField(label, `<select class="input" data-dz-select="${key}"><option value="">Как везде</option>${def.options.map(([o, n]) => `<option value="${o}" ${v === o ? 'selected' : ''}>${n}</option>`).join('')}</select>`);
+      if (prop === 'font') return dzField(label, dzFont(key, v, 'Как везде'));
       return dzField(label, `${dzSeg(key, def.options, v)}${dzClear(key, v != null)}`);
     case 'fill': {
       let out = dzField(label, `${dzSeg(`${key}.kind`, [['none', 'Нет'], ['solid', 'Цвет'], ['gradient', 'Градиент']], v?.kind)}${dzClear(key, !!v)}`);
@@ -300,6 +308,7 @@ function renderDz(keepScroll = true) {
     <div class="dz-body">${dz.tab === 'common' ? commonBody(d) : dz.part ? partBody(d, dz.part) : treeBody(d)}</div>
     <div class="dz-foot"><button class="btn" id="dz-cancel">Отмена</button><button class="btn primary" id="dz-save">Сохранить</button></div>`;
   $('.dz-body', dzEl).scrollTop = top;
+  if (pop) pop.anchor = $(`[data-dz-${pop.kind}="${pop.key}"]`, dzEl) || pop.anchor; // всплывашка открыта — держится за новую кнопку
 }
 
 // ---------- события панели ----------
@@ -314,6 +323,8 @@ dzEl.addEventListener('click', (e) => {
   if (b.id === 'dz-back') { dz.part = null; renderDz(false); return; }
   if (ds.dzTab) { dz.tab = ds.dzTab; dz.part = null; renderDz(false); return; }
   if (ds.dzPart) { dz.part = ds.dzPart; renderDz(false); return; }
+  if (ds.dzCp) { openCp(b); return; }
+  if (ds.dzFp) { openFp(b); return; }
   if (ds.dzSet) dzSet(ds.dzSet, ds.v);
   else if (ds.dzClear) dzSet(ds.dzClear, null);
   else if (ds.dzEye) dzSet(`part:${ds.dzEye}:hidden`, dz.draft.parts[ds.dzEye]?.hidden ? null : true);
@@ -332,16 +343,16 @@ dzEl.addEventListener('input', (e) => {
     dzSet(key, +t.value);
     const val = $(`[data-dz-val="${key}"]`, dzEl);
     if (val) val.textContent = `${t.value}${t.dataset.unit || ''}`;
-  } else if (t.dataset.dzColor) dzSet(t.dataset.dzColor, t.value.toLowerCase());
+  }
 });
 
-// По отпусканию ползунка и закрытию палитры — перерисовать: появились «×» и зависимые поля
+// По отпусканию ползунка — перерисовать: появились «×» и зависимые поля
 dzEl.addEventListener('change', (e) => {
   const t = e.target;
   if (!dz) return;
   if (t.dataset.dzBool) dzSet(t.dataset.dzBool, t.dataset.dzBool.startsWith('part:') ? (t.checked || null) : t.checked);
   else if (t.dataset.dzSelect) dzSet(t.dataset.dzSelect, t.value || null);
-  else if (!t.dataset.dzRange && !t.dataset.dzColor) return;
+  else if (!t.dataset.dzRange) return;
   renderDz();
 });
 
@@ -350,7 +361,8 @@ document.addEventListener('keydown', (e) => {
   if (!dz || e.key !== 'Escape' || !$('#dialog').hidden) return;
   e.preventDefault();
   e.stopImmediatePropagation();
-  if (dz.picking) setPicking(false);
+  if (pop) closePop();
+  else if (dz.picking) setPicking(false);
   else if (dz.part) { dz.part = null; renderDz(false); }
   else cancelDz();
 }, true);
@@ -376,7 +388,7 @@ function setPicking(on) {
 
 function partAt(target) {
   for (let n = target instanceof Element ? target : null; n && n !== document.body; n = n.parentElement) {
-    if (n === dzEl) return null;
+    if (n === dzEl || n === popEl) return null;
     const part = PICKABLE.find((p) => n.matches(p.sel));
     if (part) return { part, el: n };
   }
@@ -395,10 +407,10 @@ document.addEventListener('pointermove', (e) => {
   dzHi.hidden = false;
 }, true);
 
-const dzSwallow = (e) => { if (dz?.picking && !dzEl.contains(e.target)) { e.preventDefault(); e.stopImmediatePropagation(); } };
+const dzSwallow = (e) => { if (dz?.picking && !inDz(e.target)) { e.preventDefault(); e.stopImmediatePropagation(); } };
 for (const type of ['pointerdown', 'pointerup', 'mousedown', 'mouseup', 'dblclick', 'contextmenu']) document.addEventListener(type, dzSwallow, true);
 document.addEventListener('click', (e) => {
-  if (!dz?.picking || dzEl.contains(e.target)) return;
+  if (!dz?.picking || inDz(e.target)) return;
   e.preventDefault();
   e.stopImmediatePropagation();
   const hit = partAt(e.target);
@@ -408,3 +420,140 @@ document.addEventListener('click', (e) => {
   setPicking(false);
   renderDz(false);
 }, true);
+
+// ---------- всплывашки: пипетка цвета и выбор шрифта ----------
+// Живут вне панели (у неё overflow: hidden) и слева от неё — над плеером, который тут же показывает результат
+
+const popEl = document.createElement('div');
+popEl.className = 'pop';
+popEl.hidden = true;
+document.body.append(popEl);
+let pop = null; // { kind: 'cp' | 'fp', key, anchor, … }
+const inDz = (t) => dzEl.contains(t) || popEl.contains(t);
+
+// Ключ поля → текущее значение в черновике (обратное dzSet)
+function dzGet(key) {
+  const d = dz.draft;
+  const [kind, a, b] = key.split(':');
+  if (kind === 'pal') return d.palette[a];
+  if (kind === 'font') return d.fonts[a] || undefined;
+  if (kind === 'part') {
+    const [prop, sub] = b.split('.');
+    const v = d.parts[a]?.[prop];
+    return sub ? v?.[sub] : v;
+  }
+  return d[a];
+}
+
+function placePop(anchor) {
+  const z = parseFloat(document.documentElement.style.zoom) || 1; // как в showMenu (app.js)
+  const r = anchor.getBoundingClientRect();
+  popEl.hidden = false;
+  const w = popEl.offsetWidth * z, h = popEl.offsetHeight * z;
+  const left = Math.max(8, Math.min(dzEl.getBoundingClientRect().left - w - 10, innerWidth - w - 8)); // вплотную слева от панели
+  const top = Math.max(8, Math.min(r.top - 24, innerHeight - h - 8));
+  popEl.style.left = `${left / z}px`;
+  popEl.style.top = `${top / z}px`;
+}
+
+// Закрыть. Снаружи нажали на другую кнопку панели — перерисовываем её после клика, иначе клик уйдёт в пустоту
+function closePop(render = true) {
+  if (!pop) return;
+  if (pop.kind === 'cp') {
+    const v = dzGet(pop.key);
+    if (typeof v === 'string' && v.startsWith('#') && v !== pop.start) cpRemember(v);
+  }
+  pop = null;
+  popEl.hidden = true;
+  popEl.innerHTML = '';
+  if (render) { renderDz(); return; }
+  let done = false;
+  const go = () => { if (!done) { done = true; setTimeout(renderDz, 0); } };
+  document.addEventListener('click', go, { once: true });
+  setTimeout(go, 800);
+}
+document.addEventListener('pointerdown', (e) => {
+  if (pop && !popEl.contains(e.target) && !pop.anchor.contains(e.target)) closePop(false);
+}, true);
+
+// ---- пипетка ----
+
+const CP_PRESETS = ['#ffffff', '#e8e1d5', '#b9b5ad', '#8e8e93', '#48484a', '#2a2a2e', '#18181b', '#0b0b0d', '#000000',
+  '#ff5a5f', '#ff8a3d', '#f0a63a', '#f5d547', '#7ed49a', '#2ec4b6', '#5cc8e8', '#4f7cff', '#9aa8ff',
+  '#c792ea', '#ff8ac6', '#ff3da6', '#b5838d', '#8d6e63', '#556b2f', '#1f4e5f', '#3d2b56', '#5b1a1a'];
+const cpRecent = () => { try { const a = JSON.parse(localStorage.getItem('aveon.cp.recent') || '[]'); return Array.isArray(a) ? a.slice(0, 9) : []; } catch { return []; } };
+function cpRemember(hex) {
+  try { localStorage.setItem('aveon.cp.recent', JSON.stringify([hex, ...cpRecent().filter((c) => c !== hex)].slice(0, 9))); } catch {}
+}
+
+function openCp(btn) {
+  const key = btn.dataset.dzCp;
+  if (pop?.key === key) { closePop(); return; }
+  if (pop) closePop(false);
+  pop = { kind: 'cp', key, anchor: btn, start: dzGet(key), fallback: btn.dataset.fallback, tokens: btn.dataset.tokens === '1', reset: btn.dataset.reset === '1' };
+  renderCp();
+  placePop(btn);
+}
+
+const cpHex = (v) => (typeof v === 'string' && v.startsWith('#') ? v : currentHex(tokenVar(v) || pop.fallback));
+function renderCp() {
+  const v = dzGet(pop.key);
+  const hex = cpHex(v);
+  const sw = (c, title) => `<button class="cp-sw${v === c ? ' on' : ''}" data-cp-v="${c}" style="--c: ${c}" title="${esc(title || c)}" aria-label="${esc(title || c)}"></button>`;
+  const recent = cpRecent();
+  popEl.innerHTML = `${pop.tokens ? `<h5>Цвета темы</h5><div class="cp-grid">${DesignCore.TOKENS.map(([t, name, cssVar]) => `<button class="cp-sw${v === t ? ' on' : ''}" data-cp-v="${t}" style="--c: var(${cssVar})" title="${esc(name)}" aria-label="${esc(name)}"></button>`).join('')}</div>
+      <p class="cp-note">Меняются вместе с обложкой и основой</p>` : ''}
+    <h5>Готовые</h5><div class="cp-grid">${CP_PRESETS.map((c) => sw(c)).join('')}</div>
+    ${recent.length ? `<h5>Недавние</h5><div class="cp-grid">${recent.map((c) => sw(c)).join('')}</div>` : ''}
+    <h5>Свой</h5><div class="cp-row"><input type="color" data-cp-pick value="${hex}" aria-label="Свой цвет"><input class="input" data-cp-hex value="${hex}" maxlength="7" spellcheck="false" aria-label="Код цвета"></div>
+    ${pop.reset ? `<button class="btn cp-reset" data-cp-reset${v == null ? ' disabled' : ''}>Как в основе</button>` : ''}`;
+}
+
+// Выбрали цвет — черновик и кнопка в панели меняются сразу; саму панель перерисуем при закрытии
+function cpSet(v) {
+  dzSet(pop.key, v);
+  const hex = cpHex(v);
+  pop.anchor.style.setProperty('--c', hex);
+  pop.anchor.classList.remove('unset');
+  const name = $('span', pop.anchor);
+  if (name) name.textContent = v.startsWith('#') ? v : DesignCore.TOKENS.find(([t]) => t === v)[1];
+  for (const b of $$('.cp-sw', popEl)) b.classList.toggle('on', b.dataset.cpV === v);
+  for (const inp of $$('[data-cp-pick], [data-cp-hex]', popEl)) if (inp !== document.activeElement) inp.value = hex;
+  const reset = $('[data-cp-reset]', popEl);
+  if (reset) reset.disabled = false;
+}
+
+// ---- выбор шрифта: группами, каждое название — своим шрифтом ----
+
+function openFp(btn) {
+  const key = btn.dataset.dzFp;
+  if (pop?.key === key) { closePop(); return; }
+  if (pop) closePop(false);
+  pop = { kind: 'fp', key, anchor: btn };
+  const cur = dzGet(key) || '';
+  for (const id of Object.keys(DesignCore.FONTS)) ensureFont(id);
+  const item = (id, name, css) => `<button class="fp-item${cur === id ? ' on' : ''}" data-fp-v="${id}"${css ? ` style="font-family: ${esc(css)}"` : ''}>${esc(name)}</button>`;
+  popEl.innerHTML = `<div class="fp-list">${item('', btn.dataset.empty)}${DesignCore.FONT_KINDS.map(([kind, title]) => `<h5>${esc(title)}</h5>${Object.entries(DesignCore.FONTS).filter(([, f]) => f.kind === kind).map(([id, f]) => item(id, f.name, f.css)).join('')}`).join('')}</div>`;
+  placePop(btn);
+  $('.fp-item.on', popEl)?.scrollIntoView({ block: 'center' });
+}
+
+popEl.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b || !pop) return;
+  if (b.dataset.cpV) cpSet(b.dataset.cpV);
+  else if (b.hasAttribute('data-cp-reset')) { dzSet(pop.key, null); closePop(); }
+  else if (b.dataset.fpV !== undefined) { dzSet(pop.key, b.dataset.fpV || null); closePop(); }
+});
+popEl.addEventListener('input', (e) => {
+  const t = e.target;
+  if (!pop) return;
+  if (t.hasAttribute('data-cp-pick')) cpSet(t.value.toLowerCase());
+  else if (t.hasAttribute('data-cp-hex')) {
+    const m = t.value.trim().match(/^#?([0-9a-f]{6}|[0-9a-f]{3})$/i);
+    if (!m) return;
+    const h = m[1].length === 3 ? m[1].replace(/./g, '$&$&') : m[1];
+    cpSet(`#${h.toLowerCase()}`);
+  }
+});
+addEventListener('resize', () => { if (pop) closePop(); });

@@ -111,6 +111,19 @@ const ACCENTS = ['#f0a63a', '#ff7b6b', '#f5d547', '#7ed49a', '#5cc8e8', '#9aa8ff
 
 const FONTS = DesignCore.FONTS; // общие со своими дизайнами (design-core.js)
 
+// Шрифт подключаем, только когда его выбрали: стили @fontsource лежат в node_modules, как у встроенных в index.html
+const fontLinks = new Set();
+function ensureFont(id) {
+  for (const f of FONTS[id]?.files || []) {
+    if (fontLinks.has(f)) continue;
+    fontLinks.add(f);
+    const link = document.createElement('link');
+    link.rel = 'stylesheet';
+    link.href = `../node_modules/@fontsource/${f}.css`;
+    document.head.append(link);
+  }
+}
+
 let look = { ...LOOK_DEFAULTS };
 window.LOOK = look; // спектр в app.js читает viz / vizPower
 
@@ -189,6 +202,9 @@ function applyLook() {
   }
   const display = design?.fonts.display || (skin.display && look.display === LOOK_DEFAULTS.display ? skin.display : look.display);
   const text = design?.fonts.text || (skin.text && look.text === LOOK_DEFAULTS.text ? skin.text : look.text);
+  ensureFont(display);
+  ensureFont(text);
+  if (design) for (const v of Object.values(design.parts)) if (v.font) ensureFont(v.font);
   vars['--display'] = (FONTS[display] || FONTS.unbounded).css;
   vars['--ui'] = (FONTS[text] || FONTS.onest).css;
   vars['--lyrics-scale'] = String(look.lyricsSize / 100);

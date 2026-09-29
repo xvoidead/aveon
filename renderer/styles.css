@@ -3215,10 +3215,48 @@ html.dz-open body { padding-right: 384px; }
 .dz-pal { display: flex; align-items: center; gap: 8px; min-width: 0; font-size: 12.5px; color: var(--text-3); }
 .dz-pal.set { color: var(--text); }
 .dz-pal span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.dz input[type="color"] { width: 30px; height: 26px; padding: 0; border: 0; border-radius: 6px; background: none; cursor: pointer; flex: none; }
-.dz-pal:not(.set) input[type="color"], .dz-ctl input[type="color"]:not(.on) { opacity: .55; }
-.dz-token { width: 22px; height: 22px; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .15); flex: none; }
-.dz-token.on { box-shadow: 0 0 0 2px var(--oak-2), 0 0 0 4px var(--text); }
+/* цвет: кнопка-образец (сам выбор — во всплывашке .pop) */
+.cp-btn { display: flex; align-items: center; gap: 8px; min-width: 0; max-width: 100%; height: 30px; padding: 0 10px 0 5px; border-radius: 9px; background: var(--rivet); color: var(--text); font-size: 12.5px; }
+.cp-btn:hover { background: var(--rivet-2); }
+.cp-btn i { width: 20px; height: 20px; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .18); flex: none; }
+.cp-btn span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cp-btn.unset { color: var(--text-3); }
+.cp-btn.unset i { opacity: .55; }
+.cp-btn.cp-dot { width: 30px; padding: 0; justify-content: center; background: none; }
+.cp-btn.cp-dot i { width: 24px; height: 24px; }
+.cp-btn.cp-dot:hover i { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .18), 0 0 0 3px var(--rivet-2); }
+/* шрифт: кнопка с названием этим шрифтом */
+.fp-btn { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 8px; height: 32px; padding: 0 8px 0 11px; border-radius: 9px; background: var(--rivet); color: var(--text); font-size: 14px; white-space: nowrap; overflow: hidden; }
+.fp-btn:hover { background: var(--rivet-2); }
+.fp-btn svg { width: 14px; height: 14px; color: var(--text-3); flex: none; }
+
+/* всплывашка у панели конструктора: пипетка и выбор шрифта (designer.js → openCp, openFp) */
+.pop {
+  --oak: #121214; --oak-2: #1a1a1d; --rivet: #232327; --rivet-2: #303035;
+  --text: #f2f2f4; --text-2: #c4c4c9; --text-3: #8f8f96;
+  color-scheme: dark;
+  position: fixed; z-index: 41; width: 252px; max-height: calc(100vh - 16px); overflow-y: auto; padding: 10px 12px 12px;
+  background: var(--oak-2); color: var(--text); border: 1px solid var(--rivet-2); border-radius: 14px;
+  box-shadow: 0 24px 60px rgb(0 0 0 / .55); animation: rise .12s ease;
+  font: 400 13px/1.4 "Onest", "Segoe UI", sans-serif; text-transform: none; -webkit-app-region: no-drag;
+}
+.pop h5 { margin: 8px 0 6px; font: 600 11.5px "Onest", "Segoe UI", sans-serif; color: var(--text-3); letter-spacing: .02em; }
+.pop h5:first-child { margin-top: 0; }
+.cp-grid { display: grid; grid-template-columns: repeat(9, 1fr); gap: 5px; }
+.cp-sw { aspect-ratio: 1; border-radius: 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgb(255 255 255 / .15); transition: transform .12s ease; }
+.cp-sw:hover { transform: scale(1.15); }
+.cp-sw.on { box-shadow: 0 0 0 2px var(--oak-2), 0 0 0 3.5px var(--text); }
+.cp-note { margin: 6px 0 2px; font-size: 11.5px; color: var(--text-3); }
+.cp-row { display: flex; align-items: center; gap: 8px; }
+.cp-row input[type="color"] { width: 36px; height: 32px; padding: 0; border: 0; border-radius: 8px; background: none; cursor: pointer; flex: none; }
+.cp-row .input { flex: 1; min-width: 0; height: 32px; font-family: "Cascadia Mono", Consolas, monospace; text-transform: lowercase; }
+.cp-reset { width: 100%; margin-top: 10px; }
+.fp-list { margin: -2px -4px; }
+.fp-list h5 { margin: 10px 8px 4px; }
+.fp-item { display: block; width: 100%; padding: 6px 8px; border-radius: 8px; text-align: left; font-size: 16px; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fp-item:first-child { font-size: 13px; color: var(--text-2); }
+.fp-item:hover { background: var(--rivet); }
+.fp-item.on { color: var(--amber, #f0a63a); background: var(--rivet); }
 .dz-clear { width: 24px; height: 24px; color: var(--text-3); }
 .dz-clear svg { width: 13px; height: 13px; }
 .dz-tree { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }

@@ -9,16 +9,40 @@
   const CODE_PREFIX = 'AVD1.';
   const CODE_MAX = 32 * 1024;
 
-  // Шрифты общие с настройками оформления (look.js → FONTS)
+  // Шрифты общие с настройками оформления (look.js → FONTS). kind — группа в выборе шрифта (designer.js),
+  // files — стили @fontsource, которые look.js → ensureFont подключает, только когда шрифт выбран
   const FONTS = {
-    unbounded: { name: 'Unbounded', css: '"Unbounded", "Segoe UI", sans-serif' },
-    manrope: { name: 'Manrope', css: '"Manrope", "Segoe UI", sans-serif' },
-    jost: { name: 'Jost', css: '"Jost", "Segoe UI", sans-serif' },
-    onest: { name: 'Onest', css: '"Onest", "Segoe UI", sans-serif' },
-    system: { name: 'Системный', css: 'system-ui, "Segoe UI", Roboto, sans-serif' },
-    serif: { name: 'С засечками', css: 'Georgia, "Times New Roman", "Noto Serif", serif' },
-    mono: { name: 'Моноширинный', css: '"Cascadia Mono", Consolas, "Roboto Mono", monospace' },
+    unbounded: { name: 'Unbounded', kind: 'display', css: '"Unbounded", "Segoe UI", sans-serif' },
+    manrope: { name: 'Manrope', kind: 'sans', css: '"Manrope", "Segoe UI", sans-serif' },
+    jost: { name: 'Jost', kind: 'sans', css: '"Jost", "Segoe UI", sans-serif' },
+    onest: { name: 'Onest', kind: 'sans', css: '"Onest", "Segoe UI", sans-serif' },
+    inter: { name: 'Inter', kind: 'sans', css: '"Inter", "Segoe UI", sans-serif', files: ['inter/400', 'inter/500', 'inter/600', 'inter/700'] },
+    montserrat: { name: 'Montserrat', kind: 'sans', css: '"Montserrat", "Segoe UI", sans-serif', files: ['montserrat/400', 'montserrat/500', 'montserrat/600', 'montserrat/700'] },
+    rubik: { name: 'Rubik', kind: 'sans', css: '"Rubik", "Segoe UI", sans-serif', files: ['rubik/400', 'rubik/500', 'rubik/600', 'rubik/700'] },
+    nunito: { name: 'Nunito', kind: 'sans', css: '"Nunito", "Segoe UI", sans-serif', files: ['nunito/400', 'nunito/500', 'nunito/600', 'nunito/700'] },
+    comfortaa: { name: 'Comfortaa', kind: 'sans', css: '"Comfortaa", "Segoe UI", sans-serif', files: ['comfortaa/400', 'comfortaa/500', 'comfortaa/600', 'comfortaa/700'] },
+    raleway: { name: 'Raleway', kind: 'sans', css: '"Raleway", "Segoe UI", sans-serif', files: ['raleway/400', 'raleway/500', 'raleway/600', 'raleway/700'] },
+    exo2: { name: 'Exo 2', kind: 'sans', css: '"Exo 2", "Segoe UI", sans-serif', files: ['exo-2/400', 'exo-2/500', 'exo-2/600', 'exo-2/700'] },
+    oswald: { name: 'Oswald', kind: 'sans', css: '"Oswald", "Segoe UI", sans-serif', files: ['oswald/400', 'oswald/500', 'oswald/600', 'oswald/700'] },
+    ubuntu: { name: 'Ubuntu', kind: 'sans', css: '"Ubuntu", "Segoe UI", sans-serif', files: ['ubuntu/400', 'ubuntu/500', 'ubuntu/700'] },
+    system: { name: 'Системный', kind: 'sans', css: 'system-ui, "Segoe UI", Roboto, sans-serif' },
+    playfair: { name: 'Playfair Display', kind: 'serif', css: '"Playfair Display", Georgia, "Times New Roman", serif', files: ['playfair-display/400', 'playfair-display/500', 'playfair-display/600', 'playfair-display/700'] },
+    ptserif: { name: 'PT Serif', kind: 'serif', css: '"PT Serif", Georgia, "Times New Roman", serif', files: ['pt-serif/400', 'pt-serif/700'] },
+    robotoslab: { name: 'Roboto Slab', kind: 'serif', css: '"Roboto Slab", Georgia, "Times New Roman", serif', files: ['roboto-slab/400', 'roboto-slab/500', 'roboto-slab/600', 'roboto-slab/700'] },
+    lora: { name: 'Lora', kind: 'serif', css: '"Lora", Georgia, "Times New Roman", serif', files: ['lora/400', 'lora/500', 'lora/600', 'lora/700'] },
+    yeseva: { name: 'Yeseva One', kind: 'serif', css: '"Yeseva One", Georgia, "Times New Roman", serif', files: ['yeseva-one/400'] },
+    serif: { name: 'Georgia', kind: 'serif', css: 'Georgia, "Times New Roman", "Noto Serif", serif' },
+    jetbrains: { name: 'JetBrains Mono', kind: 'mono', css: '"JetBrains Mono", "Cascadia Mono", Consolas, monospace', files: ['jetbrains-mono/400', 'jetbrains-mono/500', 'jetbrains-mono/600', 'jetbrains-mono/700'] },
+    firacode: { name: 'Fira Code', kind: 'mono', css: '"Fira Code", "Cascadia Mono", Consolas, monospace', files: ['fira-code/400', 'fira-code/500', 'fira-code/600', 'fira-code/700'] },
+    mono: { name: 'Cascadia Mono', kind: 'mono', css: '"Cascadia Mono", Consolas, "Roboto Mono", monospace' },
+    russo: { name: 'Russo One', kind: 'display', css: '"Russo One", "Segoe UI", sans-serif', files: ['russo-one/400'] },
+    pixel: { name: 'Press Start 2P', kind: 'display', css: '"Press Start 2P", "Segoe UI", sans-serif', files: ['press-start-2p/400'] },
+    lobster: { name: 'Lobster', kind: 'display', css: '"Lobster", "Segoe UI", sans-serif', files: ['lobster/400'] },
+    pacifico: { name: 'Pacifico', kind: 'display', css: '"Pacifico", "Segoe UI", sans-serif', files: ['pacifico/400'] },
+    caveat: { name: 'Caveat', kind: 'display', css: '"Caveat", "Segoe UI", sans-serif', files: ['caveat/400', 'caveat/500', 'caveat/600', 'caveat/700'] },
+    marck: { name: 'Marck Script', kind: 'display', css: '"Marck Script", "Segoe UI", sans-serif', files: ['marck-script/400'] },
   };
+  const FONT_KINDS = [['sans', 'Без засечек'], ['serif', 'С засечками'], ['mono', 'Моноширинные'], ['display', 'Особые']];
 
   // Палитра — те же переменные, что у готовых дизайнов, без «--». Первые девять — фон и текст:
   // если задан хоть один, палитра из обложки фон больше не перекрашивает (look.js → SKIN_FIXED)
@@ -284,7 +308,7 @@
   }
 
   const api = {
-    BASES, MAX_DESIGNS, CODE_PREFIX, FONTS, PALETTE, TOKENS, PROPS, GROUPS, PARTS,
+    BASES, MAX_DESIGNS, CODE_PREFIX, FONTS, FONT_KINDS, PALETTE, TOKENS, PROPS, GROUPS, PARTS,
     newDesignId, cleanDesign, orderedBlocks, designCss, paletteVars, fixesBg, designCode, readDesignCode,
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
