@@ -237,7 +237,7 @@ function dzNode(d, p) {
 }
 
 function treeBody(d) {
-  return `<p class="dz-hint dz-tip">На плеере: нажми на часть — откроются её настройки, зажми и тяни — сдвинешь куда угодно.</p>${DesignCore.GROUPS.map((g) => {
+  return `<p class="dz-hint dz-tip">На плеере: нажми на часть — откроются её настройки, зажми и тяни — сдвинешь куда угодно, Shift + колесо — размер.</p>${DesignCore.GROUPS.map((g) => {
     const tops = g.sel ? DesignCore.orderedBlocks(d, g.id) : DesignCore.PARTS.filter((p) => p.group === g.id && !p.parent);
     const items = tops.map((p) => dzNode(d, p)
       + DesignCore.PARTS.filter((c) => c.parent === p.id).map((c) => dzNode(d, c)).join('')).join('');
@@ -433,7 +433,9 @@ addEventListener('pointerdown', (e) => {
   if (!hit || !hit.part.props.includes('move')) return;
   const start = dz.draft.parts[hit.part.id]?.move || { x: 0, y: 0 };
   // экранных px на один px стиля: zoom интерфейса, размер части и всё прочее разом
-  const scale = hit.el.getBoundingClientRect().width / (hit.el.offsetWidth || 1) || 1;
+  // (размер через scale сдвиг не увеличивает, в отличие от zoom, — его из пересчёта убираем)
+  const own = hit.part.scaleSize ? (dz.draft.parts[hit.part.id]?.size ?? 100) / 100 : 1;
+  const scale = hit.el.getBoundingClientRect().width / (hit.el.offsetWidth || 1) / own || 1;
   drag = { part: hit.part, el: hit.el, x0: e.clientX, y0: e.clientY, start, scale, moved: false, x: start.x, y: start.y };
 }, true);
 
@@ -467,6 +469,25 @@ function endDrag() {
 }
 addEventListener('pointerup', endDrag, true);
 addEventListener('pointercancel', endDrag, true);
+
+// Shift + колесо над частью — её размер, шагом 5 %. Chromium с Shift крутит вбок: шаг приходит в deltaX
+addEventListener('wheel', (e) => {
+  if (!dz?.picking || !e.shiftKey || drag?.moved || inDz(e.target)) return;
+  const hit = partAt(e.target);
+  if (!hit || !hit.part.props.includes('size')) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  const delta = e.deltaY || e.deltaX;
+  if (!delta) return;
+  const def = DesignCore.PROPS.size;
+  const cur = dz.draft.parts[hit.part.id]?.size ?? def.def;
+  const next = Math.min(def.max, Math.max(def.min, cur + (delta < 0 ? def.step : -def.step)));
+  dzSet(`part:${hit.part.id}:size`, next === def.def ? null : next);
+  dz.tab = 'parts';
+  dz.part = hit.part.id;
+  renderDz(false);
+  requestAnimationFrame(() => requestAnimationFrame(() => { if (dz) hiOver(hit.el, `${hit.part.name} · ${next}%`); })); // рамка — по новому размеру
+}, { capture: true, passive: false });
 
 // ---------- всплывашки: пипетка цвета и выбор шрифта ----------
 // Живут вне панели (у неё overflow: hidden) и слева от неё — над плеером, который тут же показывает результат

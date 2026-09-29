@@ -124,6 +124,7 @@
 
     { id: 'tabs', group: 'library', block: true, name: 'Вкладки', sel: '.lib-top', props: [] },
     { id: 'tab', group: 'library', parent: 'tabs', name: 'Вкладка', sel: '.source', props: ['color', 'size', 'font', 'weight', 'caps'] },
+    { id: 'friends', group: 'library', parent: 'tabs', name: 'Кнопка «Друзья»', sel: '#open-friends', props: ['color', 'fill', 'opacity', 'radius', 'border', 'hidden'], round: 'pct' },
     { id: 'tabon', group: 'library', parent: 'tabs', name: 'Выбранная вкладка', sel: '.source.active', props: ['color', 'fill', 'radius'], pick: false,
       map: { color: (c) => [['', `color: ${c}`], ['::after', `background: ${c}`]] } },
     { id: 'search', group: 'library', block: true, name: 'Поиск', sel: '.search', props: ['color', 'fill', 'opacity', 'radius', 'border', 'hidden'] },
@@ -140,8 +141,14 @@
     { id: 'rartist', group: 'library', parent: 'list', name: 'Артист в строке', sel: '.row .t-artist', props: ['color', 'size'] },
     { id: 'rtime', group: 'library', parent: 'list', name: 'Длительность', sel: '.row .col-time', props: ['color', 'hidden'] },
   ];
-  // Сдвинуть можно любую часть, кроме фонов окна (это целые колонки) и состояний вроде «строка под курсором»
-  for (const p of PARTS) if (p.group !== 'window' && p.pick !== false && !p.sel.includes(':hover')) p.props.push('move');
+  // Сдвинуть и увеличить (Shift + колесо на плеере) можно любую часть, кроме фонов окна (это целые колонки)
+  // и состояний вроде «строка под курсором»
+  for (const p of PARTS) {
+    if (p.group === 'window' || p.pick === false || p.sel.includes(':hover')) continue;
+    // добавленный размер — через scale: zoom не увеличивает то, чему размер задан в процентах (обложка и т. п.)
+    if (!p.props.includes('size')) { p.props.push('size'); p.scaleSize = true; }
+    p.props.push('move');
+  }
   const PART_BY_ID = new Map(PARTS.map((p) => [p.id, p]));
 
   const isObj = (v) => v != null && typeof v === 'object' && !Array.isArray(v);
@@ -261,7 +268,7 @@
       case 'color': return [['', `color: ${colorCss(v)}`]];
       case 'fill': return [['', `background: ${fillCss(v, vals.opacity)}`]];
       case 'radius': return [['', `border-radius: ${radiusCss(part, v)}`]];
-      case 'size': return [['', `zoom: ${v / 100}`]];
+      case 'size': return [['', part.scaleSize ? `scale: ${v / 100}` : `zoom: ${v / 100}`]];
       case 'font': return [['', `font-family: ${FONTS[v].css}`]];
       case 'weight': return [['', `font-weight: ${v}`]];
       case 'align': return [['', `text-align: ${v}`]];

@@ -127,3 +127,19 @@ test('сдвиг части: целые px в пределах, ноль — н�
   assert.equal(d.parts.stagebg, undefined);
   assert.ok(D.designCss(d).includes(`${SCOPE}.controls .play-btn { translate: 12px -3000px; }`));
 });
+
+test('размер есть у каждой части, которую можно двигать', () => {
+  const d = D.cleanDesign({ parts: { search: { size: 130 }, stagebg: { size: 130 } } });
+  assert.deepEqual(d.parts.search, { size: 130 });
+  assert.equal(d.parts.stagebg, undefined);
+  assert.ok(D.designCss(d).includes(`${SCOPE}.search { scale: 1.3; }`)); // у поиска размер добавлен — через scale
+  assert.ok(D.designCss({ parts: { title: { size: 120 } } }).includes(`${SCOPE}.now-title { zoom: 1.2; }`)); // исконный — как был
+});
+
+test('кнопка «Друзья» — отдельная часть: свой цвет, сдвиг и размер, не вместе со вкладками', () => {
+  const d = D.cleanDesign({ parts: { friends: { color: '#ff0000', move: { x: -40, y: 8 }, size: 120, hidden: true } } });
+  assert.deepEqual(d.parts.friends, { color: '#ff0000', move: { x: -40, y: 8 }, size: 120, hidden: true });
+  const css = D.designCss(d);
+  assert.ok(css.includes(`${SCOPE}#open-friends { translate: -40px 8px; }`));
+  assert.ok(css.includes(`${SCOPE}#open-friends { scale: 1.2; }`));
+});
