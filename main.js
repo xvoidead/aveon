@@ -460,6 +460,7 @@ function registerIpc() {
     tray.state(st);
   });
   ipcMain.on('island:hover', (e, on) => island.hover(!!on));
+  ipcMain.on('island:beat', () => island.beat());
   ipcMain.on('mini:hover', (e, on) => mini.hover(!!on));
   // где у всплывающего окна панель — по ней src/hover.js сам решает, ловить ли мышь
   ipcMain.on('popup:rect', (e, r) => {
@@ -572,6 +573,8 @@ const deskActions = {
 };
 
 app.on('before-quit', () => { quitting = true; });
+// упал GPU-процесс — застывают все окна, остров первым; пишем в журнал острова, чтобы было видно
+app.on('child-process-gone', (e, d) => require('./src/islandlog').log('child-gone', d.type, d.reason, d.exitCode, d.name || ''));
 
 // Ссылки aveon://track/КОД — «Открыть в авеоне» со страницы трека (сервер: /t/КОД, Discord)
 let pendingLink = process.argv.find((a) => a.startsWith('aveon://')) || null;

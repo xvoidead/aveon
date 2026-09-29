@@ -14,7 +14,9 @@ svg { width: 18px; height: 18px; }
 /* Чёрный силуэт капсулы и капель рисует слой .goo под ними (ниже): там они склеиваются, как жидкость.
    Сами капсула и капли прозрачные — поверх только их содержимое, оно остаётся чётким */
 /* размер и место слоя задаёт island.js (syncGoo): по капсуле и каплям с полями под размытие */
-.goo { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: none; filter: url(#goo) drop-shadow(0 4px 12px rgb(0 0 0 / .3)); }
+/* свой слой (will-change): иначе перерисовка текста капсулы — а караоке по буквам перерисовывает строку
+   каждый кадр — заново прогоняет SVG-фильтр, он считается на процессоре, и остров лагал */
+.goo { position: fixed; left: 0; top: 0; width: 0; height: 0; pointer-events: none; filter: url(#goo) drop-shadow(0 4px 12px rgb(0 0 0 / .3)); will-change: transform; }
 .goo i { position: absolute; left: 0; top: 0; width: 0; height: 0; background: #000; opacity: 0; will-change: transform; }
 .pill {
   position: relative; flex: none; width: 280px; height: 36px; border-radius: 22px; background: transparent; overflow: hidden;

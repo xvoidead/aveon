@@ -110,6 +110,7 @@ contextBridge.exposeInMainWorld('tishe', {
     onAction: (cb) => on('island:action', cb),
     action: (a) => ipcRenderer.send('island:action', a),
     hover: (h) => ipcRenderer.send('island:hover', h),
+    beat: () => ipcRenderer.send('island:beat'), // сторож в src/island.js: остров рисует кадры
     log: (...p) => ipcRenderer.send('island:log', ...p), // временно: журнал острова
     onPointer: (cb) => on('island:pointer', cb),
     onState: (cb) => on('island:state', cb),

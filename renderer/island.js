@@ -373,17 +373,26 @@ function syncGoo() {
   for (const [g, r, radius, op] of parts) gooPlace(g, r, { x, y }, radius, op);
 }
 
+let fillAt = 0, fillLast = '', beatAt = 0;
 function tick() {
   const now = performance.now();
+  // «живой» главному процессу раз в секунду: замолчали, пока остров виден, — он нас оживит (src/island.js)
+  if (now - beatAt > 1000) { beatAt = now; api.island.beat?.(); }
   if (now < gooAwake || now - gooSynced > 500) syncGoo();
   const drops = !!st?.hasTrack && !expanded() && !document.body.classList.contains('hidden');
   $('#side').classList.toggle('on', drops && is('friend-live'));
   $('#side-ev').classList.toggle('on', drops && unseen().length > 0);
+  // заливка по буквам: строка — градиент под текстом, каждое изменение — её перерисовка. Не чаще 30 раз
+  // в секунду и только если сдвинулась хотя бы на 0,2 % — глазом не отличить, а перерисовок вдвое-втрое меньше
   const fill = letterFill();
-  if (fill !== null) {
-    const v = `${(fill * 100).toFixed(1)}%`;
-    $('#p-title').style.setProperty('--fill', v);
-    $('#l-cur').style.setProperty('--fill', v);
+  if (fill !== null && now - fillAt > 33) {
+    const v = `${(Math.round(fill * 500) / 5).toFixed(1)}%`;
+    if (v !== fillLast) {
+      fillLast = v;
+      fillAt = now;
+      $('#p-title').style.setProperty('--fill', v);
+      $('#l-cur').style.setProperty('--fill', v);
+    }
   }
   if (st?.hasTrack && is('open')) {
     const dur = st.duration || 0;

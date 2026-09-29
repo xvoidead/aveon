@@ -6,6 +6,7 @@ const hoverWatch = require('./hover');
 const games = require('./games');
 const path = require('path');
 const config = require('./config');
+const { log } = require('./islandlog');
 
 const SIZE = { width: 780, height: 420 }; // с запасом: свёрнутая капсула растёт под длину строки, раскрытая — с текстом и друзьями
 
@@ -215,16 +216,46 @@ function ensure() {
   hoverWatch.watch(win, { leaveDelay: 350, onInside: (on) => { if (ready && !win.isDestroyed()) win.webContents.send('island:pointer', on); } });
   level();
   win.loadFile(path.join(__dirname, '..', 'renderer', 'island.html'));
-  win.webContents.once('did-finish-load', () => {
+  // on, а не once: после перезагрузки сторожем (ниже) остров снова получает место и состояние
+  win.webContents.on('did-finish-load', () => {
     ready = true;
+    lastBeat = Date.now();
     win.webContents.send('island:config', placeCfg());
     if (editing) win.webContents.send('island:preview', true);
     if (last) win.webContents.send('island:state', last);
     update();
   });
+  win.webContents.on('render-process-gone', (e, d) => { log('island.gone', d.reason, d.exitCode); revive('gone'); });
+  win.webContents.on('unresponsive', () => log('island.unresponsive'));
+  win.webContents.on('responsive', () => log('island.responsive'));
   win.on('closed', () => { win = null; ready = false; shown = false; });
   place();
 }
+
+// Сторож: остров из цикла отрисовки раз в секунду говорит «живой» (renderer/island.js → tick).
+// Замолчал, пока виден, — окно перестало выводить кадры (капсула застыла: ни трека, ни анимаций).
+// Сначала просим перерисовать окно, не помогло — перезагружаем остров. Всё — в журнал острова
+let lastBeat = Date.now();
+let stalls = 0;
+function beat() {
+  if (stalls) log('island.beat после', stalls, 'попыток');
+  lastBeat = Date.now();
+  stalls = 0;
+}
+function revive(why) {
+  if (!win || win.isDestroyed()) return;
+  log('island.revive', why);
+  ready = false;
+  lastBeat = Date.now();
+  win.webContents.reload();
+}
+setInterval(() => {
+  if (!win || win.isDestroyed() || !ready || !shown || Date.now() - lastBeat < 3000) return;
+  stalls++;
+  log('island.stall', Math.round((Date.now() - lastBeat) / 1000), 'с, попытка', stalls);
+  if (stalls === 1) win.webContents.invalidate();
+  else if (stalls === 2 || stalls % 20 === 0) revive('stall'); // не помогает — не перезагружаем по кругу, раз в ~30 с
+}, 1500);
 
 function level() {
   if (!win || win.isDestroyed()) return;
@@ -273,6 +304,8 @@ function update() {
   ensure();
   if (!ready || shown) return;
   shown = true;
+  lastBeat = Date.now(); // пока был прозрачным, кадров могло не быть — ждём заново
+  stalls = 0;
   place();
   win.setOpacity(1);
   hoverWatch.setOff(win, editing); // в редакторе мышь не ловим: нажатия — редактору
@@ -313,4 +346,4 @@ function destroy() {
   if (win && !win.isDestroyed()) win.destroy();
 }
 
-module.exports = { init, state, hover, settingsChanged, destroy, preview, screenInfo, editInfo, placement, setEditing, editMove, editOpen, editRect, editRaise };
+module.exports = { init, state, beat, hover, settingsChanged, destroy, preview, screenInfo, editInfo, placement, setEditing, editMove, editOpen, editRect, editRaise };
