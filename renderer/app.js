@@ -1084,6 +1084,12 @@ api.duck.onMeter((m) => {
 });
 api.duck.onStatus((s) => { duck.ok = s.ok; duck.error = s.error || ''; });
 
+// --m, --beat и --level (look.js → reactLoop) читает только сцена с бочкой: пишем их в .stage, а не в <html>.
+// Запись в корень 30–60 раз в секунду пересчитывала стили всей страницы (~1–3 тыс. элементов со строками
+// треков) — окно плеера ело полтора ядра, и остров, которому оно шлёт состояние, лагал
+let stageEl = null;
+const stageStyle = () => (stageEl ||= document.querySelector('.stage') || document.documentElement).style;
+
 function duckTick() {
   const now = performance.now();
   const dt = Math.min(200, now - duck.last);
@@ -1110,7 +1116,8 @@ function duckTick() {
 
   censorTick(dt); // censor.js
   applyEffect(duck.m);
-  document.documentElement.style.setProperty('--m', duck.m.toFixed(3));
+  const mv = duck.m.toFixed(3);
+  if (mv !== duck.mShown) { duck.mShown = mv; stageStyle().setProperty('--m', mv); }
   const ext = d.targets?.length ? externalLevel(duck.m) : 1;
   if (Math.abs(ext - duck.sent) > 0.01) {
     duck.sent = ext;

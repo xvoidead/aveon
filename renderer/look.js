@@ -676,7 +676,7 @@ function reactStep(prev, x) {
 function reactLoop() {
   if (window.WIN_MOVING) { requestAnimationFrame(reactLoop); return; } // окно тащат — пульс замер (app.js)
   const on = look.reactCover || look.reactGlow || look.reactHoops;
-  const root = document.documentElement.style;
+  const root = stageStyle();
   if (on && fx.analyser && !audio.paused && !document.hidden) {
     const data = reactBins.subarray(0, fx.analyser.frequencyBinCount);
     fx.analyser.getByteFrequencyData(data);
@@ -689,8 +689,8 @@ function reactLoop() {
     beat *= 0.85;
     level *= 0.85;
   }
-  // В корень пишем, только когда число изменилось: каждая запись — пересчёт стилей всей страницы,
-  // а при выключенной реакции значения затухают до нуля и дальше кадры ничего не стоят
+  // Пишем, только когда число изменилось, а при выключенной реакции значения затухают до нуля и дальше кадры
+  // ничего не стоят. И не в корень, а в .stage (app.js → stageStyle)
   const b = beat.toFixed(3), lv = level.toFixed(3);
   if (b !== beatShown) { root.setProperty('--beat', b); beatShown = b; }
   if (lv !== levelShown) { root.setProperty('--level', lv); levelShown = lv; }
