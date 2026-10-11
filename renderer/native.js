@@ -545,6 +545,48 @@
     });
   };
   handlers.wrapped = () => openWrapped();
+
+  // ---------- профиль — нативный экран на телефоне (как в соцсетях), действия — те же кнопки profile.js ----------
+
+  handlers.profileData = (mk) => {
+    const a = state.account || {};
+    mk = mk || stats.month || monthKey();
+    const md = monthData(mk);
+    const { first, last } = monthRange();
+    const isCurrent = mk === monthKey();
+    const allTime = Object.values(statsAll().days).reduce((x, y) => x + y, 0);
+    const covers = new Map(topArtists(60).map((x) => [artistKey(x.name), abs(x.cover)]));
+    return {
+      name: displayName(), login: a.login || '', avatar: abs(a.avatar || ''), host: (a.server || '').replace(/^https?:\/\//, ''),
+      sync: syncLine(), error: a.error || '', syncing: !!a.syncing, admin: !!a.admin, keys: a.keys || 'ok',
+      friends: (Friends.data?.friends || []).length,
+      conns: connections().map((c) => ({ id: c.id, name: c.name, detail: c.detail, on: !!c.on, brand: c.brand })),
+      devices: pf.devices ? pf.devices.map((d) => ({ name: d.device || 'без имени', current: !!d.current, ago: d.current ? 'это устройство' : `был в сети ${deviceAgo(d.last_used)}` })) : null,
+      devicesError: pf.devicesError || '',
+      month: {
+        key: mk, label: `${MONTHS[md.m - 1]} ${md.y}`, current: isCurrent, canPrev: mk > first, canNext: mk < last,
+        total: Math.round(md.total), totalText: fmtDur(md.total), avgText: fmtDur(md.total / Math.max(1, isCurrent ? new Date().getDate() : md.daysIn)),
+        plays: md.plays, activeDays: md.days.filter((x) => x >= 60).length, allTimeText: fmtDur(allTime),
+        days: md.days.map((x) => Math.round(x / 60)), today: isCurrent ? new Date().getDate() : 0,
+        tracks: md.tracks.slice(0, 30).map((x) => ({ ...slim(x.t), plays: x.plays, sec: Math.round(x.sec) })),
+        artists: md.topArtists.map(([name, sec]) => ({ name, sec: Math.round(sec), text: fmtDur(sec), cover: covers.get(artistKey(name)) || '' })),
+      },
+    };
+  };
+  handlers.profileMonth = (mk) => { stats.month = mk; };
+  // кнопки страницы профиля (она открыта в движке, просто не видна)
+  handlers.profileTap = (sel) => {
+    if (!/^#pf-[a-z-]+$|^\[data-conn="[a-z]+"\]$/.test(sel)) return;
+    renderProfileParts();
+    const el = $(sel, $('#profile'));
+    if (el && !el.disabled) el.click();
+  };
+  handlers.avatarSet = (dataUrl) => setAvatar(String(dataUrl || '')).then(() => toast(dataUrl ? 'Аватар обновлён' : 'Аватар убран'), (e) => toast(e.message, 'err'));
+  handlers.statsPlay = async (mk, i) => {
+    const list = monthData(mk || monthKey()).tracks.slice(0, 30).map((x) => x.t);
+    const ready = await api.meta.apply(list).catch(() => list);
+    if (ready[i]) playFrom(ready, i);
+  };
   handlers.wrappedPlay = (ids) => {
     const all = Object.values(statsAll().tracks).map((r) => r.t).filter(Boolean);
     const list = ids.map((id) => all.find((t) => t.id === id)).filter(Boolean);

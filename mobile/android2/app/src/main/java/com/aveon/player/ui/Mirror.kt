@@ -59,6 +59,8 @@ private val FULL = setOf("settings", "profile", "friends", "auth", "changelog", 
 
 @Composable
 fun PanelHost(panel: Panel) {
+    // профиль — свой экран, как в соцсетях (Profile.kt)
+    if (panel.key == "profile") { ProfileScreen(panel); return }
     val p = LocalPal.current
     if (panel.key in FULL) {
         // экран целиком: въезжает справа, сверху — полоса «‹ Назад» и заголовок
