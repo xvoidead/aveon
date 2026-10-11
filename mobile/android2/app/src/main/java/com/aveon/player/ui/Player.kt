@@ -129,7 +129,7 @@ fun PlayerLayer(nav: Nav) {
         Box(
             Modifier
                 .fillMaxSize()
-                .graphicsLayer { translationY = sheetY; shape = RoundedCornerShape(corner); clip = true }
+                // палец ловим до сдвига листа (graphicsLayer ниже): иначе лист уезжает из-под пальца и дрожит
                 .pointerInput(artSide) {
                     // тянешь вниз — плеер сворачивается за пальцем; по обложке влево/вправо — другой трек
                     awaitEachGesture {
@@ -178,7 +178,8 @@ fun PlayerLayer(nav: Nav) {
                             2 -> nav.settle(v.y)
                         }
                     }
-                },
+                }
+                .graphicsLayer { translationY = sheetY; shape = RoundedCornerShape(corner); clip = true },
         ) {
             PlayerBackground(t, pl.playing)
             Column(Modifier.fillMaxSize().statusBarsPadding().navigationBarsPadding().graphicsLayer { alpha = ((k - 0.35f) / 0.5f).coerceIn(0f, 1f) }) {

@@ -79,6 +79,7 @@ import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.input.pointer.util.VelocityTracker
 import androidx.compose.ui.layout.boundsInRoot
+import androidx.compose.ui.layout.positionInRoot
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
@@ -424,7 +425,12 @@ private fun MiniPlayer(nav: Nav, c: Float, modifier: Modifier) {
                         vt.addPosition(ch.uptimeMillis, ch.position)
                         if (axis == 0 && total.getDistance() > viewConfiguration.touchSlop) axis = if (abs(total.x) > abs(total.y)) 1 else 2
                         if (axis == 1) { ch.consume(); scope.launch { swipe.snapTo(swipe.value + delta.x) } }
-                        if (axis == 2) { ch.consume(); scope.launch { nav.expand.snapTo((nav.expand.value - delta.y / screenH).coerceIn(0f, 1f)) } }
+                        if (axis == 2) {
+                            ch.consume()
+                            // приложение под плеером сжимается — пересчитываем сдвиг пальца в экранный
+                            val sy = delta.y * (1f - 0.07f * nav.expand.value)
+                            scope.launch { nav.expand.snapTo((nav.expand.value - sy / screenH).coerceIn(0f, 1f)) }
+                        }
                     }
                     val v = vt.calculateVelocity()
                     when (axis) {
@@ -568,13 +574,66 @@ fun Overlay(visible: Boolean, content: @Composable () -> Unit) {
     ) { content() }
 }
 
-/** Шторка iOS: скруглённый верх, «ручка», тянешь вниз — закрывается (с учётом скорости). */
+/**
+ * Шторка iOS: скруглённый верх, «ручка», тянешь вниз — закрывается (с учётом скорости).
+ * Палец ловим на неподвижном слое под шторкой: если ловить на самой шторке, она уезжает из-под
+ * пальца, координаты пляшут — и шторка дрожит.
+ */
 @Composable
 fun SheetHost(visible: Boolean, onDismiss: () -> Unit, full: Boolean = false, content: @Composable ColumnScope.() -> Unit) {
     val p = LocalPal.current
-    Box(Modifier.fillMaxSize()) {
+    val dy = remember { Animatable(0f) }
+    val scope = rememberCoroutineScope()
+    val density = LocalDensity.current
+    var top by remember { mutableStateOf(0f) }    // верх шторки (без сдвига пальцем), в координатах слоя
+    var origin by remember { mutableStateOf(0f) }
+    var height by remember { mutableStateOf(1f) }
+    val dismiss by androidx.compose.runtime.rememberUpdatedState(onDismiss)
+    LaunchedEffect(visible) { if (visible) dy.snapTo(0f) }
+    Box(
+        Modifier.fillMaxSize().onGloballyPositioned { origin = it.positionInRoot().y }.then(
+            if (!visible) Modifier else Modifier.pointerInput(Unit) {
+                awaitEachGesture {
+                    val down = awaitFirstDown(requireUnconsumed = false)
+                    // тянуть можно за полосу сверху шторки (ручка и заголовок)
+                    val y0 = top + dy.value
+                    if (down.position.y !in y0..(y0 + 56.dp.toPx())) return@awaitEachGesture
+                    val vt = VelocityTracker()
+                    vt.addPosition(down.uptimeMillis, down.position)
+                    val start = dy.value
+                    var moved = false
+                    while (true) {
+                        val ev = awaitPointerEvent()
+                        val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
+                        if (!ch.pressed) break
+                        vt.addPosition(ch.uptimeMillis, ch.position)
+                        val total = ch.position.y - down.position.y
+                        if (!moved && kotlin.math.abs(total) > viewConfiguration.touchSlop) moved = true
+                        if (moved) {
+                            ch.consume()
+                            val target = (start + total).let { if (it < 0f) it / 4f else it } // вверх — туго, как резинка
+                            scope.launch { dy.snapTo(target) }
+                        }
+                    }
+                    if (!moved) return@awaitEachGesture
+                    val v = vt.calculateVelocity().y
+                    scope.launch {
+                        if (dy.value > with(density) { 110.dp.toPx() } || v > 1000f) {
+                            // уезжает вниз с той же скоростью, без прыжка назад
+                            dy.animateTo(height + 40f, spring(dampingRatio = 1f, stiffness = 900f), initialVelocity = v.coerceAtLeast(1500f))
+                            dismiss()
+                        } else dy.animateTo(0f, spring(dampingRatio = 0.75f, stiffness = 520f), initialVelocity = v)
+                    }
+                }
+            },
+        ),
+    ) {
         AnimatedVisibility(visible, enter = fadeIn(tween(220)), exit = fadeOut(tween(220))) {
-            Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)).tap(onDismiss))
+            Box(
+                Modifier.fillMaxSize()
+                    .graphicsLayer { alpha = (1f - dy.value / height).coerceIn(0f, 1f) }
+                    .background(Color.Black.copy(alpha = 0.5f)).tap(onDismiss),
+            )
         }
         AnimatedVisibility(
             visible,
@@ -582,48 +641,25 @@ fun SheetHost(visible: Boolean, onDismiss: () -> Unit, full: Boolean = false, co
             enter = androidx.compose.animation.slideInVertically(spring(dampingRatio = 0.88f, stiffness = 340f)) { it },
             exit = androidx.compose.animation.slideOutVertically(tween(230)) { it },
         ) {
-            val dy = remember { Animatable(0f) }
-            val scope = rememberCoroutineScope()
-            val density = LocalDensity.current
             Column(
                 Modifier
                     .fillMaxWidth()
                     .then(if (full) Modifier.fillMaxHeight(0.94f) else Modifier)
-                    .offset { IntOffset(0, dy.value.roundToInt()) }
+                    .onGloballyPositioned { c ->
+                        height = c.size.height.toFloat().coerceAtLeast(1f)
+                        // позиция без сдвига пальцем: graphicsLayer ниже по цепочке в неё не входит
+                        top = c.positionInRoot().y - origin
+                    }
+                    .graphicsLayer { translationY = dy.value.coerceAtLeast(-30f) }
                     .clip(RoundedCornerShape(topStart = 14.dp, topEnd = 14.dp))
                     .background(p.surface)
                     .absorb()
                     .navigationBarsPadding()
                     .imePadding(),
             ) {
-                Box(
-                    Modifier
-                        .fillMaxWidth()
-                        .pointerInput(Unit) {
-                            awaitEachGesture {
-                                val down = awaitFirstDown()
-                                val vt = VelocityTracker()
-                                var last = down.position
-                                while (true) {
-                                    val ev = awaitPointerEvent()
-                                    val ch = ev.changes.firstOrNull { it.id == down.id } ?: break
-                                    if (!ch.pressed) break
-                                    vt.addPosition(ch.uptimeMillis, ch.position)
-                                    val dd = ch.position.y - last.y
-                                    last = ch.position
-                                    ch.consume()
-                                    scope.launch { dy.snapTo((dy.value + dd).coerceAtLeast(0f)) }
-                                }
-                                val v = vt.calculateVelocity().y
-                                scope.launch {
-                                    if (dy.value > with(density) { 120.dp.toPx() } || v > 1100f) { onDismiss(); dy.snapTo(0f) }
-                                    else dy.animateTo(0f, spring(dampingRatio = 0.7f, stiffness = 500f))
-                                }
-                            }
-                        }
-                        .padding(top = 6.dp, bottom = 8.dp),
-                    contentAlignment = Alignment.Center,
-                ) { Box(Modifier.size(width = 36.dp, height = 5.dp).clip(CircleShape).background(Color(0xFF5A5A5E))) }
+                Box(Modifier.fillMaxWidth().padding(top = 6.dp, bottom = 8.dp), contentAlignment = Alignment.Center) {
+                    Box(Modifier.size(width = 36.dp, height = 5.dp).clip(CircleShape).background(Color(0xFF5A5A5E)))
+                }
                 content()
             }
         }
