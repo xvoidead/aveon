@@ -106,7 +106,7 @@ private val W15 = Color.White.copy(alpha = 0.15f)
 fun PlayerLayer(nav: Nav) {
     val pl by Engine.player.collectAsState()
     val t = pl.track ?: return
-    val k = nav.expand.value
+    val k = nav.expand.value.coerceIn(0f, 1f)
     if (k <= 0f) return
     val d = LocalDensity.current
     val scope = rememberCoroutineScope()
@@ -510,7 +510,7 @@ private fun BottomTools(pl: Player, nav: Nav) {
 private fun Tool(icon: ImageVector?, on: Boolean, onColor: Color = Color.White, onClick: () -> Unit) {
     val bg by animateFloatAsState(if (on) 1f else 0f, spring(dampingRatio = 0.7f, stiffness = 500f), label = "tool")
     Box(
-        Modifier.size(42.dp).press(scale = 0.86f, onClick = onClick).clip(RoundedCornerShape(10.dp)).background(onColor.copy(alpha = 0.92f * bg)),
+        Modifier.size(42.dp).press(scale = 0.86f, onClick = onClick).clip(RoundedCornerShape(10.dp)).background(onColor.copy(alpha = 0.92f * bg.coerceIn(0f, 1f))),
         contentAlignment = Alignment.Center,
     ) { Ico(icon, W60.mix(Color(0xFF1A1A1A), bg), 22.dp) }
 }
@@ -602,7 +602,7 @@ private fun QueueHead(title: String, via: String) {
 private fun QueueToggle(icon: ImageVector?, badge: String, on: Boolean, modifier: Modifier, onClick: () -> Unit) {
     val k by animateFloatAsState(if (on) 1f else 0f, spring(dampingRatio = 0.7f, stiffness = 500f), label = "qt")
     Box(
-        modifier.height(36.dp).press(scale = 0.94f, onClick = onClick).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.14f + 0.78f * k)),
+        modifier.height(36.dp).press(scale = 0.94f, onClick = onClick).clip(RoundedCornerShape(10.dp)).background(Color.White.copy(alpha = 0.14f + 0.78f * k.coerceIn(0f, 1f))),
         contentAlignment = Alignment.Center,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

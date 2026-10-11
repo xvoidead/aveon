@@ -41,7 +41,11 @@ data class Pal(
 }
 
 fun Color.darken(k: Float) = Color(red * (1 - k), green * (1 - k), blue * (1 - k), alpha)
-fun Color.mix(o: Color, k: Float) = Color(red + (o.red - red) * k, green + (o.green - green) * k, blue + (o.blue - blue) * k, alpha + (o.alpha - alpha) * k)
+// k зажимаем: пружины проскакивают за 0…1, а цвет вне диапазона роняет Compose
+fun Color.mix(o: Color, k: Float): Color {
+    val t = k.coerceIn(0f, 1f)
+    return Color(red + (o.red - red) * t, green + (o.green - green) * t, blue + (o.blue - blue) * t, alpha + (o.alpha - alpha) * t)
+}
 
 val DefaultPal = Pal(
     bg = Color(0xFF1B1411), surface = Color(0xFF231A16), soft = Color(0xFF2A201B), line = Color(0xFF3A2D26),

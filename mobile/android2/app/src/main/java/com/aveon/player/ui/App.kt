@@ -117,7 +117,8 @@ class Nav(val scope: CoroutineScope) {
     var barCollapsed by mutableStateOf(false)
 
     /** 0 — плеер свёрнут в мини-плеер, 1 — раскрыт на весь экран. Тянется пальцем. */
-    val expand = Animatable(0f)
+    // пружина не должна проскакивать за края: отрицательное раскрытие давало отрицательный радиус углов и падение
+    val expand = Animatable(0f).apply { updateBounds(0f, 1f) }
     var mode by mutableStateOf(PMode.Art)
     /** Где на экране обложка мини-плеера — отсюда она «вылетает» в большой плеер. */
     var miniArt by mutableStateOf(Rect.Zero)
@@ -219,7 +220,7 @@ private fun Root() {
     LaunchedEffect(nav.tab, nav.libOpen) { nav.barCollapsed = false }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        val k = nav.expand.value
+        val k = nav.expand.value.coerceIn(0f, 1f)
         // всё приложение под плеером чуть отъезжает вглубь, как карточка в iOS
         Box(
             Modifier
@@ -319,8 +320,8 @@ private fun TabBar(nav: Nav, modifier: Modifier) {
             Modifier.align(Alignment.BottomStart).offset(x = side).size(tabsW, tabsHh).glass(CircleShape)
                 .then(if (c > 0.5f) Modifier.press { nav.barCollapsed = false } else Modifier),
         ) {
-            if (c < 0.99f) TabsRow(nav, Modifier.fillMaxSize().graphicsLayer { alpha = 1f - c * 1.6f })
-            if (c > 0.01f) Box(Modifier.fillMaxSize().graphicsLayer { alpha = c }, contentAlignment = Alignment.Center) {
+            if (c < 0.99f) TabsRow(nav, Modifier.fillMaxSize().graphicsLayer { alpha = (1f - c * 1.6f).coerceIn(0f, 1f) })
+            if (c > 0.01f) Box(Modifier.fillMaxSize().graphicsLayer { alpha = c.coerceIn(0f, 1f) }, contentAlignment = Alignment.Center) {
                 Ico(tabIcon(if (nav.tab == Tab.Search) Tab.Home else nav.tab), LocalPal.current.accent, 24.dp)
             }
         }
@@ -341,7 +342,7 @@ private fun TabBar(nav: Nav, modifier: Modifier) {
                 Modifier.align(Alignment.BottomStart)
                     .offset { IntOffset(with(d) { mx.roundToPx() }, with(d) { (-bottom).roundToPx() } + ((1f - miniShown) * 90.dp.toPx()).roundToInt()) }
                     .size(mw, miniH)
-                    .graphicsLayer { alpha = miniShown },
+                    .graphicsLayer { alpha = miniShown.coerceIn(0f, 1f) },
             )
         }
     }
