@@ -40,7 +40,7 @@
   const isDl = (t) => { try { return DL.done.has(dlKey(t)); } catch { return false; } };
   const slim = (t) => t && ({
     id: t.id, title: t.title || '', artist: t.artist || '', album: t.album || '', duration: +t.duration || 0,
-    cover: abs(t.cover), source: t.source || '', playable: t.playable !== false, preview: !!t.preview, dl: isDl(t),
+    cover: abs(t.cover), source: t.source || '', playable: t.playable !== false, preview: !!t.preview, dl: isDl(t), explicit: !!t.explicit,
   });
 
   // ---------- плеер ----------

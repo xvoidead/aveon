@@ -1,0 +1,5 @@
+include ':app'
+include ':capacitor-cordova-android-plugins'
+project(':capacitor-cordova-android-plugins').projectDir = new File('../android/capacitor-cordova-android-plugins/') // общие с mobile/android: их собирает cap sync
+
+apply from: 'capacitor.settings.gradle'
