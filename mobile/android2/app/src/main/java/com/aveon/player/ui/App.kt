@@ -40,6 +40,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListScope
 import androidx.compose.foundation.lazy.LazyListState
@@ -309,9 +311,16 @@ private fun TabBar(nav: Nav, modifier: Modifier) {
     val c by animateFloatAsState(if (nav.barCollapsed && hasTrack) 1f else 0f, spring(dampingRatio = 0.78f, stiffness = 420f), label = "bar")
     val miniShown by animateFloatAsState(if (hasTrack) 1f else 0f, spring(dampingRatio = 0.8f, stiffness = 380f), label = "mini")
     val d = LocalDensity.current
+    // клавиатура открыта — панель уезжает вниз, а не висит над клавиатурой
+    val ime = WindowInsets.ime.getBottom(d) > 0
+    val hide by animateFloatAsState(if (ime) 1f else 0f, tween(200), label = "barIme")
     val side = 14.dp; val gap = 8.dp
     val tabsH = 62.dp; val miniH = 56.dp; val small = 56.dp
-    BoxWithConstraints(modifier.fillMaxWidth().navigationBarsPadding().padding(bottom = 6.dp).height(miniH + gap + tabsH)) {
+    if (hide >= 0.999f) return
+    BoxWithConstraints(
+        modifier.fillMaxWidth().graphicsLayer { translationY = hide * 160.dp.toPx(); alpha = 1f - hide }
+            .navigationBarsPadding().padding(bottom = 6.dp).height(miniH + gap + tabsH),
+    ) {
         val w = maxWidth
         // вкладки
         val tabsW = lerpDp(w - side * 2 - gap - tabsH, small, c)

@@ -319,6 +319,28 @@
   };
   handlers.homeTrack = (i) => playFrom(homeTop, i);
   handlers.homeList = (i) => homeLists[i]?.open();
+  // ---------- вход и регистрация — нативный экран на телефоне, поля и кнопки — те же, что в app.js ----------
+
+  handlers.authData = () => {
+    const a = state.account || {};
+    const shown = (sel) => !$(sel).hidden;
+    return {
+      mode: authMode, register: authMode === 'register', title: $('#auth-title').textContent, sub: $('#auth-sub').textContent,
+      go: $('#auth-go').textContent, busy: $('#auth-go').disabled, ask: $('#auth-switch-text').textContent, other: $('#auth-switch').textContent,
+      serverField: shown('#auth-server-field'), serverLine: shown('#auth-server-line'), serverHost: $('#auth-server-host').textContent,
+      server: $('#auth-server').value, login: $('#auth-login').value || a.login || '', error: $('#auth-error').textContent,
+    };
+  };
+  handlers.authSubmit = (server, login, password, password2) => {
+    $('#auth-server').value = server || '';
+    $('#auth-login').value = login || '';
+    $('#auth-password').value = password || '';
+    $('#auth-password2').value = password2 || '';
+    $('#auth-form').requestSubmit();
+  };
+  handlers.authSwitch = () => $('#auth-switch').click();
+  handlers.authServerEdit = () => $('#auth-server-edit').click();
+
   handlers.friendProfile = (id) => { if (friendsEl.hidden) openFriends(); openFriendProfile(id); };
 
   // ---------- чат и профиль друга — нативные экраны внутри панели «Друзья» ----------

@@ -62,6 +62,7 @@ fun PanelHost(panel: Panel, native: Boolean = true) {
     // профиль, чат и профиль друга — свои экраны, как в соцсетях (Profile.kt, Social.kt)
     if (native && panel.key == "profile") { ProfileScreen(panel); return }
     if (native && panel.key == "friends") { FriendsHost(panel); return }
+    if (native && panel.key == "auth") { AuthScreen(panel); return }
     val p = LocalPal.current
     if (panel.key in FULL) {
         // экран целиком: въезжает справа, сверху — полоса «‹ Назад» и заголовок
