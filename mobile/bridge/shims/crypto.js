@@ -1,7 +1,9 @@
-// Синхронный crypto для src/: хэши и HMAC на @noble/hashes, случайные байты из WebCrypto
+// Синхронный crypto для src/: хэши, HMAC и scrypt на @noble/hashes, AES-GCM на @noble/ciphers, случайные байты из WebCrypto
 import { sha256 } from '@noble/hashes/sha2.js';
 import { md5, sha1 } from '@noble/hashes/legacy.js';
 import { hmac } from '@noble/hashes/hmac.js';
+import { scrypt } from '@noble/hashes/scrypt.js';
+import { gcm } from '@noble/ciphers/aes.js';
 import { Buffer } from 'buffer';
 
 const ALGS = { sha256, md5, sha1 };
@@ -47,4 +49,51 @@ export function randomUUID() {
   return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
 }
 
-export default { createHash, createHmac, randomBytes, randomUUID };
+// Ключ шифрования из пароля (src/account.js: ключи сервисов на сервере)
+export function scryptSync(password, salt, keylen, opts = {}) {
+  return Buffer.from(scrypt(bytes(password), bytes(salt), { N: opts.N || opts.cost || 16384, r: opts.r || opts.blockSize || 8, p: opts.p || opts.parallelization || 1, dkLen: keylen }));
+}
+
+// AES-GCM как в Node: update копит, final шифрует/расшифровывает разом; тег — отдельно
+function concat(parts) {
+  const total = parts.reduce((n, p) => n + p.length, 0);
+  const all = new Uint8Array(total);
+  let off = 0;
+  for (const p of parts) { all.set(p, off); off += p.length; }
+  return all;
+}
+
+function checkAlg(alg) {
+  if (!/^aes-(128|192|256)-gcm$/.test(alg)) throw new Error('cipher ' + alg);
+}
+
+export function createCipheriv(alg, key, iv) {
+  checkAlg(alg);
+  const parts = [];
+  let tag = null;
+  return {
+    update(x, enc) { parts.push(typeof x === 'string' ? Buffer.from(x, enc || 'utf8') : bytes(x)); return Buffer.alloc(0); },
+    final() {
+      const out = gcm(bytes(key), bytes(iv)).encrypt(concat(parts));
+      tag = Buffer.from(out.subarray(out.length - 16));
+      return Buffer.from(out.subarray(0, out.length - 16));
+    },
+    getAuthTag() { return tag; },
+  };
+}
+
+export function createDecipheriv(alg, key, iv) {
+  checkAlg(alg);
+  const parts = [];
+  let tag = null;
+  return {
+    setAuthTag(t) { tag = bytes(t); return this; },
+    update(x, enc) { parts.push(typeof x === 'string' ? Buffer.from(x, enc || 'base64') : bytes(x)); return Buffer.alloc(0); },
+    final() {
+      if (!tag) throw new Error('auth tag');
+      return Buffer.from(gcm(bytes(key), bytes(iv)).decrypt(concat([...parts, tag])));
+    },
+  };
+}
+
+export default { createHash, createHmac, randomBytes, randomUUID, scryptSync, createCipheriv, createDecipheriv };
