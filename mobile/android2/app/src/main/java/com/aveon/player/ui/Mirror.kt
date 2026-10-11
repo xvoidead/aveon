@@ -58,9 +58,10 @@ import kotlin.math.roundToInt
 private val FULL = setOf("settings", "profile", "friends", "auth", "changelog", "admin")
 
 @Composable
-fun PanelHost(panel: Panel) {
-    // профиль — свой экран, как в соцсетях (Profile.kt)
-    if (panel.key == "profile") { ProfileScreen(panel); return }
+fun PanelHost(panel: Panel, native: Boolean = true) {
+    // профиль, чат и профиль друга — свои экраны, как в соцсетях (Profile.kt, Social.kt)
+    if (native && panel.key == "profile") { ProfileScreen(panel); return }
+    if (native && panel.key == "friends") { FriendsHost(panel); return }
     val p = LocalPal.current
     if (panel.key in FULL) {
         // экран целиком: въезжает справа, сверху — полоса «‹ Назад» и заголовок

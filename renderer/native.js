@@ -319,7 +319,84 @@
   };
   handlers.homeTrack = (i) => playFrom(homeTop, i);
   handlers.homeList = (i) => homeLists[i]?.open();
-  handlers.friendProfile = (id) => openFriendProfile(id);
+  handlers.friendProfile = (id) => { if (friendsEl.hidden) openFriends(); openFriendProfile(id); };
+
+  // ---------- чат и профиль друга — нативные экраны внутри панели «Друзья» ----------
+
+  const frNow = (n) => n?.track ? {
+    track: slim(n.track), playing: !!n.playing, live: !!n.live,
+    ago: n.playing || n.live ? '' : friendAgo(n), pos: n.playing ? friendPos(n) : 0,
+  } : null;
+  const frOut = (f) => ({
+    id: f.id, name: f.name || '', login: f.login || '', avatar: friendAvatarUrl(f), inRoom: !!f.in_room, unread: f.unread || 0,
+    since: f.since ? fpDate(f.since) : '', now: frNow(f.now),
+  });
+  const msgOut = (m) => ({
+    id: String(m.id), mine: !!m.mine, text: m.text || '', edited: !!m.edited, pending: !!m.pending, my: m.my || '',
+    time: m.pending ? 'отправляется…' : msgTime(m.created),
+    track: m.track ? { title: m.track.title || '', artist: m.track.artist || '', cover: /^https?:/i.test(m.track.cover || '') ? m.track.cover : '' } : null,
+    album: m.album ? { title: m.album.title || '', cover: /^https?:/i.test(m.album.cover || '') ? m.album.cover : '', count: m.album.count || 0 } : null,
+    reactions: (m.reactions || []).map((r) => ({ e: r.e, n: r.users.length, mine: r.e === m.my })),
+  });
+  handlers.friendsView = () => {
+    if (Chat.id) {
+      const f = friendById(Chat.id);
+      if (f) return {
+        mode: 'chat', friend: frOut(f), reactions: MSG_REACTIONS,
+        messages: Chat.messages.map(msgOut), loading: !!(Chat.loading || Chat.firstLoad), error: Chat.error || '', more: !!Chat.more,
+        sending: !!Chat.sending, nowTitle: state.track?.title || '',
+      };
+    }
+    if (FP.id) {
+      const f = friendById(FP.id);
+      if (f) {
+        const act = roomAction(f);
+        const s = FP.data?.stats;
+        return {
+          mode: 'profile', friend: frOut(f), roomAct: act, knocked: Friends.knocked.has(f.id),
+          roomLabel: act === 'knock' ? (Friends.knocked.has(f.id) ? 'Просьба отправлена' : 'Попроситься') : Together.room ? 'Позвать в руму' : 'Позвать в руму',
+          loading: !FP.data && !FP.error, error: FP.error || '',
+          stats: s ? {
+            month: fpDuration(s.month), total: fpDuration(s.total), days: s.days, totalSec: s.total,
+            artists: s.artists.map((a) => ({ name: a.name, text: fpDuration(a.sec) })),
+            tracks: s.tracks.map((x) => ({ ...slim(x.track), plays: x.plays })),
+          } : null,
+        };
+      }
+    }
+    return { mode: 'list' };
+  };
+  const chatMsg = (mid) => Chat.messages.find((m) => String(m.id) === String(mid));
+  Object.assign(handlers, {
+    chatOpen: (id) => openChat(id),
+    chatBack: () => closeChat(),
+    fpBack: () => closeFriendProfile(),
+    chatSend: (text) => (Chat.id && String(text || '').trim() ? sendMessage(Chat.id, { text: String(text).trim() }) : false),
+    chatAttach: () => { if (Chat.id && state.track) sendMessage(Chat.id, { track: shareable(state.track) }); else toast('Сейчас ничего не играет'); },
+    chatOlder: () => loadChat(true),
+    chatRefresh: () => loadChat(),
+    chatReact: (mid, e) => { const m = chatMsg(mid); if (m) reactMsg(m, e); },
+    chatPlay: (mid) => { const m = chatMsg(mid); if (m?.track) { playShared(m.track); toast(`Включаю «${m.track.title}»`); } },
+    chatAlbum: (mid) => { const m = chatMsg(mid); if (m?.album) importShare(`aveon:${m.album.code}`); },
+    chatCopyText: (mid) => { const m = chatMsg(mid); return m ? msgCopyText(m) : ''; },
+    chatEdit: async (mid, text) => {
+      const m = chatMsg(mid);
+      text = String(text || '').trim();
+      if (!m || text === (m.text || '')) return;
+      if (!text && !m.track) { toast('Пустое сообщение не сохранить', 'err'); return; }
+      try {
+        const { message } = await api.friends.edit(Chat.id, m.id, text);
+        Chat.messages = Chat.messages.map((x) => (x.id === message.id ? message : x));
+        renderFriends();
+      } catch (e) { toast(e.message, 'err'); }
+    },
+    fpChat: () => { if (FP.id) openChat(FP.id); },
+    fpRoom: () => { const f = friendById(FP.id); if (f) (roomAction(f) === 'knock' ? knockFriend(f) : inviteFriend(f)); },
+    fpMore: () => { const f = friendById(FP.id); if (f) friendMenu(f, $('#fp-more', friendsEl) || friendsEl); },
+    fpSync: () => { const f = friendById(FP.id); if (f) playFriend(f, false); },
+    fpStart: () => { const f = friendById(FP.id); if (f) playFriend(f, true); },
+    fpPlay: (i) => { const x = FP.data?.stats.tracks[i]; if (x) { playShared(x.track); toast(`Включаю «${x.track.title}»`); } },
+  });
 
   // ---------- волна ----------
 
