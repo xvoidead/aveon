@@ -10,6 +10,13 @@ services:
       - AVEON_ADMINS=xvoidead,htdealwme
       # порт закрыт от интернета, поэтому X-Forwarded-For от nginx принимаем с любого адреса docker-сети
       - AVEON_PROXIES=*
+      # письма с кодами (почта аккаунта и сброс пароля) — ящик noreply в Mailu на mail.aveon.su.
+      # Пароль лежит в .env рядом с этим файлом (AVEON_SMTP_PASS=…), в образ он не попадает
+      - AVEON_SMTP_HOST=mail.aveon.su
+      - AVEON_SMTP_PORT=587
+      - AVEON_SMTP_USER=noreply@aveon.su
+      - AVEON_SMTP_PASS=${AVEON_SMTP_PASS:-}
+      - AVEON_SMTP_FROM=Авеон <noreply@aveon.su>
     stop_grace_period: 15s
     restart: unless-stopped
 

@@ -29,7 +29,11 @@ var columns = []struct{ table, col, decl string }{
 	{"users", "banned", "INTEGER NOT NULL DEFAULT 0"},    // админка: заблокированный не может войти
 	{"messages", "edited", "INTEGER NOT NULL DEFAULT 0"}, // когда сообщение изменили, 0 — не меняли
 	{"messages", "album", "TEXT"},                        // альбом в сообщении: {code, title, count, cover} — код из share.go
+	{"users", "email", "TEXT NOT NULL DEFAULT ''"},       // подтверждённая почта для сброса пароля, в нижнем регистре; '' — нет
 }
+
+// Индексы по колонкам из списка выше: создаём, когда колонки уже точно есть
+const lateIndexes = `CREATE UNIQUE INDEX IF NOT EXISTS users_email ON users(email) WHERE email != '';`
 
 func openDB(path string) error {
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
@@ -61,6 +65,9 @@ func openDB(path string) error {
 				return err
 			}
 		}
+	}
+	if _, err := db.Exec(lateIndexes); err != nil {
+		return fmt.Errorf("indexes: %w", err)
 	}
 	return nil
 }
@@ -200,6 +207,7 @@ func cleanup() (sessions, nowplaying int64, err error) {
 		return
 	}
 	nowplaying, _ = res.RowsAffected()
+	_, err = db.Exec("DELETE FROM email_codes WHERE expires < ?", t)
 	return
 }
 

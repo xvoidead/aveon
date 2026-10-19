@@ -18,6 +18,7 @@ function enterFs() {
   fs.home = { parent: lyricsEl.parentNode, next: lyricsEl.nextSibling };
   fs.lyricsWasOpen = lyricsOpen();
   closeStats();
+  closeFriends(); // панель друзей не остаётся поверх полноэкранного режима
   $('#fs-lyrics').append(lyricsEl);
   fsEl.hidden = false;
   openLyrics(); // загрузит текст текущего трека, если его ещё нет

@@ -10,6 +10,11 @@
 //	AVEON_PROXIES      от кого верить X-Forwarded-For: адреса и подсети через запятую, * — от всех (127.0.0.1,::1)
 //	AVEON_BACKUPS      папка ежедневных копий базы (backups рядом с базой); пустая — не делать
 //	AVEON_BACKUP_KEEP  сколько копий хранить (7)
+//	AVEON_SMTP_HOST    SMTP-сервер для писем с кодами (почта и сброс пароля); пустая — почта выключена
+//	AVEON_SMTP_PORT    порт (587, STARTTLS)
+//	AVEON_SMTP_USER    логин ящика; без него письма идут без авторизации (только для тестов)
+//	AVEON_SMTP_PASS    пароль ящика
+//	AVEON_SMTP_FROM    отправитель, например «Авеон <noreply@aveon.su>» (по умолчанию AVEON_SMTP_USER)
 //
 // Сервер держит румы и приглашения в памяти, поэтому запускается одним процессом.
 package main
@@ -47,10 +52,15 @@ func routes() *http.ServeMux {
 	h("POST /api/auth/login", api(login))
 	h("POST /api/auth/logout", authed(logout))
 	h("POST /api/auth/logout-all", authed(logoutAll))
+	h("POST /api/auth/reset/request", api(resetRequest))
+	h("POST /api/auth/reset/check", api(resetCheck))
+	h("POST /api/auth/reset/confirm", api(resetConfirm))
 	h("GET /api/me", authed(meGet))
 	h("PATCH /api/me", authed(meUpdate))
 	h("PUT /api/me/avatar", authed(meAvatar))
 	h("POST /api/me/password", authed(mePassword))
+	h("POST /api/me/email", authed(meEmail))
+	h("POST /api/me/email/confirm", authed(meEmailConfirm))
 	h("POST /api/me/delete", authed(meDelete))
 	h("GET /api/avatar/{id}", authed(avatarGet))
 	h("GET /api/sync", authed(syncGet))
@@ -92,6 +102,7 @@ func routes() *http.ServeMux {
 	h("GET /api/admin/overview", adminOnly(adminOverview))
 	h("GET /api/admin/users", adminOnly(adminUsers))
 	h("POST /api/admin/users/{id}/logout", adminOnly(adminKick))
+	h("POST /api/admin/users/{id}/password", adminOnly(adminResetPassword))
 	h("POST /api/admin/users/{id}/ban", adminOnly(adminBan))
 	h("POST /api/admin/users/{id}/rename", adminOnly(adminRename))
 	h("POST /api/admin/users/{id}/notify", adminOnly(adminNotify))
@@ -111,7 +122,7 @@ func housekeeping(ctx context.Context, backupDir string, keep int) {
 		if err != nil {
 			slog.Error("cleanup", "err", err)
 		}
-		for _, l := range []*RateLimit{loginLimit, regLimit, joinLimit} {
+		for _, l := range []*RateLimit{loginLimit, regLimit, joinLimit, resetLimit, mailUserLimit, mailIPLimit, codeLimit} {
 			l.Prune()
 		}
 		pruneInvites()
@@ -165,6 +176,13 @@ func main() {
 	}
 	if len(admins) == 0 {
 		slog.Warn("AVEON_ADMINS не задана — админка выключена")
+	}
+	if err := setupMail(); err != nil {
+		slog.Error("почта", "err", err)
+		os.Exit(1)
+	}
+	if !mailEnabled() {
+		slog.Warn("AVEON_SMTP_HOST не задана — привязка почты и сброс пароля выключены")
 	}
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)

@@ -158,6 +158,21 @@ window.addEventListener('resize', closeMenu);
 
 // ---------- диалог: ввод названия или подтверждение ----------
 
+// Показать/скрыть пароль: кнопка-глаз рядом с полем (.pw), одна на всех — делегированный клик
+const PW_TOGGLE = '<button type="button" class="pw-toggle" aria-label="Показать пароль" aria-pressed="false"><svg><use href="#i-eye"/></svg></button>';
+function setPwShown(btn, shown) {
+  btn.parentElement.querySelector('input').type = shown ? 'text' : 'password';
+  btn.setAttribute('aria-pressed', String(shown));
+  btn.setAttribute('aria-label', shown ? 'Скрыть пароль' : 'Показать пароль');
+  btn.querySelector('use').setAttribute('href', shown ? '#i-eye-off' : '#i-eye');
+}
+document.addEventListener('click', (e) => {
+  const btn = e.target.closest?.('.pw-toggle');
+  if (!btn) return;
+  setPwShown(btn, btn.getAttribute('aria-pressed') !== 'true');
+  btn.parentElement.querySelector('input').focus();
+});
+
 function ask({ title, text = '', value = '', ok, input = true, danger = false, password = false }) {
   const dlg = $('#dialog');
   const field = $('#dialog-input');
@@ -166,7 +181,10 @@ function ask({ title, text = '', value = '', ok, input = true, danger = false, p
   $('#dialog-ok').textContent = ok;
   $('#dialog-ok').classList.toggle('danger', danger);
   $('#dialog-ok').classList.toggle('primary', !danger);
-  field.hidden = !input;
+  $('#dialog-field').hidden = !input;
+  const pwBtn = $('#dialog-pw');
+  pwBtn.hidden = !password;
+  setPwShown(pwBtn, false);
   field.type = password ? 'password' : 'text';
   field.value = value;
   dlg.hidden = false;
@@ -2312,7 +2330,7 @@ $('#settings').addEventListener('pointerdown', (e) => { if (e.target.id === 'set
 function secretField(key, label, placeholder) {
   const has = state.cfg.has[key];
   return `<div class="field"><label>${label}</label><div class="ctl">
-    <input class="input" type="password" data-secret="${key}" placeholder="${has ? 'Сохранён. Вставь новый, чтобы заменить' : esc(placeholder)}" spellcheck="false">
+    <span class="pw"><input class="input" type="password" data-secret="${key}" placeholder="${has ? 'Сохранён. Вставь новый, чтобы заменить' : esc(placeholder)}" spellcheck="false">${PW_TOGGLE}</span>
     <button class="btn" data-save-secret="${key}">Сохранить</button>
     ${has ? `<button class="btn danger icon-only" data-clear-secret="${key}" aria-label="Удалить"><svg><use href="#i-close"/></svg></button>` : ''}
   </div></div>`;
@@ -2658,9 +2676,11 @@ function applySynced(changed) {
 
 // ---------- экран входа: без аккаунта плеер закрыт ----------
 
-const LOCAL_SERVER = /^http:\/\/(localhost|127\.|192\.168\.|10\.)/i;
 const authEl = $('#auth');
 let authMode = 'login';
+// сброс пароля: логин или почта, на которые запросили код, и проверенный код
+let resetWho = '';
+let resetCode = '';
 
 const locked = () => !authEl.hidden;
 
@@ -2711,6 +2731,20 @@ const AUTH_TEXT = {
     title: 'регистрация', sub: 'Один аккаунт на все компьютеры: альбомы, настройки бочки и статистика будут везде одинаковыми.',
     go: 'Создать аккаунт', busy: 'Создаю…', ask: 'Уже есть аккаунт?', other: 'Войти',
   },
+  // забыли пароль: код придёт на почту, привязанную в профиле (server/email.go)
+  forgot: {
+    title: 'сброс пароля', sub: 'Пришлём код на почту, привязанную к аккаунту. Почту привязывают в профиле.',
+    go: 'Прислать код', busy: 'Отправляю…', ask: 'Вспомнили пароль?', other: 'Войти',
+  },
+  // код проверяется сам, как только набраны шесть цифр, — кнопки у этого шага нет
+  code: {
+    title: 'код из письма', sub: '',
+    go: '', busy: '', ask: 'Письмо не пришло?', other: 'Прислать ещё раз',
+  },
+  newpass: {
+    title: 'новый пароль', sub: 'Код подошёл. Придумай новый пароль — не короче 8 символов. На других устройствах нужно будет войти заново.',
+    go: 'Сменить пароль и войти', busy: 'Меняю…', ask: 'Код не тот?', other: 'Ввести другой',
+  },
 };
 
 function setAuthMode(mode) {
@@ -2722,21 +2756,31 @@ function setAuthMode(mode) {
   $('#auth-go').textContent = t.go;
   $('#auth-switch-text').textContent = t.ask;
   $('#auth-switch').textContent = t.other;
-  $('#auth-password2-field').hidden = !reg;
-  $('#auth-password').autocomplete = reg ? 'new-password' : 'current-password';
-  $('#auth-password').placeholder = reg ? 'не короче 8 символов' : '';
+  const forgot = mode === 'forgot';
+  const code = mode === 'code';
+  const newpass = mode === 'newpass';
+  const step = code || newpass; // шаги после письма: логин и сервер уже известны
+  const fresh = reg || newpass; // придумываем новый пароль
+  if (code) {
+    // текстом, а не innerHTML: логин или почту ввёл человек
+    const sub = $('#auth-sub');
+    sub.textContent = 'Если к аккаунту ';
+    sub.append(Object.assign(document.createElement('b'), { textContent: resetWho }),
+      ' привязана почта, на неё пришло письмо с шестью цифрами. Не видно — загляни в «Спам».');
+  }
+  $('#auth-login-field').hidden = step;
+  $('#auth-login-label').textContent = forgot ? 'логин или почта' : 'логин';
+  $('#auth-login').maxLength = forgot ? 254 : 32;
+  $('#auth-login').autocomplete = forgot ? 'email' : 'username';
+  $('#auth-code-field').hidden = !code;
+  $('#auth-go').hidden = code;
+  $('#auth-password-field').hidden = forgot || code;
+  $('#auth-password-label').textContent = newpass ? 'новый пароль' : 'пароль';
+  $('#auth-forgot').hidden = mode !== 'login';
+  $('#auth-password2-field').hidden = !fresh;
+  $('#auth-password').autocomplete = fresh ? 'new-password' : 'current-password';
+  $('#auth-password').placeholder = fresh ? 'не короче 8 символов' : '';
   $('#auth-error').textContent = '';
-}
-
-// Адрес сервера: вшитый — не показываем; уже известный — одной строкой с «изменить»; иначе поле
-function showServer(edit) {
-  const a = state.account;
-  const known = a.server || a.defaultServer;
-  const field = !a.defaultServer && (edit || !known);
-  $('#auth-server-field').hidden = !field;
-  $('#auth-server-line').hidden = field || !!a.defaultServer;
-  $('#auth-server-host').textContent = (known || '').replace(/^https?:\/\//, '');
-  if (field) $('#auth-server').value = (a.server || '').replace(/^https?:\/\//, '');
 }
 
 function showAuth(message = '') {
@@ -2745,35 +2789,146 @@ function showAuth(message = '') {
   closeProfile();
   closeMenu();
   const a = state.account;
-  showServer(false);
+  if (authMode === 'code' || authMode === 'newpass') authMode = 'login'; // экран входа заново — сброс с начала
   $('#auth-login').value = a.login || $('#auth-login').value;
-  $('#auth-password').value = $('#auth-password2').value = '';
+  $('#auth-password').value = $('#auth-password2').value = $('#auth-code').value = '';
   setAuthMode(authMode);
   $('#auth-error').textContent = message;
   authEl.hidden = false;
-  const first = !$('#auth-server-field').hidden && !$('#auth-server').value ? '#auth-server'
-    : $('#auth-login').value ? '#auth-password' : '#auth-login';
-  $(first).focus();
+  $($('#auth-login').value && authMode !== 'forgot' ? '#auth-password' : '#auth-login').focus();
 }
 
 $('#auth-switch').onclick = () => {
+  if (authMode === 'code') { sendResetCode(); return; } // «Письмо не пришло? Прислать ещё раз»
+  if (authMode === 'newpass') { stepTo('code', -1); return; } // «Код не тот? Ввести другой»
   setAuthMode(authMode === 'login' ? 'register' : 'login');
   $('#auth-login').focus();
 };
-$('#auth-server-edit').onclick = () => {
-  showServer(true);
-  $('#auth-server').focus();
+$('#auth-forgot').onclick = () => {
+  setAuthMode('forgot');
+  $('#auth-login').focus();
 };
 
+const stillMotion = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Шаги сброса сменяют друг друга сдвигом: вперёд — уезжает влево, назад — вправо
+async function stepTo(mode, dir = 1) {
+  const form = $('#auth-form');
+  if (!stillMotion()) {
+    await form.animate([{ opacity: 1, transform: 'none' }, { opacity: 0, transform: `translateX(${-20 * dir}px)` }],
+      { duration: 170, easing: 'cubic-bezier(.4, 0, 1, 1)' }).finished.catch(() => {});
+  }
+  setAuthMode(mode);
+  if (mode === 'code') otpEnter();
+  if (mode === 'newpass') $('#auth-password').value = $('#auth-password2').value = '';
+  if (!stillMotion()) {
+    form.animate([{ opacity: 0, transform: `translateX(${20 * dir}px)` }, { opacity: 1, transform: 'none' }],
+      { duration: 280, easing: 'cubic-bezier(.2, .9, .3, 1)' });
+  }
+  $(mode === 'code' ? '#auth-code' : '#auth-password').focus();
+}
+
+// ---- шесть ячеек кода: поле ввода одно, прозрачное поверх ячеек (вставка и автозаполнение кода работают) ----
+
+const otpEl = $('#auth-code-field');
+const otpInput = $('#auth-code');
+const otpCells = [...otpEl.querySelectorAll('.otp-cell')];
+let otpPrev = '';
+
+function otpPaint(popFrom = -1) {
+  const v = otpInput.value;
+  otpCells.forEach((c, i) => {
+    c.textContent = v[i] || '';
+    c.classList.toggle('next', i === v.length);
+  });
+  if (popFrom < 0 || stillMotion()) return;
+  for (let i = popFrom; i < v.length; i++) { // вставили сразу несколько — впрыгивают по очереди
+    otpCells[i].animate([{ transform: 'scale(.5)', opacity: 0 }, { transform: 'scale(1.12)', opacity: 1, offset: .6 }, { transform: 'scale(1)' }],
+      { duration: 280, delay: (i - popFrom) * 45, easing: 'cubic-bezier(.2, .9, .3, 1.2)', fill: 'backwards' });
+  }
+}
+
+function otpEnter() {
+  otpEl.classList.remove('ok', 'bad', 'checking', 'enter');
+  otpInput.value = otpPrev = '';
+  otpInput.disabled = false;
+  otpPaint();
+  void otpEl.offsetWidth; // перезапуск анимации появления
+  otpEl.classList.add('enter');
+}
+
+otpInput.addEventListener('input', () => {
+  if (otpEl.classList.contains('checking') || otpEl.classList.contains('ok')) return;
+  otpInput.value = otpInput.value.replace(/\D/g, '').slice(0, 6);
+  const v = otpInput.value;
+  otpEl.classList.remove('enter', 'bad');
+  otpPaint(v.length > otpPrev.length ? otpPrev.length : -1);
+  otpPrev = v;
+  $('#auth-error').textContent = '';
+  if (v.length === 6) checkResetCode();
+});
+
+// Шесть цифр набраны — спрашиваем сервер, не гася код: верный ведёт к новому паролю, неверный трясётся и стирается
+async function checkResetCode() {
+  const code = otpInput.value;
+  otpEl.classList.add('checking');
+  otpInput.disabled = true;
+  try {
+    await api.account.resetCheck(resetWho, code);
+    resetCode = code;
+    otpEl.classList.replace('checking', 'ok');
+    await pause(stillMotion() ? 0 : 560);
+    await stepTo('newpass');
+    return;
+  } catch (ex) {
+    otpEl.classList.replace('checking', 'bad');
+    $('#auth-error').textContent = ex.message;
+    if (!stillMotion()) {
+      await otpEl.animate([{ transform: 'none' }, { transform: 'translateX(-9px)' }, { transform: 'translateX(8px)' },
+        { transform: 'translateX(-5px)' }, { transform: 'translateX(3px)' }, { transform: 'none' }],
+      { duration: 420, easing: 'ease-out' }).finished.catch(() => {});
+    }
+    await pause(220);
+  }
+  otpEl.classList.remove('bad');
+  otpInput.disabled = false;
+  otpInput.value = otpPrev = '';
+  otpPaint();
+  if (authMode === 'code') otpInput.focus();
+}
+
+// Код сброса: сервер отвечает одинаково, есть такой аккаунт или нет, — сразу переходим к вводу кода
+async function sendResetCode() {
+  const err = $('#auth-error');
+  const go = $('#auth-go');
+  go.disabled = true;
+  err.textContent = '';
+  try {
+    await api.account.resetRequest(resetWho);
+    if (authMode === 'code') { otpEnter(); otpInput.focus(); toast('Отправили новый код'); } else await stepTo('code');
+  } catch (ex) {
+    err.textContent = ex.message;
+  }
+  go.disabled = false;
+}
 $('#auth-form').onsubmit = async (e) => {
   e.preventDefault();
   const err = $('#auth-error');
-  const server = $('#auth-server-field').hidden ? state.account.server || '' : $('#auth-server').value.trim();
   const login = $('#auth-login').value.trim();
   const password = $('#auth-password').value;
   const register = authMode === 'register';
   const fail = (msg, field) => { err.textContent = msg; if (field) $(field).focus(); };
-  if (!$('#auth-server-field').hidden && !server) return fail('Укажи адрес сервера', '#auth-server');
+  if (authMode === 'forgot') {
+    if (!login) return fail('Введи логин или почту', '#auth-login');
+    resetWho = login;
+    $('#auth-go').textContent = AUTH_TEXT.forgot.busy;
+    await sendResetCode();
+    if (authMode === 'forgot') $('#auth-go').textContent = AUTH_TEXT.forgot.go; // не ушло — остаёмся
+    return;
+  }
+  if (authMode === 'code') return; // код проверяется сам на шестой цифре
+  if (authMode === 'newpass') return submitReset(password, fail);
   if (!login) return fail('Введи логин', '#auth-login');
   if (!password) return fail('Введи пароль', '#auth-password');
   if (register && password.length < 8) return fail('Пароль должен быть не короче 8 символов', '#auth-password');
@@ -2785,13 +2940,10 @@ $('#auth-form').onsubmit = async (e) => {
   err.textContent = '';
   try {
     const r = register
-      ? await api.account.register(server, login, password, '')
-      : await api.account.login(server, login, password);
+      ? await api.account.register(login, password, '')
+      : await api.account.login(login, password);
     state.account = r.status;
     leaveAuth();
-    if (/^http:\/\//i.test(r.status.server) && !LOCAL_SERVER.test(r.status.server)) {
-      toast('Сервер без https: пароль идёт по сети открытым текстом', 'err');
-    }
     toast(register ? `Аккаунт создан, привет, ${r.status.name || r.status.login}` : `С возвращением, ${r.status.name || r.status.login}`);
     applySynced(r.changed);
   } catch (ex) {
@@ -2800,6 +2952,30 @@ $('#auth-form').onsubmit = async (e) => {
   go.disabled = false;
   go.textContent = AUTH_TEXT[authMode].go;
 };
+
+async function submitReset(password, fail) {
+  if (password.length < 8) return fail('Пароль должен быть не короче 8 символов', '#auth-password');
+  if (password !== $('#auth-password2').value) return fail('Пароли не совпадают', '#auth-password2');
+  const go = $('#auth-go');
+  go.disabled = true;
+  go.textContent = AUTH_TEXT.newpass.busy;
+  $('#auth-error').textContent = '';
+  try {
+    const r = await api.account.resetConfirm(resetWho, resetCode, password);
+    state.account = r.status;
+    setAuthMode('login'); // в следующий раз экран входа — обычный
+    leaveAuth();
+    toast(`Пароль изменён, с возвращением, ${r.status.name || r.status.login}`);
+    applySynced(r.changed);
+  } catch (ex) {
+    if (/код/i.test(ex.message)) { // код успел устареть — назад к вводу кода
+      await stepTo('code', -1);
+      $('#auth-error').textContent = ex.message;
+    } else fail(ex.message, '#auth-password');
+  }
+  go.disabled = false;
+  go.textContent = AUTH_TEXT[authMode].go;
+}
 
 api.account.onEvent((ev) => {
   if (ev.status) { state.account = ev.status; Collab.loaded = false; } // collab.js: список совместных — заново для нового аккаунта

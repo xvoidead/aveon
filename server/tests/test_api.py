@@ -460,6 +460,16 @@ def test_admin(client):
         assert client.post(f"/api/admin/users/{uid(client, t_user2)}/notify", json={"text": "привет"}, headers=h(t_adm)).status_code == 200
         assert client.get("/api/announce", headers=h(t_user2)).json()["notice"]["text"] == "привет"
 
+        # сброс пароля: только админ, временный пароль в ответе, сессии закрыты, старый пароль не подходит
+        assert client.post(f"/api/admin/users/{uid_user}/password", headers=h(t_user2)).status_code == 403
+        r = client.post(f"/api/admin/users/{uid_user}/password", headers=h(t_adm))
+        assert r.status_code == 200 and len(r.json()["password"]) == 14 and r.json()["closed"] >= 1
+        assert client.get("/api/me", headers=h(t_user)).status_code == 401
+        assert client.post("/api/auth/login", json={"login": l_user, "password": "password123"}).status_code == 401
+        assert client.post("/api/auth/login", json={"login": l_user, "password": r.json()["password"]}).status_code == 200
+        assert client.post(f"/api/admin/users/{uid(client, t_adm)}/password", headers=h(t_adm)).status_code == 400
+        assert client.post("/api/admin/users/999999/password", headers=h(t_adm)).status_code == 404
+
 
 # ---------- совместные плейлисты ----------
 

@@ -117,3 +117,14 @@ CREATE TABLE IF NOT EXISTS nowplaying (
     pos        REAL NOT NULL,     -- позиция, с, в момент at
     at         INTEGER NOT NULL   -- мс, серверное время
 );
+
+-- коды из писем: подтвердить почту (verify) и сбросить пароль (reset). В базе только sha256 кода
+CREATE TABLE IF NOT EXISTS email_codes (
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    purpose    TEXT NOT NULL,
+    email      TEXT NOT NULL,     -- куда отправили код: для verify это ещё не подтверждённая почта
+    code_hash  TEXT NOT NULL,
+    expires    INTEGER NOT NULL,
+    attempts   INTEGER NOT NULL DEFAULT 0,
+    PRIMARY KEY (user_id, purpose)
+);

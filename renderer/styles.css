@@ -726,9 +726,14 @@ body.eqpop .eq-panel { height: auto; flex: 1; min-height: 0; }
 .auth-field { display: flex; flex-direction: column; gap: 7px; color: var(--text-2); font-size: 13px; }
 .auth-field .input { flex: none; height: 42px; padding: 0 14px; border-radius: 10px; font-size: 15px; background: var(--oak-2); }
 .auth-field .input:focus { border-color: var(--amber); }
+.pw { position: relative; display: flex; flex: 1; min-width: 0; }
+.pw .input { width: 100%; padding-right: 38px; }
+.pw-toggle { position: absolute; top: 0; right: 0; bottom: 0; width: 38px; display: grid; place-items: center; color: var(--text-3); border-radius: 8px; }
+.pw-toggle:hover, .pw-toggle:focus-visible { color: var(--text); }
+.dialog .pw { margin-top: 10px; }
+.dialog .pw .input { margin-top: 0; }
+.auth-field .pw { flex: none; }
 
-.auth-server { display: flex; align-items: baseline; gap: 10px; color: var(--text-3); font-size: 13px; }
-.auth-server b { color: var(--text-2); font-weight: 500; }
 .auth-link { color: var(--amber); font-size: 13px; }
 .auth-link:hover { text-decoration: underline; text-underline-offset: 3px; }
 
@@ -737,6 +742,32 @@ body.eqpop .eq-panel { height: auto; flex: 1; min-height: 0; }
 .auth-go { height: 44px; margin-top: 6px; justify-content: center; border-radius: 12px; font-size: 15px; }
 .auth-go:disabled { opacity: .6; cursor: default; }
 .auth-switch { margin: 2px 0 0; color: var(--text-3); font-size: 13px; text-align: center; }
+/* «Забыли пароль?» — под полем пароля, справа; к нему поджимаемся ближе, чем к остальным полям */
+.auth-forgot { align-self: flex-end; margin-top: -8px; color: var(--text-3); }
+.auth-forgot:hover { color: var(--amber); }
+/* код из письма: шесть ячеек. Набранная цифра впрыгивает, следующая ячейка мигает кареткой,
+   шесть цифр — ячейки «дышат», пока сервер проверяет; верный код вспыхивает, неверный трясётся */
+.otp { position: relative; display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; margin: 2px 0 4px; }
+.otp-input { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; opacity: 0; border: 0; padding: 0; font-size: 16px; cursor: text; }
+.otp-cell {
+  position: relative; height: 58px; display: grid; place-items: center; border-radius: 14px;
+  background: var(--fill, var(--oak-2)); color: var(--text); font: 700 26px/1 var(--display); font-variant-numeric: tabular-nums;
+  box-shadow: inset 0 0 0 1.5px transparent; transition: box-shadow .15s, background-color .25s, color .25s;
+}
+.otp:focus-within .otp-cell.next { box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--amber) 70%, transparent); }
+.otp:focus-within .otp-cell.next::after { content: ""; width: 2px; height: 26px; border-radius: 2px; background: var(--amber); animation: otp-caret 1.05s steps(1) infinite; }
+@keyframes otp-caret { 50% { opacity: 0; } }
+.otp.enter .otp-cell { animation: otp-in .44s cubic-bezier(.2, .9, .3, 1.25) both; animation-delay: calc(var(--i) * 45ms); }
+@keyframes otp-in { from { opacity: 0; transform: translateY(14px) scale(.85); } }
+.otp.checking .otp-cell { animation: otp-wait .9s ease-in-out infinite; animation-delay: calc(var(--i) * 80ms); }
+@keyframes otp-wait { 50% { opacity: .45; transform: translateY(-3px); } }
+.otp.ok .otp-cell { background: var(--amber); color: var(--oak); animation: otp-ok .46s cubic-bezier(.2, .9, .3, 1.35) both; animation-delay: calc(var(--i) * 40ms); }
+@keyframes otp-ok { 45% { transform: scale(1.14); } }
+.otp.bad .otp-cell { box-shadow: inset 0 0 0 2px var(--danger); color: var(--danger); }
+@media (prefers-reduced-motion: reduce) {
+  .otp .otp-cell, .otp:focus-within .otp-cell.next::after { animation: none !important; }
+}
+.auth-sub b { color: var(--text); font-weight: 600; }
 
 @media (max-width: 860px) {
   .auth { grid-template-columns: 1fr; }

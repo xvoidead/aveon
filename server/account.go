@@ -62,7 +62,7 @@ func authenticate(header string) (Auth, error) {
 
 func userView(u Row) M {
 	return M{"id": u.Int("id"), "login": u.Str("login"), "name": u.Str("name"), "created": u.Int("created"),
-		"avatar_at": u.Int("avatar_at"), "admin": isAdmin(u.Str("login"))}
+		"avatar_at": u.Int("avatar_at"), "admin": isAdmin(u.Str("login")), "email": u.Str("email")}
 }
 
 func getUser(q querier, id int64) (Row, error) {
@@ -292,7 +292,8 @@ func meGet(r *http.Request, me Auth) (any, error) {
 		sessions = append(sessions, M{"id": d.Int("id"), "device": d.Str("device"), "created": d.Int("created"),
 			"last_used": d.Int("last_used"), "current": d.Int("id") == me.SessionID})
 	}
-	return M{"user": userView(user), "sessions": sessions}, nil
+	view, err := meView(user)
+	return M{"user": view, "sessions": sessions}, err
 }
 
 func meUpdate(r *http.Request, me Auth) (any, error) {

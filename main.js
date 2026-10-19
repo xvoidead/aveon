@@ -370,8 +370,13 @@ function registerIpc() {
 
   // Аккаунт и синхронизация
   handle('acc:status', () => account.status());
-  handle('acc:register', (server, login, password, name) => { friends.reset(); return account.register(server, login, password, name); });
-  handle('acc:login', (server, login, password) => { friends.reset(); return account.login(server, login, password); });
+  handle('acc:register', (login, password, name) => { friends.reset(); return account.register(login, password, name); });
+  handle('acc:login', (login, password) => { friends.reset(); return account.login(login, password); });
+  handle('acc:resetRequest', (who) => account.resetRequest(who));
+  handle('acc:resetCheck', (who, code) => account.resetCheck(who, code));
+  handle('acc:resetConfirm', (who, code, password) => { friends.reset(); return account.resetConfirm(who, code, password); });
+  handle('acc:email', (email) => account.setEmail(email));
+  handle('acc:emailConfirm', (code) => account.confirmEmail(code));
   handle('acc:logoutAll', () => account.logoutAll());
   handle('acc:me', () => account.me());
   handle('acc:rename', (name) => account.rename(name));
@@ -412,6 +417,7 @@ function registerIpc() {
   handle('adm:overview', () => account.adminApi.overview());
   handle('adm:users', (q) => account.adminApi.users(q));
   handle('adm:kick', (id) => account.adminApi.kick(id));
+  handle('adm:password', (id) => account.adminApi.resetPassword(id));
   handle('adm:ban', (id, banned) => account.adminApi.ban(id, banned));
   handle('adm:rename', (id, name) => account.adminApi.rename(id, name));
   handle('adm:announce', (text, track) => account.adminApi.announce(text, track));

@@ -1,0 +1,232 @@
+/*
+ * Aveon — страница входа Mailu (/sso/login, /sso/pw_change).
+ * Подключается системным nginx через sub_filter только на /sso/, файлы лежат в /var/www/mail.aveon.su
+ * и отдаются по /aveon-sso/. Шаблоны Mailu не трогаем — переживёт обновление образа.
+ * Токены совпадают с темой SnappyMail (themes/Aveon/styles.css).
+ */
+
+@font-face { font-family: "Onest"; font-weight: 400; font-display: swap; src: url("fonts/onest-cyrillic-400-normal.woff2") format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "Onest"; font-weight: 500; font-display: swap; src: url("fonts/onest-cyrillic-500-normal.woff2") format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "Onest"; font-weight: 600; font-display: swap; src: url("fonts/onest-cyrillic-600-normal.woff2") format("woff2"); unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: "Onest"; font-weight: 400; font-display: swap; src: url("fonts/onest-latin-400-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F, U+20AC, U+2122, U+FEFF, U+FFFD; }
+@font-face { font-family: "Onest"; font-weight: 500; font-display: swap; src: url("fonts/onest-latin-500-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F, U+20AC, U+2122, U+FEFF, U+FFFD; }
+@font-face { font-family: "Onest"; font-weight: 600; font-display: swap; src: url("fonts/onest-latin-600-normal.woff2") format("woff2"); unicode-range: U+0000-00FF, U+2000-206F, U+20AC, U+2122, U+FEFF, U+FFFD; }
+
+:root {
+	color-scheme: light;
+	--av-canvas: #f2f2f5;
+	--av-surface: #ffffff;
+	--av-ink: #1c1c1e;
+	--av-ink-2: #5c5c62;
+	--av-ink-3: #8e8e93;
+	--av-line: rgb(0 0 0 / .07);
+	--av-fill: rgb(118 118 128 / .10);
+	--av-fill-2: rgb(118 118 128 / .18);
+	--av-accent: #4f78d8;
+	--av-accent-ink: #3a5fb8;
+	--av-accent-soft: rgb(79 120 216 / .14);
+	--av-danger: #c4302b;
+	--av-danger-soft: #fdecea;
+	--av-ok-soft: #e7f5ea;
+	--av-ok: #1f8a3b;
+	--av-pop: 0 1px 2px rgb(0 0 0 / .04), 0 24px 60px -12px rgb(0 0 0 / .14);
+	--av-font: "Onest", -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+	--av-ease: cubic-bezier(.32, .72, 0, 1);
+}
+@media (prefers-color-scheme: dark) {
+	:root {
+		color-scheme: dark;
+		--av-canvas: #000;
+		--av-surface: #1c1c1e;
+		--av-ink: #f5f5f7;
+		--av-ink-2: #c7c7cc;
+		--av-ink-3: #8e8e93;
+		--av-line: rgb(255 255 255 / .09);
+		--av-fill: rgb(118 118 128 / .22);
+		--av-fill-2: rgb(118 118 128 / .32);
+		--av-accent: #6f93ea;
+		--av-accent-ink: #9db7f4;
+		--av-accent-soft: rgb(111 147 234 / .2);
+		--av-danger: #ff6961;
+		--av-danger-soft: rgb(255 105 97 / .14);
+		--av-ok-soft: rgb(50 215 75 / .12);
+		--av-ok: #32d74b;
+		--av-pop: 0 0 0 1px rgb(255 255 255 / .08), 0 24px 60px -12px rgb(0 0 0 / .7);
+	}
+}
+
+/* ---------- Каркас: убираем админский интерфейс, оставляем одну карточку ---------- */
+
+html, body {
+	background: var(--av-canvas) !important;
+	color: var(--av-ink);
+	font-family: var(--av-font) !important;
+	-webkit-font-smoothing: antialiased;
+}
+
+.main-header,
+.main-sidebar,
+.main-footer,
+.card-header,
+.content-header small,
+.content-header .col-sm-6 + .col-sm-6 { display: none !important; }
+
+.wrapper, .content-wrapper { background: transparent !important; }
+.content-wrapper {
+	margin-left: 0 !important;
+	min-height: 100vh !important;
+	min-height: 100dvh !important;
+	display: flex;
+	flex-direction: column;
+	align-items: center;
+	justify-content: center;
+	padding: 32px 16px 12vh;
+	font-size: 15px !important;
+}
+
+/* заголовок со знаком Aveon */
+.content-header { padding: 0 0 24px !important; width: 100%; max-width: 400px; }
+.content-header .container-fluid,
+.content-header .row,
+.content-header .col-sm-6 { padding: 0 !important; margin: 0 !important; max-width: 100% !important; flex: 1 1 100% !important; }
+.content-header h1 {
+	color: var(--av-ink);
+	font-size: 26px !important;
+	font-weight: 600;
+	letter-spacing: -.02em;
+	line-height: 1.2;
+	text-align: center;
+	margin: 0 !important;
+}
+.content-header h1::before {
+	content: '';
+	display: block;
+	width: 64px;
+	height: 64px;
+	margin: 0 auto 22px;
+	border-radius: 16px;
+	background: #0e0e0e url("icon.png") center / cover no-repeat;
+	box-shadow: 0 10px 30px -10px rgb(0 0 0 / .45);
+	transform: rotate(-4deg);
+}
+.content-header h1::after {
+	content: 'Почта aveon.su';
+	display: block;
+	margin-top: 8px;
+	color: var(--av-ink-3);
+	font-size: 15px;
+	font-weight: 400;
+	letter-spacing: 0;
+}
+
+.content { width: 100%; max-width: 400px; padding: 0 !important; }
+.content .row { margin: 0 !important; }
+.content .col-lg-12,
+.content .col-xs-12 { padding: 0 !important; }
+
+/* ---------- Карточка и форма ---------- */
+
+.card {
+	background: var(--av-surface) !important;
+	border: 0 !important;
+	border-radius: 24px !important;
+	box-shadow: var(--av-pop) !important;
+	margin: 0 !important;
+}
+.card-body { padding: 28px 28px 24px !important; }
+
+.form-group { margin-bottom: 18px; }
+.form-group:last-child { margin-bottom: 0; }
+
+label {
+	color: var(--av-ink-2);
+	font-size: 13px;
+	font-weight: 500 !important;
+	margin-bottom: 6px;
+}
+
+.form-control {
+	background: var(--av-fill) !important;
+	border: 1.5px solid transparent !important;
+	border-radius: 12px !important;
+	box-shadow: none !important;
+	color: var(--av-ink) !important;
+	font-size: 15px !important;
+	height: 46px !important;
+	padding: 0 14px !important;
+	transition: border-color .15s var(--av-ease), background-color .15s var(--av-ease), box-shadow .15s var(--av-ease);
+}
+.form-control:hover { background: var(--av-fill-2) !important; }
+.form-control:focus {
+	background: var(--av-surface) !important;
+	border-color: var(--av-accent) !important;
+	box-shadow: 0 0 0 4px var(--av-accent-soft) !important;
+	outline: none;
+}
+.form-control.is-invalid, .has-error .form-control { border-color: var(--av-danger) !important; }
+.invalid-feedback, .help-block { color: var(--av-danger); font-size: 13px; }
+
+/* кнопки: вход в почту — главная, вход в админку — тихая */
+.btn {
+	border-radius: 999px !important;
+	font-family: inherit;
+	font-size: 15px !important;
+	font-weight: 600 !important;
+	height: 46px;
+	text-shadow: none !important;
+	transition: background-color .15s var(--av-ease), color .15s var(--av-ease), transform .1s var(--av-ease);
+	width: 100%;
+	display: block;
+}
+.btn:active { transform: scale(.985); }
+.btn:focus-visible { outline: 2px solid var(--av-accent) !important; outline-offset: 3px; box-shadow: none !important; }
+
+#submitWebmail,
+.card-body .btn:first-of-type {
+	background: var(--av-accent) !important;
+	border: 0 !important;
+	color: #fff !important;
+	margin-top: 8px;
+	box-shadow: 0 8px 20px -8px rgb(79 120 216 / .8) !important;
+}
+#submitWebmail:hover,
+.card-body .btn:first-of-type:hover { background: var(--av-accent-ink) !important; }
+
+#submitAdmin {
+	background: transparent !important;
+	border: 0 !important;
+	color: var(--av-ink-2) !important;
+	font-weight: 500 !important;
+	height: 40px;
+	margin-top: 6px;
+}
+#submitAdmin:hover { background: var(--av-fill) !important; color: var(--av-ink) !important; }
+
+/* ---------- Сообщения (неверный пароль и т.п.) ---------- */
+
+.alert {
+	border: 0 !important;
+	border-radius: 14px !important;
+	font-size: 14px;
+	margin: 0 0 14px !important;
+	padding: 12px 40px 12px 16px !important;
+	box-shadow: none !important;
+}
+.alert-danger, .alert-error { background: var(--av-danger-soft) !important; color: var(--av-danger) !important; }
+.alert-success, .alert-info { background: var(--av-ok-soft) !important; color: var(--av-ok) !important; }
+.alert-warning { background: var(--av-accent-soft) !important; color: var(--av-accent-ink) !important; }
+.alert .close { color: inherit !important; opacity: .6; text-shadow: none; top: 50%; transform: translateY(-50%); padding: 0 14px !important; }
+
+@media (max-width: 480px) {
+	.content-wrapper { justify-content: flex-start; padding-top: 12vh; }
+	.card-body { padding: 22px 20px 20px !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	* { transition: none !important; }
+}
+
+/* в тёмной теме знак не должен сливаться с чёрным фоном */
+@media (prefers-color-scheme: dark) {
+	.content-header h1::before { box-shadow: 0 0 0 1px rgb(255 255 255 / .14), 0 10px 30px -10px rgb(0 0 0 / .8); }
+}

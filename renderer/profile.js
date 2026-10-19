@@ -306,12 +306,13 @@ async function loadDevices() {
   try {
     const me = await api.account.me();
     pf.devices = me.sessions || [];
+    pf.me = me.user;
     pf.devicesError = '';
   } catch (e) {
     pf.devicesError = e.message;
   }
   pf.loadingDevices = false;
-  if (profileOpen()) renderProfileParts(['devices']);
+  if (profileOpen()) renderProfileParts(['devices', 'account']);
 }
 
 // ---- страница ----
@@ -344,10 +345,30 @@ function keysNote() {
   return '<p class="pf-note pf-keys">Ключи сервисов хранятся на сервере зашифрованными твоим паролем — сервер их не видит.</p>';
 }
 
+// Почта для восстановления пароля (server/email.go): привязывают кодом из письма
+function emailHtml() {
+  const u = pf.me;
+  // ещё не загрузили, профиль от прошлого аккаунта или старый сервер без почты
+  if (!u || u.login !== state.account.login || u.email === undefined) return '';
+  const pending = u.email_pending && u.email_pending !== u.email
+    ? `<p class="pf-note pf-email">Ждём код из письма на <b>${esc(u.email_pending)}</b>.</p>
+      <div class="row-actions"><button class="btn primary" id="pf-email-code">Ввести код</button>
+        <button class="btn" id="pf-email-resend">Прислать ещё раз</button></div>` : '';
+  if (u.email) {
+    return `<p class="pf-note pf-email">Почта <b>${esc(u.email)}</b> — по ней можно восстановить пароль.</p>
+      ${pending}
+      ${pending ? '' : `<div class="row-actions"><button class="btn" id="pf-email-set">Изменить почту</button>
+        <button class="btn" id="pf-email-remove">Отвязать</button></div>`}`;
+  }
+  return pending || `<p class="pf-note pf-email warn">Почта не привязана — забытый пароль не восстановить.</p>
+    <div class="row-actions"><button class="btn primary" id="pf-email-set">Привязать почту</button></div>`;
+}
+
 function accountHtml() {
   return `<h2 class="pf-h">Аккаунт</h2>
     <p class="muted pf-note">Альбомы, эквалайзер, настройки бочки, статистика и ключи сервисов (Яндекс Музыка, SoundCloud, Spotify) одинаковые на всех твоих компьютерах. Папки с музыкой и микрофон остаются только здесь.</p>
     ${keysNote()}
+    ${emailHtml()}
     <div class="row-actions">
       <button class="btn" id="pf-password">Сменить пароль</button>
       <button class="btn" id="pf-logout">Выйти</button>
@@ -428,6 +449,35 @@ function bindProfile() {
     const next = await ask({ title: 'Смена пароля', text: 'Новый пароль, не короче 8 символов. На других устройствах нужно будет войти заново.', ok: 'Сменить', password: true });
     if (!next) return;
     try { await api.account.password(old, next); toast('Пароль изменён'); pf.devices = null; loadDevices(); } catch (err) { toast(err.message, 'err'); }
+  });
+  // почта: адрес → письмо с кодом → код. Ошибки сервера показываем как есть («почта уже привязана» и т. п.)
+  const confirmEmail = async (addr) => {
+    const code = await ask({ title: 'Код из письма', text: `Отправили 6 цифр на ${addr}. Письмо может попасть в «Спам».`, ok: 'Подтвердить' });
+    if (!code) return;
+    try {
+      pf.me = (await api.account.emailConfirm(code)).user;
+      toast('Почта привязана');
+    } catch (err) { toast(err.message, 'err'); }
+    renderProfileParts(['account']);
+  };
+  const sendEmail = async (addr) => {
+    try {
+      pf.me = (await api.account.email(addr)).user;
+    } catch (err) { toast(err.message, 'err'); return; }
+    renderProfileParts(['account']);
+    await confirmEmail(addr);
+  };
+  on('#pf-email-set', async () => {
+    const addr = await ask({ title: 'Почта для восстановления', text: 'Пришлём на неё код подтверждения. Если забудешь пароль, код для сброса придёт сюда же.', value: pf.me?.email || '', ok: 'Прислать код' });
+    if (addr && addr.trim().toLowerCase() !== pf.me?.email) await sendEmail(addr.trim());
+  });
+  on('#pf-email-code', () => confirmEmail(pf.me.email_pending));
+  on('#pf-email-resend', () => sendEmail(pf.me.email_pending));
+  on('#pf-email-remove', async () => {
+    const ok = await ask({ title: 'Отвязать почту?', text: 'Без почты забытый пароль не восстановить.', ok: 'Отвязать', danger: true, input: false });
+    if (!ok) return;
+    try { pf.me = (await api.account.email('')).user; toast('Почта отвязана'); } catch (err) { toast(err.message, 'err'); }
+    renderProfileParts(['account']);
   });
   on('#pf-logout-all', async () => {
     try {

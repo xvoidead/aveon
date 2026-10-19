@@ -3,6 +3,7 @@
 //	GET  /api/admin/overview                 → сводка: пользователи, кто онлайн и что слушает, румы, сообщения
 //	GET  /api/admin/users?q=&limit=          → пользователи (поиск по логину и имени)
 //	POST /api/admin/users/{id}/logout        → закрыть все его сессии
+//	POST /api/admin/users/{id}/password      → сбросить пароль: временный пароль в ответе (один раз), сессии закрываются
 //	POST /api/admin/users/{id}/ban {banned}  → заблокировать (и выкинуть отовсюду) / разблокировать
 //	POST /api/admin/users/{id}/rename {name} → сменить имя (например, за оскорбительное)
 //	PUT  /api/admin/announce {text, track?}  → объявление всем (с треком — «трек дня»); пустой текст — убрать
@@ -13,6 +14,7 @@ package main
 import (
 	"database/sql"
 	"encoding/json"
+	"log/slog"
 	"net/http"
 	"os"
 	"sort"
@@ -279,6 +281,49 @@ func adminKick(r *http.Request, me Auth) (any, error) {
 	}
 	n, _ := res.RowsAffected()
 	return M{"closed": n}, nil
+}
+
+// adminResetPassword — новый случайный пароль вида ABCD-EFGH-JKLM (60 бит, crypto/rand) и выход отовсюду.
+// Пароль уходит только в ответ админу, в базе — scrypt, в журнале его нет. Админам (и себе) не сбрасываем:
+// как и с блоком, один админ не должен забирать аккаунт другого; свой пароль меняют в профиле
+func adminResetPassword(r *http.Request, me Auth) (any, error) {
+	key := "admin:" + itoa(me.UserID)
+	if resetLimit.Blocked(key) {
+		return nil, fail(429, "Слишком много сбросов пароля, попробуй через час")
+	}
+	u, err := target(db, r)
+	if err != nil {
+		return nil, err
+	}
+	id := u.Int("id")
+	if id == me.UserID || isAdmin(u.Str("login")) {
+		return nil, fail(400, "Пароль админа так не сбросить — он меняет его сам в профиле")
+	}
+	password := randomCode(4) + "-" + randomCode(4) + "-" + randomCode(4)
+	hash := hashPassword(password) // до транзакции: scrypt долгий, базу он держать не должен
+	var closed int64
+	err = tx(func(q *sql.Tx) error {
+		res, err := q.Exec("UPDATE users SET pw_hash = ? WHERE id = ?", hash, id)
+		if err != nil {
+			return err
+		}
+		if n, _ := res.RowsAffected(); n == 0 {
+			return fail(404, "Нет такого пользователя") // удалили, пока считали хеш
+		}
+		res, err = q.Exec("DELETE FROM sessions WHERE user_id = ?", id)
+		if err != nil {
+			return err
+		}
+		closed, _ = res.RowsAffected()
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	resetLimit.Hit(key)
+	loginLimit.Reset("login:" + strings.ToLower(u.Str("login"))) // старые неудачные попытки не должны мешать войти с новым
+	slog.Info("admin: сброс пароля", "admin", me.UserID, "user", id, "login", u.Str("login"), "sessions", closed)
+	return M{"password": password, "closed": closed}, nil
 }
 
 type banBody struct {

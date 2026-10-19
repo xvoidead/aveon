@@ -137,4 +137,9 @@ var (
 	loginLimit = newRateLimit(10, 15*time.Minute) // неудачные входы на IP и на логин
 	regLimit   = newRateLimit(10, time.Hour)      // новые аккаунты с одного IP
 	joinLimit  = newRateLimit(20, 10*time.Minute) // неверные коды рум: код из 6 символов можно перебрать
+	resetLimit = newRateLimit(30, time.Hour)      // сбросы пароля одним админом: scrypt дорогой, а украденный токен не должен перебить всех
+
+	mailUserLimit = newRateLimit(3, time.Hour)       // писем с кодом на одно действие пользователя: verify:id, reset:id
+	mailIPLimit   = newRateLimit(20, time.Hour)      // запросов писем с одного IP — не даём слать спам чужим ящикам
+	codeLimit     = newRateLimit(20, 10*time.Minute) // неверных кодов сброса с одного IP: перебор по многим аккаунтам
 )

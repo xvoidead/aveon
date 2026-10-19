@@ -8,9 +8,9 @@ const config = require('./config');
 const albums = require('./albums');
 const store = require('./store');
 
-// Адрес сервера аккаунтов, вшитый в плеер, например 'http://1.2.3.4:25565' или 'https://aveon.example.ru'.
-// Пока пусто, на экране входа есть поле «Сервер». Можно переопределить переменной AVEON_SERVER.
-const DEFAULT_SERVER = process.env.AVEON_SERVER || '';
+// Сервер аккаунтов один — api.music.aveon.su, выбора на экране входа нет.
+// AVEON_SERVER — только для разработки: поднять server/ локально и войти в него (npm run tester)
+const SERVER = (process.env.AVEON_SERVER || 'https://api.music.aveon.su').trim().replace(/\/+$/, '');
 
 const AUTO_EVERY = 5 * 60 * 1000;
 const AFTER_CHANGE = 4000;
@@ -32,16 +32,7 @@ class ApiError extends Error {
 
 const acc = () => config.get().account;
 
-function normServer(url) {
-  url = String(url || DEFAULT_SERVER).trim().replace(/\/+$/, '');
-  if (!url) throw new Error('Укажи адрес сервера');
-  // Голый IP или адрес с портом (так выдаёт панель хостинга) — почти всегда без https
-  if (!/^https?:\/\//i.test(url)) url = (/^[\d.]+(:\d+)?$|:\d+$/.test(url) ? 'http://' : 'https://') + url;
-  try { new URL(url); } catch { throw new Error('Не похоже на адрес сервера'); }
-  return url;
-}
-
-async function api(method, route, body, { server = acc().server, token = config.getSecret('acc.token') } = {}) {
+async function api(method, route, body, { server = SERVER, token = config.getSecret('acc.token') } = {}) {
   let res;
   try {
     res = await fetch(server + route, {
@@ -72,8 +63,7 @@ function ensureDevice() {
 function status() {
   const a = acc();
   return {
-    server: a.server,
-    defaultServer: DEFAULT_SERVER,
+    server: SERVER,
     loggedIn: !!config.getSecret('acc.token'),
     login: a.login,
     name: a.name,
@@ -93,22 +83,44 @@ function dropSession() {
   notify({ status: status(), error: 'Сессия истекла, войди в аккаунт заново' });
 }
 
-async function enter(route, server, fields) {
-  server = normServer(server);
+async function enter(route, fields, { keysReset = false } = {}) {
+  const server = SERVER;
   ensureDevice();
-  const r = await api('POST', route, { ...fields, device: os.hostname().slice(0, 64) }, { server, token: '' });
+  const r = await api('POST', route, { ...fields, device: os.hostname().slice(0, 64) }, { token: '' });
   config.setSecret('acc.token', r.token);
   config.setSecret('acc.key', deriveKey(fields.password, r.user.login).toString('base64'));
   // keysSig пустой — при первой синхронизации ключи с сервера и здесь сливаются, а не затирают друг друга
-  config.set({ account: { server, login: r.user.login, name: r.user.name, avatar: '', avatarAt: 0, admin: !!r.user.admin, keysSig: '', keysAt: 0 } });
+  config.set({ account: { server, login: r.user.login, name: r.user.name, avatar: '', avatarAt: 0, admin: !!r.user.admin, keysSig: '', keysAt: 0, keysReset } });
   lastStatsPushed = '';
   start();
   const changed = await sync().catch(() => null);
   return { status: status(), changed };
 }
 
-const register = (server, login, password, name) => enter('/api/auth/register', server, { login, password, name });
-const login = (server, login, password) => enter('/api/auth/login', server, { login, password });
+const register = (login, password, name) => enter('/api/auth/register', { login, password, name });
+const login = (login, password) => enter('/api/auth/login', { login, password });
+
+// ---- забыли пароль: код на подтверждённую почту (server/email.go) ----
+
+// who — логин или почта. Сервер отвечает одинаково, есть такой аккаунт или нет
+async function resetRequest(who) {
+  await api('POST', '/api/auth/reset/request', { login: who }, { token: '' });
+}
+
+// Верен ли код — до того, как человек придумывает новый пароль. Код не гасится
+async function resetCheck(who, code) {
+  await api('POST', '/api/auth/reset/check', { login: who, code }, { token: '' });
+}
+
+// Новый пароль по коду из письма — и сразу вход. Ключи сервисов на сервере зашифрованы забытым паролем:
+// их не расшифровать, поэтому при первой синхронизации заменяем их здешними (keysReset)
+const resetConfirm = (who, code, password) =>
+  enter('/api/auth/reset/confirm', { login: who, code, password }, { keysReset: true });
+
+// ---- почта аккаунта: привязать (придёт код), подтвердить кодом, убрать пустой строкой ----
+
+const setEmail = (email) => api('POST', '/api/me/email', { email });
+const confirmEmail = (code) => api('POST', '/api/me/email/confirm', { code });
 
 async function logout() {
   if (config.getSecret('acc.token')) await api('POST', '/api/auth/logout').catch(() => {});
@@ -236,7 +248,7 @@ async function avatarOf(userId, at) {
   if (avatars.has(key)) return avatars.get(key);
   let url = '';
   try {
-    const res = await fetch(`${acc().server}/api/avatar/${encodeURIComponent(userId)}`, {
+    const res = await fetch(`${SERVER}/api/avatar/${encodeURIComponent(userId)}`, {
       headers: { Authorization: `Bearer ${config.getSecret('acc.token')}` },
       signal: AbortSignal.timeout(15000),
     });
@@ -342,7 +354,7 @@ async function runSync() {
 
 // Параллельные вызовы ждут одну и ту же синхронизацию
 function sync() {
-  if (!config.getSecret('acc.token') || !acc().server) return Promise.resolve(null);
+  if (!config.getSecret('acc.token')) return Promise.resolve(null);
   if (running) return running;
   running = runSync()
     .then((changed) => { lastError = ''; notify({ status: statusAfter(), changed }); return changed; })
@@ -380,6 +392,9 @@ function stop() {
 function init(onEvent) {
   notify = onEvent;
   ensureDevice();
+  // раньше сервер выбирали на экране входа: friends.js и together.js читают адрес из настроек — там всегда наш.
+  // Вход на другом адресе здесь не действует: сервер ответит 401, и плеер попросит войти заново
+  if (acc().server !== SERVER) config.set({ account: { server: SERVER } });
   albums.onChange(schedule);
   if (config.getSecret('acc.token')) {
     start();
@@ -461,7 +476,13 @@ async function syncKeys(remote, changed) {
   await put('keys', 'main', remote, (theirs) => {
     let data = null;
     if (theirs?.box) {
-      try { data = unseal(theirs.box, key); } catch { keysState = 'badkey'; return undefined; } // другой пароль
+      try { data = unseal(theirs.box, key); } catch {
+        if (!acc().keysReset) { keysState = 'badkey'; return undefined; } // другой пароль
+        // пароль сбросили по почте: старый ключ потерян навсегда — кладём на сервер здешние ключи
+        const at = Date.now();
+        config.set({ account: { keysSig: keySig(keysNow()), keysAt: at } });
+        return { at, box: seal(keysNow(), key) };
+      }
     }
     const now = keysNow();
     if (first) {
@@ -487,6 +508,7 @@ async function syncKeys(remote, changed) {
     if (!localAt) return undefined;
     return { at: localAt, box: seal(now, key) };
   });
+  if (acc().keysReset) config.set({ account: { keysReset: false } }); // записали — дальше как обычно
 }
 
 // Поменяли ключ сервиса (настройки, вход в Spotify) — синхронизировать поскорее
@@ -498,6 +520,7 @@ const adminApi = {
   overview: () => api('GET', '/api/admin/overview'),
   users: (q) => api('GET', `/api/admin/users?q=${encodeURIComponent(q || '')}`),
   kick: (id) => api('POST', `/api/admin/users/${encodeURIComponent(id)}/logout`),
+  resetPassword: (id) => api('POST', `/api/admin/users/${encodeURIComponent(id)}/password`),
   ban: (id, banned) => api('POST', `/api/admin/users/${encodeURIComponent(id)}/ban`, { banned }),
   rename: (id, name) => api('POST', `/api/admin/users/${encodeURIComponent(id)}/rename`, { name }),
   announce: (text, track) => api('PUT', '/api/admin/announce', { text, track: track || null }),
@@ -510,6 +533,7 @@ async function announcement() {
 }
 
 module.exports = {
-  init, status, register, login, logout, logoutAll, me, rename, changePassword, remove, sync, settingsChanged,
+  init, status, register, login, resetRequest, resetCheck, resetConfirm, setEmail, confirmEmail,
+  logout, logoutAll, me, rename, changePassword, remove, sync, settingsChanged,
   sharePut, shareGet, sharePublic, collab, avatarOf, setAvatar, api, adminApi, announcement, keysChanged,
 };

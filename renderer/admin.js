@@ -3,7 +3,7 @@
 // ---------- админка ----------
 // Только для логинов из AVEON_ADMINS на сервере (server/admin.go). Кнопка — в профиле.
 // Пульт: эфир (кто что слушает, с бегущими полосками), румы с «зайти», графики за 30 дней,
-// рейтинг месяца и общий топ сервера. Пользователи: поиск, имя, выкинуть, блок, личное уведомление.
+// рейтинг месяца и общий топ сервера. Пользователи: поиск, имя, выкинуть, сброс пароля, блок, личное уведомление.
 // Объявление всем — можно с «треком дня» (у всех кнопка ▶).
 // Здесь же — показ объявлений и личных уведомлений у всех: баннер сверху, один раз.
 
@@ -227,6 +227,8 @@ function admUserMenu(id, anchor) {
     } },
     { label: `Скопировать @${x.login}`, icon: 'i-copy', onClick: () => copyText(`@${x.login}`) },
     { label: 'Выкинуть со всех устройств', icon: 'i-device', onClick: () => run(() => api.admin.kick(x.id), `@${x.login} вышел отовсюду`) },
+    // админам не сбрасываем — сервер тоже не даст (server/admin.go adminResetPassword)
+    ...(x.admin ? [] : [{ label: 'Сбросить пароль', icon: 'i-keys', onClick: () => admResetPassword(x) }]),
     { sep: true },
     x.banned
       ? { label: 'Разблокировать', icon: 'i-shield', onClick: () => run(() => api.admin.ban(x.id, false), `@${x.login} разблокирован`) }
@@ -235,6 +237,20 @@ function admUserMenu(id, anchor) {
         if (ok) run(() => api.admin.ban(x.id, true), `@${x.login} заблокирован`);
       } },
   ], { anchor });
+}
+
+// сброс пароля: сервер придумывает временный и отдаёт его один раз — показываем с «Скопировать»
+async function admResetPassword(x) {
+  const ok = await ask({ title: `Сбросить пароль @${x.login}?`, text: 'Старый пароль перестанет подходить, а все устройства выйдут из аккаунта. Новый временный пароль покажем один раз.', ok: 'Сбросить', danger: true, input: false });
+  if (!ok) return;
+  let r;
+  try { r = await api.admin.resetPassword(x.id); } catch (e) { toast(e.message, 'err'); return; }
+  ADM.users = null; renderAdmin(); loadAdmin(); // сессий теперь 0
+  let text = 'Передай его пользователю — пусть сразу сменит в профиле. Больше его нигде не увидеть.';
+  while (await ask({ title: `Временный пароль @${x.login}`, text, value: r.password, ok: 'Скопировать' })) {
+    if (await copyText(r.password)) { toast('Пароль скопирован'); return; }
+    text = 'Не получилось скопировать — выдели пароль в поле и скопируй вручную.';
+  }
 }
 
 async function loadAdmin() {

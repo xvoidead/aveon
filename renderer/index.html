@@ -320,7 +320,7 @@
     <form class="sheet dialog" id="dialog-form" role="dialog" aria-labelledby="dialog-title">
       <h2 id="dialog-title"></h2>
       <p class="sec-desc" id="dialog-text"></p>
-      <input class="input" id="dialog-input" spellcheck="false" maxlength="80">
+      <span class="pw" id="dialog-field"><input class="input" id="dialog-input" spellcheck="false" maxlength="80"><button type="button" class="pw-toggle" id="dialog-pw" aria-label="Показать пароль" aria-pressed="false" hidden><svg><use href="#i-eye"/></svg></button></span>
       <div class="dialog-actions">
         <button type="button" class="btn" id="dialog-cancel">Отмена</button>
         <button type="submit" class="btn primary" id="dialog-ok"></button>
@@ -348,18 +348,18 @@
         <h1 class="auth-title" id="auth-title">вход</h1>
         <p class="auth-sub" id="auth-sub"></p>
 
-        <div class="auth-server" id="auth-server-line" hidden>
-          <span>сервер <b id="auth-server-host"></b></span>
-          <button type="button" class="auth-link" id="auth-server-edit">изменить</button>
-        </div>
-        <label class="auth-field" id="auth-server-field">адрес сервера
-          <input class="input" id="auth-server" placeholder="1.2.3.4:8787" spellcheck="false"></label>
-        <label class="auth-field">логин
+        <label class="auth-field" id="auth-login-field"><span id="auth-login-label">логин</span>
           <input class="input" id="auth-login" spellcheck="false" maxlength="32" autocomplete="username"></label>
-        <label class="auth-field">пароль
-          <input class="input" id="auth-password" type="password" maxlength="256"></label>
+        <!-- код из письма: настоящее поле прозрачное поверх шести ячеек, ячейки только рисуют цифры -->
+        <div class="otp" id="auth-code-field" hidden>
+          <input class="otp-input" id="auth-code" inputmode="numeric" autocomplete="one-time-code" maxlength="6" spellcheck="false" aria-label="Код из письма, шесть цифр">
+          <span class="otp-cell" style="--i:0"></span><span class="otp-cell" style="--i:1"></span><span class="otp-cell" style="--i:2"></span><span class="otp-cell" style="--i:3"></span><span class="otp-cell" style="--i:4"></span><span class="otp-cell" style="--i:5"></span>
+        </div>
+        <label class="auth-field" id="auth-password-field"><span id="auth-password-label">пароль</span>
+          <span class="pw"><input class="input" id="auth-password" type="password" maxlength="256"><button type="button" class="pw-toggle" aria-label="Показать пароль" aria-pressed="false"><svg><use href="#i-eye"/></svg></button></span></label>
+        <button type="button" class="auth-link auth-forgot" id="auth-forgot">Забыли пароль?</button>
         <label class="auth-field" id="auth-password2-field">пароль ещё раз
-          <input class="input" id="auth-password2" type="password" maxlength="256"></label>
+          <span class="pw"><input class="input" id="auth-password2" type="password" maxlength="256"><button type="button" class="pw-toggle" aria-label="Показать пароль" aria-pressed="false"><svg><use href="#i-eye"/></svg></button></span></label>
 
         <p class="auth-error" id="auth-error" role="alert"></p>
         <button class="btn primary auth-go" type="submit" id="auth-go"></button>

@@ -323,23 +323,36 @@
 
   handlers.authData = () => {
     const a = state.account || {};
-    const shown = (sel) => !$(sel).hidden;
+    const otp = $('#auth-code-field');
+    const has = (c) => otp.classList.contains(c);
     return {
       mode: authMode, register: authMode === 'register', title: $('#auth-title').textContent, sub: $('#auth-sub').textContent,
       go: $('#auth-go').textContent, busy: $('#auth-go').disabled, ask: $('#auth-switch-text').textContent, other: $('#auth-switch').textContent,
-      serverField: shown('#auth-server-field'), serverLine: shown('#auth-server-line'), serverHost: $('#auth-server-host').textContent,
-      server: $('#auth-server').value, login: $('#auth-login').value || a.login || '', error: $('#auth-error').textContent,
+      serverField: false, serverLine: false, serverHost: '', server: '', // сервер один — выбора нет
+      login: $('#auth-login').value || a.login || '', error: $('#auth-error').textContent,
+      // сброс пароля (app.js: setAuthMode): forgot → code → newpass
+      forgot: authMode === 'forgot', code: authMode === 'code', newpass: authMode === 'newpass',
+      showLogin: !$('#auth-login-field').hidden, showPass: !$('#auth-password-field').hidden,
+      showPass2: !$('#auth-password2-field').hidden, showGo: !$('#auth-go').hidden, showForgot: !$('#auth-forgot').hidden,
+      // ячейки кода: enter — только что появились (или новый код), checking — ждём сервер, ok/bad — ответ
+      codeState: ['ok', 'bad', 'checking', 'enter'].find(has) || '', codeValue: $('#auth-code').value,
     };
   };
+  handlers.authForgot = () => $('#auth-forgot').click();
+  handlers.authCode = (code) => {
+    const el = $('#auth-code');
+    if (el.disabled) return; // идёт проверка — app.js сам сотрёт или пустит дальше
+    el.value = String(code || '');
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  };
   handlers.authSubmit = (server, login, password, password2) => {
-    $('#auth-server').value = server || '';
     $('#auth-login').value = login || '';
     $('#auth-password').value = password || '';
     $('#auth-password2').value = password2 || '';
     $('#auth-form').requestSubmit();
   };
   handlers.authSwitch = () => $('#auth-switch').click();
-  handlers.authServerEdit = () => $('#auth-server-edit').click();
+  handlers.authServerEdit = () => {}; // старые сборки Android ещё зовут его — сервер один, менять нечего
 
   handlers.friendProfile = (id) => { if (friendsEl.hidden) openFriends(); openFriendProfile(id); };
 
