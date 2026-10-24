@@ -1,5 +1,5 @@
 // Тексты песен из LRCLIB (lrclib.net): бесплатно, без ключа. syncedLyrics — LRC с таймкодами.
-const { request, HttpError } = require('./http');
+const { requestPatient: request, HttpError } = require('./http'); // при перегрузке LRCLIB (503) ждём и повторяем
 
 const API = 'https://lrclib.net/api';
 const HEADERS = { 'User-Agent': 'aveon-player/1.0 (desktop music player)' }; // LRCLIB просит указывать клиент
