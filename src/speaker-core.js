@@ -1,0 +1,212 @@
+// Чистая часть «колонки» (src/speaker.js): без electron, сети и ssh, поэтому проверяется node --test (npm run test:speaker).
+// Колонка — Яндекс Станция Лайт 2 по SSH. У неё нет TLS и нет прямого пути к аудио-CDN SoundCloud, поэтому звук
+// отдаёт этот компьютер, а здесь — всё, что нужно для этого: плейлисты, диапазоны, команды ssh и скрипты для колонки.
+
+const MIME = {
+  '.mp3': 'audio/mpeg', '.flac': 'audio/flac', '.wav': 'audio/wav', '.ogg': 'audio/ogg', '.oga': 'audio/ogg',
+  '.opus': 'audio/ogg', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.webm': 'audio/webm', '.weba': 'audio/webm',
+};
+
+// Порт на колонке, куда обратный SSH-туннель выводит наш сервер. Не порт самой колонки: у Яндекса заняты 9850…9926
+const REMOTE_PORT = 19790;
+const STATE_DIR = '/tmp/aveon-speaker';
+const MASTER = 186; // numid «Master Playback Volume» (softvol 0…255) у Станции Лайт 2
+
+// Имя из ~/.ssh/config или адрес. Дефис в начале нельзя: ssh принял бы его за ключ
+const validHost = (h) => typeof h === 'string' && /^[A-Za-z0-9_][A-Za-z0-9_.@:-]*$/.test(h);
+
+// Доля 0…1 → значение Master 0…255. Не число или пустое — 0.7: на таком уровне музыка звучит как привычно
+function masterOf(level) {
+  const x = typeof level === 'number' && Number.isFinite(level) ? level : 0.7;
+  return Math.round(Math.min(1, Math.max(0, x)) * 255);
+}
+
+// Range: bytes=a-b | a- | -n. undefined — диапазона нет, null — не годится (416)
+function parseRange(header, size) {
+  const m = header && /^bytes=(\d*)-(\d*)$/.exec(String(header).trim());
+  if (!m || !(m[1] || m[2])) return undefined;
+  let start = m[1] ? parseInt(m[1], 10) : size - parseInt(m[2], 10);
+  let end = m[1] && m[2] ? parseInt(m[2], 10) : size - 1;
+  start = Math.max(0, start);
+  end = Math.min(end, size - 1);
+  return start > end ? null : { start, end };
+}
+
+// Куда указывает media://… из resolveStream: файл кэша или локальный файл (те же проверки, что в протоколе main.js).
+// Строка — путь, null — media://, но отдавать нельзя, undefined — это не media://, адрес обычный
+function mediaFile(url, { cacheFileOf, isAllowed }) {
+  let u;
+  try { u = new URL(url); } catch { return undefined; }
+  if (u.protocol !== 'media:') return undefined;
+  if (u.hostname === 'cache') return cacheFileOf(u.searchParams.get('f'));
+  if (u.hostname === 'local') {
+    const p = u.searchParams.get('p') || '';
+    return isAllowed(p) ? p : null;
+  }
+  return null;
+}
+
+const isPlaylist = (type, url) => /mpegurl/i.test(type || '') || /\.m3u8?(\?|$)/i.test(url || '');
+
+// HLS-плейлист для колонки: каждую ссылку (сегменты, init, вложенные плейлисты) меняем на адрес нашего сервера.
+// register(url) запоминает настоящий адрес и возвращает новый. Относительные ссылки считаем от адреса самого плейлиста
+function rewritePlaylist(text, baseUrl, register) {
+  const swap = (u) => {
+    if (!u) return u;
+    let abs;
+    try { abs = new URL(u, baseUrl).href; } catch { return u; }
+    return /^https?:/.test(abs) ? register(abs) : u; // skd://, data: и прочее оставляем как есть
+  };
+  return text.split(/\r?\n/).map((line) => {
+    if (!line.trim()) return line;
+    if (line.startsWith('#')) return line.replace(/URI="([^"]*)"/g, (m, u) => `URI="${swap(u)}"`);
+    return swap(line.trim());
+  }).join('\n');
+}
+
+// ---- ssh ----
+
+const BASE = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8'];
+
+// Скрипт идёт в stdin: так не нужно экранировать кавычки для удалённой оболочки
+const controlArgs = (host) => [...BASE, host, 'sh', '-s'];
+
+// Колонка ходит на свой 127.0.0.1:REMOTE_PORT, туннель приводит её к нашему серверу на localPort
+const tunnelArgs = (host, localPort) => [
+  '-N', ...BASE, '-o', 'ExitOnForwardFailure=yes', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=3',
+  '-R', `${REMOTE_PORT}:127.0.0.1:${localPort}`, host,
+];
+
+// ---- скрипты для колонки (busybox sh) ----
+
+// maind --gst-launch на сигнал выходит, не закрыв звук как положено, и в системе остаются общая память и семафор
+// микшера dmix (ключи 0x400, 0x401). Следующие клиенты цепляются к ним, устройство готовится, а запуск потока до
+// железа не доходит: молчит и плеер, и сама Алиса, пока не перезапустить quasar. Сироту убираем сразу после выхода
+// плеера. Трогаем только когда к памяти никто не подключён (nattch = 0): у живого сервера он не ноль.
+// На конце трека maind выходит сам и убирает за собой, там сирот нет
+const DMIX_CLEAN = `dmix_clean() {
+  N=$(ipcs -m | grep -E '^0x0*400 ' | sed 's/  */ /g' | cut -d' ' -f6)
+  [ "$N" = 0 ] && ipcrm -M 0x400 -M 0x401 -S 0x400 2>/dev/null
+  return 0
+}`;
+
+// Смотритель: играет поток и сам возвращает громкость, когда трек закончился или плеер остановили.
+// maind --gst-launch завершается сам на конце потока (в логе «EOS»), поэтому конец трека ловить не нужно
+const RUN = `#!/bin/sh
+export LD_LIBRARY_PATH=/system/vendor/quasar/libs GST_PLUGIN_PATH=/system/vendor/quasar/libs
+D=${STATE_DIR}
+${DMIX_CLEAN}
+echo $$ > $D/pid
+/system/vendor/quasar/maind --gst-launch "uridecodebin uri=$1 ! audioconvert ! audioresample ! alsasink" > $D/gst.log 2>&1 < /dev/null &
+G=$!
+T=$(basename "$1")
+B=http://127.0.0.1:${REMOTE_PORT}
+KILLED=
+trap 'KILLED=1; kill $G 2>/dev/null' TERM INT
+# рукопожатие: колонка сама сообщает компьютеру позицию трека (строка Progress в логе плеера, раз в секунду)
+(
+  LAST=
+  while kill -0 $G 2>/dev/null; do
+    L=$(tail -n 5 $D/gst.log 2>/dev/null | grep 'Progress:' | tail -n 1)
+    if [ -n "$L" ] && [ "$L" != "$LAST" ]; then
+      LAST=$L
+      P=$(echo "$L" | awk '{for(i=1;i<=NF;i++) if($i=="Progress:"){v=$(i+1); sub("ms","",v); print v}}')
+      wget -q -T 2 -O /dev/null "$B/p/$T?ms=$P" 2>/dev/null
+    fi
+    sleep 0.1
+  done
+) &
+wait $G
+wait $G 2>/dev/null
+dmix_clean
+# трек кончился сам (не остановили): сразу даём знать, чтобы Авеон включил следующий
+[ -z "$KILLED" ] && wget -q -T 2 -O /dev/null "$B/e/$T" 2>/dev/null
+V=$(cat $D/vol 2>/dev/null)
+[ -n "$V" ] && amixer cset numid=${MASTER} "$V" >/dev/null 2>&1
+rm -f $D/vol $D/pid`;
+
+const PLAY_URL = new RegExp(`^http://127\\.0\\.0\\.1:${REMOTE_PORT}/s/[0-9a-f]{32}$`);
+
+function playScript({ url, level }) {
+  if (!PLAY_URL.test(url)) throw new Error('bad play url');
+  return `D=${STATE_DIR}
+mkdir -p $D
+${DMIX_CLEAN}
+if [ -f $D/pid ]; then
+  OLD=$(cat $D/pid)
+  kill $OLD 2>/dev/null
+  i=0
+  while kill -0 $OLD 2>/dev/null && [ $i -lt 30 ]; do sleep 0.1; i=$((i + 1)); done
+fi
+dmix_clean
+[ -f $D/vol ] || amixer cget numid=${MASTER} | grep -E '^  : values=' | sed 's/.*values=//' | cut -d, -f1 > $D/vol
+[ -n "$(cat $D/vol)" ] || { rm -f $D/vol; echo "FAIL volume"; exit 1; }
+cat > $D/run.sh <<'EOF'
+${RUN}
+EOF
+amixer cset numid=${MASTER} ${masterOf(level)} >/dev/null 2>&1
+# туннель с компьютера поднимается параллельно этому скрипту: ждём его порт здесь, а не отдельными запросами по ssh
+i=0
+while ! grep -qi ':${HEX_PORT} 00000000:0000 0A ' /proc/net/tcp && [ $i -lt 80 ]; do sleep 0.1; i=$((i + 1)); done
+grep -qi ':${HEX_PORT} 00000000:0000 0A ' /proc/net/tcp || { echo "FAIL tunnel"; exit 1; }
+: > $D/gst.log
+rm -f $D/pid
+setsid sh $D/run.sh ${url} > /dev/null 2>&1 < /dev/null &
+# готово, когда плеер написал первую строку Progress (звук пошёл) или умер: без фиксированного ожидания
+i=0
+while [ $i -lt 100 ]; do
+  P=$(cat $D/pid 2>/dev/null)
+  if [ -n "$P" ] && ! kill -0 $P 2>/dev/null; then break; fi
+  grep -q 'Progress:' $D/gst.log 2>/dev/null && break
+  sleep 0.1; i=$((i + 1))
+done
+P=$(cat $D/pid 2>/dev/null)
+if [ -n "$P" ] && kill -0 $P 2>/dev/null && grep -q 'Progress:' $D/gst.log 2>/dev/null; then echo "OK $P"; else echo FAIL; grep -iE 'error' $D/gst.log | tail -n 2 | cut -c1-200; fi
+`;
+}
+
+const stopScript = () => `D=${STATE_DIR}
+${DMIX_CLEAN}
+if [ -f $D/pid ]; then
+  P=$(cat $D/pid)
+  kill $P 2>/dev/null
+  i=0
+  while kill -0 $P 2>/dev/null && [ $i -lt 30 ]; do sleep 0.1; i=$((i + 1)); done
+  dmix_clean
+  echo STOPPED
+else
+  dmix_clean
+  echo IDLE
+fi
+`;
+
+const statusScript = () => `D=${STATE_DIR}
+if [ -f $D/pid ] && kill -0 $(cat $D/pid) 2>/dev/null; then
+  echo PLAYING
+  tail -n 30 $D/gst.log 2>/dev/null | grep 'Progress:' | tail -n 1
+else echo IDLE; fi
+`;
+
+// Вывел ли туннель наш порт на колонке: в /proc/net/tcp порт стоит в шестнадцатеричном виде, 0A — LISTEN
+const HEX_PORT = REMOTE_PORT.toString(16).toUpperCase().padStart(4, '0');
+const listenScript = () => `grep -qi ':${HEX_PORT} 00000000:0000 0A ' /proc/net/tcp && echo UP || echo DOWN
+`;
+
+function playResult(out) {
+  const text = String(out || '').trim();
+  if (/^OK \d+/m.test(text)) return { ok: true };
+  return { ok: false, error: text.split('\n').filter(Boolean).slice(-2).join(' ') || 'нет ответа от колонки' };
+}
+
+const isPlaying = (out) => /^PLAYING/m.test(String(out || ''));
+
+// Позиция трека, секунды: плеер сам пишет в gst.log раз в секунду «Progress: 5256ms / 124238ms». null — строки ещё нет
+function progressOf(out) {
+  const m = /Progress: (\d+)ms \//.exec(String(out || ''));
+  return m ? Number(m[1]) / 1000 : null;
+}
+
+module.exports = {
+  MIME, REMOTE_PORT, validHost, masterOf, parseRange, mediaFile, isPlaylist, rewritePlaylist,
+  controlArgs, tunnelArgs, playScript, stopScript, statusScript, listenScript, playResult, isPlaying, progressOf,
+};

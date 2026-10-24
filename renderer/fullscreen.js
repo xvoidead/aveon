@@ -57,19 +57,19 @@ function fsLoop() {
   const tick = () => {
     if (!fsOpen()) return;
     if (fs.trackId !== state.track?.id) fsRender();
-    const d = audio.duration || state.track?.duration || 0;
+    const d = (speakerMode ? state.track?.duration : audio.duration) || state.track?.duration || 0;
     if (!fs.seeking) {
-      const c = audio.currentTime || 0;
+      const c = nowPos();
       setSlider(fsProg, d ? c / d : 0);
       const cur = fmt(c);
       if ($('#fs-cur').textContent !== cur) $('#fs-cur').textContent = cur;
     }
     const dur = fmt(d);
     if ($('#fs-dur').textContent !== dur) $('#fs-dur').textContent = dur;
-    if (fs.paused !== audio.paused) {
-      fs.paused = audio.paused;
-      setIcon($('#fs-play'), audio.paused ? '#i-play' : '#i-pause');
-      $('#fs-play').setAttribute('aria-label', audio.paused ? 'Играть' : 'Пауза');
+    if (fs.paused !== nowPaused()) {
+      fs.paused = nowPaused();
+      setIcon($('#fs-play'), fs.paused ? '#i-play' : '#i-pause');
+      $('#fs-play').setAttribute('aria-label', fs.paused ? 'Играть' : 'Пауза');
     }
     fs.raf = requestAnimationFrame(tick);
   };

@@ -76,6 +76,7 @@
     <symbol id="i-share" viewBox="0 0 24 24"><path d="M12 14.5V4m0 0L8 8m4-4 4 4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/><path d="M8.5 11H7a2 2 0 0 0-2 2v5a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-5a2 2 0 0 0-2-2h-1.5" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
     <symbol id="i-code" viewBox="0 0 24 24"><rect x="3.5" y="6" width="17" height="12" rx="2.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M7.5 10.5v3M10.5 10.5v3M13.5 10.5v3M16.5 10.5v3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
     <symbol id="i-device" viewBox="0 0 24 24"><rect x="3.5" y="5" width="17" height="11" rx="2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M8.5 19.5h7M12 16v3.5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
+    <symbol id="i-speaker" viewBox="0 0 24 24"><rect x="6" y="3" width="12" height="18" rx="3" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="14.5" r="2.8" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="12" cy="7.5" r="1" fill="currentColor"/></symbol>
     <symbol id="i-palette" viewBox="0 0 24 24"><path d="M12 3.8a8.2 8.2 0 1 0 0 16.4c1.1 0 1.7-.7 1.7-1.5 0-.9-.8-1.3-.8-2.2 0-.9.7-1.6 1.6-1.6h2.1a3.6 3.6 0 0 0 3.6-3.6c0-4.2-3.7-7.5-8.2-7.5z" fill="none" stroke="currentColor" stroke-width="1.7"/><circle cx="7.8" cy="11" r="1.2" fill="currentColor"/><circle cx="10.5" cy="7.4" r="1.2" fill="currentColor"/><circle cx="15" cy="7.8" r="1.2" fill="currentColor"/></symbol>
     <symbol id="i-phone" viewBox="0 0 24 24"><path d="M5 4.5h3.2l1.6 4-2.1 1.3a10 10 0 0 0 6.5 6.5l1.3-2.1 4 1.6V19a1.5 1.5 0 0 1-1.6 1.5A15.5 15.5 0 0 1 3.5 6.1 1.5 1.5 0 0 1 5 4.5z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
     <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 3.5 5 6.2v5.3c0 4.3 2.9 7.8 7 9 4.1-1.2 7-4.7 7-9V6.2z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="m9 12 2.2 2.2L15.5 10" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></symbol>
@@ -133,6 +134,7 @@
       <div class="slider volume" id="volume"><div class="slider-fill" id="volume-fill"></div><div class="slider-knob"></div></div>
       <div class="volume-tools">
       <button class="icon-btn small" id="btn-eq" aria-label="Эквалайзер" title="Эквалайзер (E)" aria-pressed="false"><svg><use href="#i-eq"/></svg></button>
+      <button class="icon-btn small desktop-only" id="btn-speaker" aria-label="Играть на колонке" title="Играть на колонке" aria-pressed="false" hidden><svg><use href="#i-speaker"/></svg><i class="spk-dot"></i></button>
       <button class="icon-btn small" id="btn-lyrics" aria-label="Текст песни" title="Текст песни (L)" aria-pressed="false"><svg><use href="#i-lyrics"/></svg></button>
       <button class="icon-btn small" id="btn-fs" aria-label="Во весь экран" title="Во весь экран (F)"><svg><use href="#i-full"/></svg></button>
       <button class="icon-btn small" id="btn-modes" aria-label="Ещё: караоке, визуализатор, таймер сна, фокус" title="Ещё" aria-haspopup="menu"><svg><use href="#i-more"/></svg></button>
@@ -403,6 +405,7 @@
   <script src="admin.js"></script>
   <script src="presence.js"></script>
   <script src="cache.js"></script>
+  <script src="speaker.js"></script>
   <script src="downloads.js"></script>
   <script src="wave.js"></script>
   <script src="scratch.js"></script>

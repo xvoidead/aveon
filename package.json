@@ -12,7 +12,8 @@
     "mobile:build": "node mobile/build.mjs && cap sync android",
     "release": "node scripts/release.mjs",
     "tester": "electron . --tester",
-    "test:design": "node --test scripts/design-core.test.js"
+    "test:design": "node --test scripts/design-core.test.js",
+    "test:speaker": "node --test scripts/speaker-core.test.js"
   },
   "license": "MIT",
   "devDependencies": {

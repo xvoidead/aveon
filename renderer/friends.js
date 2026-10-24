@@ -37,7 +37,7 @@ function sendNow() {
   frNowTimer = null;
   if (!state.account.loggedIn) return;
   const t = state.track;
-  api.friends.now(t ? { track: shareable(t), playing: !audio.paused, pos: audio.currentTime || 0 } : null); // shareable — together.js
+  api.friends.now(t ? { track: shareable(t), playing: !nowPaused(), pos: nowPos() } : null); // shareable — together.js
 }
 
 // смена трека даёт несколько событий подряд — отправляем одно

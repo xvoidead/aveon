@@ -104,7 +104,7 @@ function islandNotify(text, kind = 'info', person = null, actions = []) {
     if (!t || !(islandOpt('lyrics') || state.cfg?.mini?.lyrics !== false)) return none;
     if (lyr.id !== t.id) { loadLyr(t); return none; }
     if (!lyr.lines.length) return none;
-    const now = audio.currentTime + 0.2;
+    const now = nowPos() + 0.2;
     let i = -1;
     while (i + 1 < lyr.lines.length && lyr.lines[i + 1].t <= now) i++;
     const text = (k) => (lyr.lines[k]?.text || '').trim();
@@ -219,9 +219,9 @@ function islandNotify(text, kind = 'info', person = null, actions = []) {
       title: t.title || '',
       artist: t.artist || '',
       cover: t.cover || '',
-      playing: !audio.paused,
-      pos: audio.currentTime || 0,
-      duration: isFinite(audio.duration) ? audio.duration : t.duration || 0,
+      playing: !nowPaused(),
+      pos: nowPos(),
+      duration: !speakerMode && isFinite(audio.duration) ? audio.duration : t.duration || 0,
       at: Date.now(),
       m: +duck.m.toFixed(2),
       manual: !!duck.forced,

@@ -44,9 +44,11 @@ const livewall = require('./src/livewall');
 const resolve = require('./src/resolve');
 const cache = require('./src/cache');
 const cacheFiles = require('./src/cache-files');
+const speaker = require('./src/speaker');
 
 const { resolveStream, sharedStream, matchCache } = resolve;
 resolve.init(local);
+speaker.init({ resolveStream, cacheFiles, local, onEvent: (ev) => send('speaker:event', ev) });
 
 const SOURCES = { sc, ym, sp };
 const MIME = {
@@ -288,6 +290,11 @@ function registerIpc() {
   handle('src:collections', (source) => SOURCES[source].collections());
   handle('src:collection', (source, id) => SOURCES[source].collection(id));
   handle('stream', (track) => resolveStream(track));
+
+  // Колонка по SSH (src/speaker.js): кнопка в плеере и раздел в настройках (renderer/speaker.js)
+  handle('speaker:play', (track) => speaker.play(track));
+  handle('speaker:stop', () => speaker.stop());
+  handle('speaker:status', () => speaker.status());
 
   handle('albums:list', () => albums.list());
   handle('albums:get', (id) => {
@@ -645,6 +652,7 @@ app.on('window-all-closed', async () => {
   eqpop.destroy();
   hotkeys.destroy();
   tray.destroy();
+  speaker.destroy();
   duck.stop();
   discord.stop();
   config.flush();

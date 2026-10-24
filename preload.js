@@ -25,6 +25,12 @@ contextBridge.exposeInMainWorld('tishe', {
     collection: (src, id) => call('src:collection', src, id),
   },
   stream: (track) => call('stream', track),
+  speaker: {
+    play: (track) => call('speaker:play', track),
+    stop: () => call('speaker:stop'),
+    status: () => call('speaker:status'),
+    onEvent: (cb) => on('speaker:event', cb),
+  },
   albums: {
     list: () => call('albums:list'),
     get: (id) => call('albums:get', id),

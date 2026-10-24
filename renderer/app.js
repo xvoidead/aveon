@@ -322,6 +322,10 @@ function onAudio(type, fn) {
 }
 const fx = {};
 let loadSeq = 0;
+// Позиция и «играет ли» с учётом колонки (speaker.js): там своё время, локальный звук молчит
+const nowPos = () => (speakerMode ? speakerPosition() : audio.currentTime || 0);
+const nowPaused = () => (speakerMode ? !spk.playing : audio.paused);
+let speakerMode = false; // режим «всё на колонку» (speaker.js): треки идут на колонку, локальный звук молчит
 let failStreak = 0;
 let retried = false;
 let seeking = false;
@@ -728,6 +732,7 @@ async function loadTrack(track, { autoplay = true, startAt = 0, quiet = false } 
   Together.beforeLoad();
   handOff();
   audio.pause();
+  if (speakerMode && !track.shared) { if (autoplay) speakerSend(track); return; } // speaker.js
   let stream;
   try {
     stream = await (track.shared ? api.together.stream(track) : api.stream(track));
@@ -789,20 +794,20 @@ onAudio('durationchange', renderProgress);
 onAudio('progress', renderProgress);
 
 function renderProgress() {
-  const d = audio.duration || state.track?.duration || 0;
-  const c = audio.currentTime || 0;
+  const d = (speakerMode ? state.track?.duration : audio.duration) || state.track?.duration || 0;
+  const c = speakerMode ? speakerPosition() : audio.currentTime || 0; // speaker.js: время на колонке считаем сами
   $('#time-cur').textContent = fmt(c);
   $('#time-dur').textContent = fmt(d);
   setSlider($('#progress'), d ? c / d : 0);
   const b = audio.buffered;
-  $('#progress-buf').style.width = d && b.length ? `${(b.end(b.length - 1) / d) * 100}%` : '0';
+  $('#progress-buf').style.width = !speakerMode && d && b.length ? `${(b.end(b.length - 1) / d) * 100}%` : '0';
   if ('mediaSession' in navigator && d && isFinite(d)) {
     try { navigator.mediaSession.setPositionState({ duration: d, position: Math.min(c, d), playbackRate: 1 }); } catch {}
   }
 }
 
 function updatePlayState() {
-  const playing = !audio.paused;
+  const playing = speakerMode ? spk.playing : !audio.paused;
   setIcon($('#btn-play'), playing ? '#i-pause' : '#i-play');
   $('#btn-play').setAttribute('aria-label', playing ? 'Пауза' : 'Играть');
   document.body.classList.toggle('paused', !playing);
@@ -819,6 +824,7 @@ function togglePlay() {
     if (list.length) playFrom(list, 0);
     return;
   }
+  if (speakerMode) { speakerPlayPause(); return; } // speaker.js: пауза на колонке = остановка, дальше с начала трека
   if (audio.paused) {
     ensureGraph();
     ctx.resume();
@@ -2128,7 +2134,7 @@ const SET_TABS = [
 const SEC_TAB = {
   island: 'desk', mini: 'desk', tray: 'desk', hotkeys: 'desk', livewall: 'desk', // desk.js
   skin: 'style', dock: 'style', react: 'style', theme: 'style', colors: 'style', type: 'style', bg: 'style', barrel: 'style', list: 'style', lyricslook: 'style', fsmode: 'style', motion: 'style', // look.js
-  sound: 'look', duck: 'call', mic: 'call', ext: 'call', censor: 'censor', ym: 'services', sc: 'services', sp: 'services', discord: 'services', local: 'library', cache: 'cache', keys: 'keys' };
+  sound: 'look', duck: 'call', mic: 'call', ext: 'call', censor: 'censor', ym: 'services', sc: 'services', sp: 'services', discord: 'services', local: 'library', cache: 'cache', keys: 'keys', speaker: 'desk' };
 let settingsTab = 'style';
 
 function openSettings(focus) {
@@ -2496,6 +2502,7 @@ ${censorSettingsHtml()}
 
     ${cacheSection()}
     ${deskSection()}
+    ${speakerSection()}
 
     <section class="sec desktop-only" data-sec="ext">
       <h3 class="sec-title">Приглушать другие программы</h3>
@@ -2637,6 +2644,7 @@ ${censorSettingsHtml()}
   });
   bindCache(body); // cache.js
   bindDesk(body); // desk.js
+  bindSpeaker(body); // speaker.js
   $('#folder-add', body).onclick = addFolder;
   const rescan = $('#folder-rescan', body);
   if (rescan) rescan.onclick = () => scanLocal(true);

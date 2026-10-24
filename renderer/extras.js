@@ -699,7 +699,7 @@ function wordEnd(lines, li, wi) {
 function syncWords(force) {
   const l = ly.lines[ly.active];
   if (!l?.words) return;
-  const t = audio.currentTime + 0.05;
+  const t = nowPos() + 0.05;
   let n = 0;
   while (n < l.words.length && l.words[n].t <= t) n++;
   const letters = window.LOOK?.lyricsLetters !== false; // look.js
@@ -725,7 +725,7 @@ function syncWords(force) {
 
 function syncLyrics(force = false) {
   if (!ly.lines.length) return;
-  const t = audio.currentTime + 0.2; // небольшой запас, чтобы строка загоралась вместе с голосом
+  const t = nowPos() + 0.2; // небольшой запас, чтобы строка загоралась вместе с голосом
   let idx = -1;
   for (let i = 0; i < ly.lines.length && ly.lines[i].t <= t; i++) idx = i;
   if (idx === ly.active && !force) {
@@ -751,7 +751,7 @@ function startLyricsSync() {
   cancelAnimationFrame(ly.raf);
   const loop = () => {
     if (!lyricsOpen()) return;
-    if (!audio.paused || audio.seeking) syncLyrics();
+    if (!nowPaused() || (!speakerMode && audio.seeking)) syncLyrics();
     ly.raf = requestAnimationFrame(loop);
   };
   ly.raf = requestAnimationFrame(loop);
@@ -759,7 +759,7 @@ function startLyricsSync() {
 
 $('#lyrics-body').addEventListener('click', (e) => {
   const b = e.target.closest('button.lyric');
-  if (!b || !ly.lines.length) return;
+  if (!b || !ly.lines.length || speakerMode) return; // на колонке перематывать нельзя
   audio.currentTime = Math.max(0, ly.lines[+b.dataset.l].t);
   ly.userScrollAt = 0;
   if (audio.paused) togglePlay();
