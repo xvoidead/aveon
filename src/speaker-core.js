@@ -90,6 +90,47 @@ const DMIX_CLEAN = `dmix_clean() {
   return 0
 }`;
 
+// Часы колонки (36 белых светодиодов: 4 цифры по 7 сегментов A..G + двоеточие DH/DL) показывают время трека мм:сс.
+// Прошивка перерисовывает время раз в минуту, а мы рисуем каждую секунду, так что после конца трека кладём обычное время
+// обратно сами. led.sh show <секунд> — время трека, led.sh clock — обычные часы (пояс +3, как в led-clockface.sh)
+const LED = `#!/bin/sh
+L=/sys/class/leds/plum:white:clock
+BRIGHT=$LEDB
+[ -n "$BRIGHT" ] || BRIGHT=60
+ALL="A0 A1 A2 A3 B0 B1 B2 B3 C0 C1 C2 C3 D0 D1 D2 D3 E0 E1 E2 E3 F0 F1 F2 F3 G0 G1 G2 G3 DH DL DEGREE"
+segs() {
+  case "$1" in
+    0) echo A B C D E F ;; 1) echo B C ;; 2) echo A B D E G ;; 3) echo A B C D G ;; 4) echo B C F G ;;
+    5) echo A C D F G ;; 6) echo A C D E F G ;; 7) echo A B C ;; 8) echo A B C D E F G ;; 9) echo A B C D F G ;;
+  esac
+}
+draw() {
+  want=""
+  i=0
+  for d in $1 $2 $3 $4; do
+    for s in $(segs $d); do want="$want $s$i"; done
+    i=$((i + 1))
+  done
+  [ "$5" = 1 ] && want="$want DH DL"
+  for s in $ALL; do
+    case " $want " in *" $s "*) v=$BRIGHT ;; *) v=0 ;; esac
+    echo $v > $L$s/brightness 2>/dev/null
+  done
+}
+case "$1" in
+  show)
+    S=$2
+    m=$(( (S / 60) % 100 ))
+    sec=$((S % 60))
+    draw $((m / 10)) $((m % 10)) $((sec / 10)) $((sec % 10)) $((1 - S % 2))
+    ;;
+  clock)
+    h=$(( ($(date -u +%H) + 3) % 24 ))
+    mi=$(date -u +%M)
+    draw $((h / 10)) $((h % 10)) $(echo $mi | cut -c1) $(echo $mi | cut -c2) 1
+    ;;
+esac`;
+
 // Смотритель: играет поток и сам возвращает громкость, когда трек закончился или плеер остановили.
 // maind --gst-launch завершается сам на конце потока (в логе «EOS»), поэтому конец трека ловить не нужно
 const RUN = `#!/bin/sh
@@ -104,14 +145,39 @@ B=http://127.0.0.1:${REMOTE_PORT}
 KILLED=
 trap 'KILLED=1; kill $G 2>/dev/null' TERM INT
 # рукопожатие: колонка сама сообщает компьютеру позицию трека (строка Progress в логе плеера, раз в секунду)
+LOG=/data/quasar/daemons_logs/maind.log
 (
   LAST=
+  # двойной тап по громкости: два «Button click» одной кнопки не позже чем через 0.8 с — /b/<токен>?k=up|down
+  LASTB=$(tail -n 40 $LOG 2>/dev/null | grep 'Button click: volume_' | tail -n 1)
+  PK=
+  PT=0
   while kill -0 $G 2>/dev/null; do
+    if [ "$4" = 1 ]; then
+      BL=$(tail -n 40 $LOG 2>/dev/null | grep 'Button click: volume_' | tail -n 1)
+      if [ -n "$BL" ] && [ "$BL" != "$LASTB" ]; then
+        LASTB=$BL
+        case "$BL" in *volume_up) K=up ;; *) K=down ;; esac
+        TM=$(echo "$BL" | awk '{t=$3; sub("]","",t); split(t,a,":"); split(a[3],b,"."); print ((a[1]*60+a[2])*60+b[1])*1000+b[2]}')
+        DT=$((TM - PT))
+        if [ "$K" = "$PK" ] && [ $DT -ge 0 ] && [ $DT -le 800 ]; then
+          PK=
+          PT=0
+          wget -q -T 2 -O /dev/null "$B/b/$T?k=$K" 2>/dev/null
+          # два тапа сдвинули громкость на два шага: возвращаем ту, что была у трека
+          ( sleep 0.3; amixer cset numid=${MASTER} "$3" >/dev/null 2>&1 ) &
+        else
+          PK=$K
+          PT=$TM
+        fi
+      fi
+    fi
     L=$(tail -n 5 $D/gst.log 2>/dev/null | grep 'Progress:' | tail -n 1)
     if [ -n "$L" ] && [ "$L" != "$LAST" ]; then
       LAST=$L
       P=$(echo "$L" | awk '{for(i=1;i<=NF;i++) if($i=="Progress:"){v=$(i+1); sub("ms","",v); print v}}')
       wget -q -T 2 -O /dev/null "$B/p/$T?ms=$P" 2>/dev/null
+      [ "$2" = 1 ] && sh $D/led.sh show $((P / 1000))
     fi
     sleep 0.1
   done
@@ -119,6 +185,7 @@ trap 'KILLED=1; kill $G 2>/dev/null' TERM INT
 wait $G
 wait $G 2>/dev/null
 dmix_clean
+[ "$2" = 1 ] && sh $D/led.sh clock
 # трек кончился сам (не остановили): сразу даём знать, чтобы Авеон включил следующий
 [ -z "$KILLED" ] && wget -q -T 2 -O /dev/null "$B/e/$T" 2>/dev/null
 V=$(cat $D/vol 2>/dev/null)
@@ -127,7 +194,7 @@ rm -f $D/vol $D/pid`;
 
 const PLAY_URL = new RegExp(`^http://127\\.0\\.0\\.1:${REMOTE_PORT}/s/[0-9a-f]{32}$`);
 
-function playScript({ url, level }) {
+function playScript({ url, level, display, keys }) {
   if (!PLAY_URL.test(url)) throw new Error('bad play url');
   return `D=${STATE_DIR}
 mkdir -p $D
@@ -144,6 +211,9 @@ dmix_clean
 cat > $D/run.sh <<'EOF'
 ${RUN}
 EOF
+cat > $D/led.sh <<'LEDEOF'
+${LED}
+LEDEOF
 amixer cset numid=${MASTER} ${masterOf(level)} >/dev/null 2>&1
 # туннель с компьютера поднимается параллельно этому скрипту: ждём его порт здесь, а не отдельными запросами по ssh
 i=0
@@ -151,7 +221,7 @@ while ! grep -qi ':${HEX_PORT} 00000000:0000 0A ' /proc/net/tcp && [ $i -lt 80 ]
 grep -qi ':${HEX_PORT} 00000000:0000 0A ' /proc/net/tcp || { echo "FAIL tunnel"; exit 1; }
 : > $D/gst.log
 rm -f $D/pid
-setsid sh $D/run.sh ${url} > /dev/null 2>&1 < /dev/null &
+setsid sh $D/run.sh ${url} ${display ? 1 : 0} ${masterOf(level)} ${keys ? 1 : 0} > /dev/null 2>&1 < /dev/null &
 # готово, когда плеер написал первую строку Progress (звук пошёл) или умер: без фиксированного ожидания
 i=0
 while [ $i -lt 100 ]; do

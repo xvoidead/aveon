@@ -61,7 +61,9 @@ function speakerEnded() {
 // Рукопожатие с колонкой: она сама присылает позицию трека раз в секунду и сообщение о конце (смотритель в
 // src/speaker-core.js, через туннель). Время прихода минус позиция = момент начала трека: без опросов и задержки ssh
 api.speaker.onEvent((ev) => {
-  if (!speakerMode || ev.id !== state.track?.id) return;
+  if (!speakerMode) return;
+  if (ev.type === 'key') { if (ev.key === 'up') next(); else prev(); return; } // двойной тап по громкости на колонке
+  if (ev.id !== state.track?.id) return;
   if (ev.type === 'end') { if (!spkBusy) speakerEnded(); return; }
   const start = ev.at - ev.ms;
   spkStartAt = !spkSynced || Math.abs(start - spkStartAt) > 400 ? start : Math.min(spkStartAt, start);
@@ -167,6 +169,8 @@ function speakerSection() {
     <div class="field"><label>Громкость колонки</label><div class="ctl"><div class="seg" id="spk-level">
       ${SPK_LEVELS.map((v) => `<button data-v="${v}" class="${Math.abs((c.level ?? 0.7) - v) < 0.01 ? 'on' : ''}">${Math.round(v * 100)}%</button>`).join('')}
     </div></div></div>
+    <div class="field"><label>Время трека на часах колонки</label><div class="ctl"><label class="switch"><input type="checkbox" id="spk-display" ${c.display !== false ? 'checked' : ''} aria-label="Время трека на часах колонки"><span></span></label></div></div>
+    <div class="field"><label>Двойной тап по громкости<br><small>+ следующий трек, − предыдущий</small></label><div class="ctl"><label class="switch"><input type="checkbox" id="spk-keys" ${c.keys !== false ? 'checked' : ''} aria-label="Двойной тап по громкости переключает треки"><span></span></label></div></div>
     <div class="field"><label for="spk-sync">Сдвиг текста и полосы<br><small>плюс — раньше, минус — позже</small></label><div class="ctl">
       <input type="range" id="spk-sync" min="-1500" max="1500" step="50" value="${c.syncMs ?? 0}"><output id="spk-sync-v">${c.syncMs ?? 0} мс</output>
     </div></div>
@@ -212,6 +216,8 @@ function bindSpeaker(body) {
       $$('#spk-level button', sec).forEach((x) => x.classList.toggle('on', x === b));
     };
   });
+  $('#spk-display', sec).onchange = (e) => saveCfg({ speaker: { display: e.target.checked } });
+  $('#spk-keys', sec).onchange = (e) => saveCfg({ speaker: { keys: e.target.checked } });
   const sync = $('#spk-sync', sec);
   sync.oninput = () => { $('#spk-sync-v', sec).textContent = `${sync.value} мс`; };
   sync.onchange = () => saveCfg({ speaker: { syncMs: +sync.value } });

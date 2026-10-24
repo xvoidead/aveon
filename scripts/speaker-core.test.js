@@ -164,3 +164,10 @@ test('progressOf: позиция из строки Progress лога плеер�
   assert.equal(S.progressOf(''), null);
   assert.equal(S.isPlaying(`PLAYING\n${line}\n`), true);
 });
+
+test('двойной тап по громкости: смотритель ловит два клика одной кнопки и шлёт /b/<токен>', () => {
+  const sh = S.playScript({ url: URL_OK, level: 0.7, display: true, keys: true });
+  assert.ok(sh.includes('Button click: volume_') && sh.includes('$B/b/$T?k=$K'));
+  assert.ok(sh.includes(`run.sh ${URL_OK} 1 179 1`), 'аргументы: дисплей, громкость трека, кнопки');
+  assert.ok(S.playScript({ url: URL_OK, level: 0.5, display: false, keys: false }).includes(`run.sh ${URL_OK} 0 128 0`));
+});

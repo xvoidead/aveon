@@ -117,10 +117,10 @@ async function currentStream(s) {
 async function onRequest(req, res) {
   const m = /^\/(s|seg)\/([0-9a-f]{32})(?:\/(\d{1,6}))?$/.exec((req.url || '').split('?')[0]);
   const s = session;
-  // сообщение от колонки (смотритель в speaker-core.js): /p/<токен>?ms=<позиция> раз в секунду и /e/<токен> — трек кончился
-  const ev = /^\/(p|e)\/([0-9a-f]{32})(?:\?ms=(\d{1,9}))?$/.exec(req.url || '');
+  // сообщение от колонки (смотритель в speaker-core.js): /p/<токен>?ms=<позиция> раз в секунду и /e/<токен> — трек кончился, /b/<токен>?k=up|down — двойной тап по громкости
+  const ev = /^\/(p|e|b)\/([0-9a-f]{32})(?:\?(?:ms=(\d{1,9})|k=(up|down)))?$/.exec(req.url || '');
   if (ev && req.method === 'GET') {
-    if (s && s.token === ev[2]) deps.onEvent?.({ type: ev[1] === 'p' ? 'pos' : 'end', id: s.track.id, ms: Number(ev[3] || 0), at: Date.now() });
+    if (s && s.token === ev[2]) deps.onEvent?.({ type: { p: 'pos', e: 'end', b: 'key' }[ev[1]], id: s.track.id, ms: Number(ev[3] || 0), key: ev[4] || '', at: Date.now() });
     res.writeHead(204);
     res.end();
     return;
@@ -220,7 +220,7 @@ async function play(track) {
   const url = `http://127.0.0.1:${core.REMOTE_PORT}/s/${s.token}`;
   const resolved = currentStream(s);
   resolved.catch(() => {});
-  const run = ctl(host, core.playScript({ url, level: cfg().level }));
+  const run = ctl(host, core.playScript({ url, level: cfg().level, display: cfg().display !== false, keys: cfg().keys !== false }));
   try {
     const [, out] = await Promise.race([Promise.all([resolved, run]), dead]);
     const r = core.playResult(out);
