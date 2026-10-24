@@ -292,7 +292,8 @@ function registerIpc() {
   handle('stream', (track) => resolveStream(track));
 
   // Колонка по SSH (src/speaker.js): кнопка в плеере и раздел в настройках (renderer/speaker.js)
-  handle('speaker:play', (track) => speaker.play(track));
+  handle('speaker:play', (track, at) => speaker.play(track, at));
+  handle('speaker:volume', (level) => speaker.volume(level));
   handle('speaker:stop', () => speaker.stop());
   handle('speaker:status', () => speaker.status());
 

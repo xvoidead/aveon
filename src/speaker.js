@@ -24,6 +24,9 @@ function init(d) { deps = d; }
 
 const cfg = () => config.get().speaker || {};
 
+// Громкость колонки — та же, что в окне: ползунок плеера (0…1). level в настройках колонки больше не нужен
+const levelNow = () => { const v = config.get().volume; return typeof v === 'number' ? v : 0.5; };
+
 function hostOrThrow() {
   const { host } = cfg();
   if (!host) throw new Error('Колонка не задана: speaker.host в настройках (имя из ~/.ssh/config или адрес)');
@@ -118,6 +121,14 @@ async function onRequest(req, res) {
   const m = /^\/(s|seg)\/([0-9a-f]{32})(?:\/(\d{1,6}))?$/.exec((req.url || '').split('?')[0]);
   const s = session;
   // сообщение от колонки (смотритель в speaker-core.js): /p/<токен>?ms=<позиция> раз в секунду и /e/<токен> — трек кончился, /b/<токен>?k=up|down — двойной тап по громкости
+  // /o/<токен> — с какой секунды трека начат поток: плеер колонки своё время считает с нуля, а на часах нужно время трека
+  const off = /^\/o\/([0-9a-f]{32})$/.exec(req.url || '');
+  if (off && req.method === 'GET') {
+    const ms = s && s.token === off[1] ? String(Math.round((s.base || 0) * 1000)) : '0';
+    res.writeHead(200, { 'Content-Type': 'text/plain', 'Content-Length': String(ms.length) });
+    res.end(ms);
+    return;
+  }
   const ev = /^\/(p|e|b)\/([0-9a-f]{32})(?:\?(?:ms=(\d{1,9})|k=(up|down)))?$/.exec(req.url || '');
   if (ev && req.method === 'GET') {
     if (s && s.token === ev[2]) deps.onEvent?.({ type: { p: 'pos', e: 'end', b: 'key' }[ev[1]], id: s.track.id, ms: Number(ev[3] || 0), key: ev[4] || '', at: Date.now() });
@@ -148,8 +159,28 @@ async function serveTrack(req, res, s) {
     isAllowed: (p) => deps.local.allowed.has(p),
   });
   if (file === null) throw new Error('файл недоступен');
-  if (file) return sendFile(file, req, res);
+  if (file) return sendFile(file, req, res, s);
   return proxy(stream.url, req, res, s);
+}
+
+// Трек начинается не с начала: перемотать запущенный плеер нечем (см. speaker-core.js), поэтому отдаём поток уже со сдвигом.
+// С какой секунды получилось на самом деле — сообщаем окну (плейлист режется по сегментам, mp3 по байтам)
+function setBase(s, seconds) {
+  s.seek = 0;
+  s.base = seconds;
+  deps.onEvent?.({ type: 'base', id: s.track.id, ms: Math.round(seconds * 1000), at: Date.now() });
+}
+
+// mp3 отдаётся одним куском, перемотка по нему — доля от размера. У записи с переменным битрейтом попадание
+// приблизительное, зато декодер подхватывает с ближайшего кадра. Остальные форматы (m4a и прочие) играем с начала
+function byteSeek(s, type, size) {
+  const dur = s.track.duration || 0;
+  if (!(s.seek > 0) || !size || !dur || !/audio\/mpeg|mp3/i.test(type || '')) return 0;
+  const at = Math.min(s.seek, Math.max(0, dur - 5));
+  const off = Math.floor((size * at) / dur);
+  if (off <= 0) return 0;
+  setBase(s, at);
+  return off;
 }
 
 function pipe(src, res) {
@@ -159,9 +190,16 @@ function pipe(src, res) {
 }
 
 // Файл из кэша или свой файл — с перемоткой, как в main.js (serveFile)
-async function sendFile(file, req, res) {
+async function sendFile(file, req, res, s) {
   let size;
   try { size = (await fs.promises.stat(file)).size; } catch { res.writeHead(404); res.end(); return; }
+  const type = core.MIME[path.extname(file).toLowerCase()] || '';
+  const from = s ? byteSeek(s, type, size) : 0;
+  if (from) { // играем с нужной секунды: отдаём хвост файла как целый поток
+    res.writeHead(200, { 'Content-Type': type || 'application/octet-stream', 'Content-Length': String(size - from) });
+    pipe(fs.createReadStream(file, { start: from }), res);
+    return;
+  }
   const range = core.parseRange(req.headers.range, size);
   if (range === null) { res.writeHead(416, { 'Content-Range': `bytes */${size}` }); res.end(); return; }
   const head = { 'Content-Type': core.MIME[path.extname(file).toLowerCase()] || 'application/octet-stream', 'Accept-Ranges': 'bytes' };
@@ -177,7 +215,9 @@ async function sendFile(file, req, res) {
 // Плейлист HLS: ссылки в нём колонка открыть не может (https), поэтому они уходят на наш сервер.
 // Список только растёт: плейлист-мастер и его варианты получают свои номера и не сбивают друг друга
 function sendPlaylist(text, url, res, s) {
-  const body = core.rewritePlaylist(text, url, (u) => `/seg/${s.token}/${s.segs.push(u) - 1}`);
+  const cut = core.trimPlaylist(text, s.seek || 0); // начать не с начала: выкидываем сегменты до нужной секунды
+  if (cut.offset) setBase(s, cut.offset);
+  const body = core.rewritePlaylist(cut.text, url, (u) => `/seg/${s.token}/${s.segs.push(u) - 1}`);
   res.writeHead(200, { 'Content-Type': 'application/vnd.apple.mpegurl', 'Content-Length': Buffer.byteLength(body) });
   res.end(body);
 }
@@ -193,6 +233,21 @@ async function proxy(url, req, res, s) {
     clearTimeout(timer);
   }
   if (r.ok && core.isPlaylist(r.headers.get('content-type'), url)) return sendPlaylist(await r.text(), url, res, s);
+  // трек с нужной секунды: длину и тип знаем только из ответа, поэтому спрашиваем ещё раз, уже с нужного байта
+  if (s && r.ok && !req.headers.range) {
+    const off = byteSeek(s, r.headers.get('content-type'), Number(r.headers.get('content-length') || 0));
+    if (off) {
+      r.body?.cancel().catch(() => {});
+      const r2 = await fetch(url, { headers: { Range: `bytes=${off}-` }, signal: abort.signal });
+      if (r2.ok) { // 206 отдаём колонке как обычный поток целиком: перематывать она всё равно не умеет
+        res.writeHead(200, { 'content-type': r2.headers.get('content-type') || 'audio/mpeg' });
+        if (!r2.body) { res.end(); return; }
+        pipe(Readable.fromWeb(r2.body), res);
+        return;
+      }
+      r = await fetch(url, { signal: abort.signal }); // не дал кусок — играем с начала
+    }
+  }
   const head = {};
   for (const k of ['content-type', 'content-range', 'accept-ranges']) {
     const v = r.headers.get(k);
@@ -207,11 +262,12 @@ async function proxy(url, req, res, s) {
 
 // ---- управление ----
 
-async function play(track) {
+// at — с какой секунды играть (кнопка колонки на ходу, клик по полосе). Громкость берём ту, что стоит в окне
+async function play(track, at = 0) {
   const host = hostOrThrow();
   if (!deps) throw new Error('Модуль колонки не запущен');
   if (!track?.id) throw new Error('Нужен трек');
-  const s = { token: crypto.randomBytes(16).toString('hex'), track, stream: null, streamAt: 0, segs: [] };
+  const s = { token: crypto.randomBytes(16).toString('hex'), track, stream: null, streamAt: 0, segs: [], seek: at > 1 ? at : 0, base: 0 };
   // Всё сразу: сервер, туннель, поиск потока и запуск плеера. Плеер сам ждёт порт туннеля и поток (сервер ответит,
   // когда поток найден), так что запуск занимает столько, сколько самый долгий из шагов, а не сумму
   await ensureServer();
@@ -220,7 +276,7 @@ async function play(track) {
   const url = `http://127.0.0.1:${core.REMOTE_PORT}/s/${s.token}`;
   const resolved = currentStream(s);
   resolved.catch(() => {});
-  const run = ctl(host, core.playScript({ url, level: cfg().level, display: cfg().display !== false, keys: cfg().keys !== false }));
+  const run = ctl(host, core.playScript({ url, level: levelNow(), display: cfg().display !== false, keys: cfg().keys !== false }));
   try {
     const [, out] = await Promise.race([Promise.all([resolved, run]), dead]);
     const r = core.playResult(out);
@@ -231,6 +287,13 @@ async function play(track) {
     throw e;
   }
   return { host, title: track.title || '' };
+}
+
+// Ползунок громкости в окне двигает громкость колонки, пока она играет
+async function volume(level) {
+  const { host } = cfg();
+  if (!session || !host || !core.validHost(host)) return { ok: false };
+  return { ok: (await ctl(host, core.volumeScript(level))).includes('VOL') };
 }
 
 async function stop() {
@@ -267,4 +330,4 @@ function destroy() {
   closeServer();
 }
 
-module.exports = { init, play, stop, status, destroy };
+module.exports = { init, play, volume, stop, status, destroy };

@@ -168,6 +168,30 @@ test('progressOf: позиция из строки Progress лога плеер�
 test('двойной тап по громкости: смотритель ловит два клика одной кнопки и шлёт /b/<токен>', () => {
   const sh = S.playScript({ url: URL_OK, level: 0.7, display: true, keys: true });
   assert.ok(sh.includes('Button click: volume_') && sh.includes('$B/b/$T?k=$K'));
-  assert.ok(sh.includes(`run.sh ${URL_OK} 1 179 1`), 'аргументы: дисплей, громкость трека, кнопки');
-  assert.ok(S.playScript({ url: URL_OK, level: 0.5, display: false, keys: false }).includes(`run.sh ${URL_OK} 0 128 0`));
+  assert.ok(sh.includes(`run.sh ${URL_OK} 1 1`), 'аргументы: дисплей, кнопки');
+  assert.ok(sh.includes('echo 179 > $D/lvl'), 'громкость трека лежит в файле: ползунок в окне её меняет');
+  assert.ok(S.playScript({ url: URL_OK, level: 0.5, display: false, keys: false }).includes(`run.sh ${URL_OK} 0 0`));
+  assert.ok(S.volumeScript(0.5).includes('echo 128 > $D/lvl') && S.volumeScript(0.5).includes('amixer cset numid=186 128'));
+});
+
+test('trimPlaylist: начать не с начала — сегменты до нужной секунды выкидываются, offset говорит сколько вышло', () => {
+  const pl = ['#EXTM3U', '#EXT-X-MAP:URI="init.mp4"', '#EXTINF:10.0,', 'a0.m4s', '#EXTINF:10.0,', 'a1.m4s', '#EXTINF:8.5,', 'a2.m4s', '#EXT-X-ENDLIST'].join('\n');
+  const segs = (t) => t.split('\n').filter((l) => l && !l.startsWith('#'));
+  assert.deepEqual(S.trimPlaylist(pl, 0), { text: pl, offset: 0 });
+  assert.deepEqual(segs(S.trimPlaylist(pl, 5).text), ['a0.m4s', 'a1.m4s', 'a2.m4s']);
+  assert.equal(S.trimPlaylist(pl, 5).offset, 0);
+  assert.deepEqual(segs(S.trimPlaylist(pl, 15).text), ['a1.m4s', 'a2.m4s']);
+  assert.equal(S.trimPlaylist(pl, 15).offset, 10);
+  assert.ok(S.trimPlaylist(pl, 15).text.includes('#EXT-X-MAP:URI="init.mp4"'), 'заголовки целы');
+  assert.equal(S.trimPlaylist(pl, 25).offset, 20);
+  // список качеств (без #EXTINF) не трогаем: обрежется тот плейлист, на который он сошлётся
+  const master = '#EXTM3U\n#EXT-X-STREAM-INF:BANDWIDTH=1\nv.m3u8';
+  assert.deepEqual(S.trimPlaylist(master, 30), { text: master, offset: 0 });
+});
+
+test('часы колонки показывают время трека, а не время куска: смотритель спрашивает сдвиг у компьютера', () => {
+  const sh = S.playScript({ url: URL_OK, level: 0.7, display: true, keys: true });
+  assert.ok(sh.includes('$B/o/$T'), 'сдвиг берётся с нашего сервера');
+  assert.ok(sh.includes('show $(((P + OFF) / 1000))'), 'на часы идёт позиция плюс сдвиг');
+  assert.ok(sh.indexOf('OFF=\n') < sh.indexOf('$B/o/$T'), 'сдвиг спрашивается один раз за трек');
 });

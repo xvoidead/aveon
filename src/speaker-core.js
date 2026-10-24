@@ -48,6 +48,30 @@ function mediaFile(url, { cacheFileOf, isAllowed }) {
 
 const isPlaylist = (type, url) => /mpegurl/i.test(type || '') || /\.m3u8?(\?|$)/i.test(url || '');
 
+// Начать трек не с начала: плеер колонки запускается одной строкой конвейера и команд после запуска не принимает —
+// перемотать его нечем, поэтому выкидываем из плейлиста сегменты до нужной секунды.
+// Точность — до начала сегмента (у SoundCloud это 10 секунд), сколько получилось на самом деле — в offset.
+// Плейлист без #EXTINF (список качеств) не трогаем: обрежется тот, на который он сошлётся
+function trimPlaylist(text, at) {
+  const lines = text.split(/\r?\n/);
+  if (!(at > 0) || !lines.some((l) => l.startsWith('#EXTINF'))) return { text, offset: 0 };
+  const out = [];
+  let acc = 0;
+  let offset = 0;
+  for (let i = 0; i < lines.length; i++) {
+    const m = /^#EXTINF:([\d.]+)/.exec(lines[i]);
+    if (!m) { out.push(lines[i]); continue; }
+    const dur = Number(m[1]) || 0;
+    let j = i + 1;
+    while (j < lines.length && (!lines[j].trim() || lines[j].startsWith('#'))) j++; // ссылка сегмента
+    if (acc + dur <= at) { offset = acc += dur; i = j; continue; } // сегмент целиком раньше нужной секунды
+    out.push(...lines.slice(i, j + 1));
+    acc += dur;
+    i = j;
+  }
+  return { text: out.join('\n'), offset };
+}
+
 // HLS-плейлист для колонки: каждую ссылку (сегменты, init, вложенные плейлисты) меняем на адрес нашего сервера.
 // register(url) запоминает настоящий адрес и возвращает новый. Относительные ссылки считаем от адреса самого плейлиста
 function rewritePlaylist(text, baseUrl, register) {
@@ -150,10 +174,11 @@ LOG=/data/quasar/daemons_logs/maind.log
   LAST=
   # двойной тап по громкости: два «Button click» одной кнопки не позже чем через 0.8 с — /b/<токен>?k=up|down
   LASTB=$(tail -n 40 $LOG 2>/dev/null | grep 'Button click: volume_' | tail -n 1)
+  OFF=
   PK=
   PT=0
   while kill -0 $G 2>/dev/null; do
-    if [ "$4" = 1 ]; then
+    if [ "$3" = 1 ]; then
       BL=$(tail -n 40 $LOG 2>/dev/null | grep 'Button click: volume_' | tail -n 1)
       if [ -n "$BL" ] && [ "$BL" != "$LASTB" ]; then
         LASTB=$BL
@@ -165,7 +190,7 @@ LOG=/data/quasar/daemons_logs/maind.log
           PT=0
           wget -q -T 2 -O /dev/null "$B/b/$T?k=$K" 2>/dev/null
           # два тапа сдвинули громкость на два шага: возвращаем ту, что была у трека
-          ( sleep 0.3; amixer cset numid=${MASTER} "$3" >/dev/null 2>&1 ) &
+          ( sleep 0.3; amixer cset numid=${MASTER} "$(cat $D/lvl)" >/dev/null 2>&1 ) &
         else
           PK=$K
           PT=$TM
@@ -177,7 +202,10 @@ LOG=/data/quasar/daemons_logs/maind.log
       LAST=$L
       P=$(echo "$L" | awk '{for(i=1;i<=NF;i++) if($i=="Progress:"){v=$(i+1); sub("ms","",v); print v}}')
       wget -q -T 2 -O /dev/null "$B/p/$T?ms=$P" 2>/dev/null
-      [ "$2" = 1 ] && sh $D/led.sh show $((P / 1000))
+      # плеер считает время своего куска с нуля: с какой секунды трека он начат, знает компьютер — спрашиваем один раз
+      [ -z "$OFF" ] && OFF=$(wget -q -T 2 -O - "$B/o/$T" 2>/dev/null)
+      [ -z "$OFF" ] && OFF=0
+      [ "$2" = 1 ] && sh $D/led.sh show $(((P + OFF) / 1000))
     fi
     sleep 0.1
   done
@@ -214,6 +242,7 @@ EOF
 cat > $D/led.sh <<'LEDEOF'
 ${LED}
 LEDEOF
+echo ${masterOf(level)} > $D/lvl
 amixer cset numid=${MASTER} ${masterOf(level)} >/dev/null 2>&1
 # туннель с компьютера поднимается параллельно этому скрипту: ждём его порт здесь, а не отдельными запросами по ssh
 i=0
@@ -221,7 +250,7 @@ while ! grep -qi ':${HEX_PORT} 00000000:0000 0A ' /proc/net/tcp && [ $i -lt 80 ]
 grep -qi ':${HEX_PORT} 00000000:0000 0A ' /proc/net/tcp || { echo "FAIL tunnel"; exit 1; }
 : > $D/gst.log
 rm -f $D/pid
-setsid sh $D/run.sh ${url} ${display ? 1 : 0} ${masterOf(level)} ${keys ? 1 : 0} > /dev/null 2>&1 < /dev/null &
+setsid sh $D/run.sh ${url} ${display ? 1 : 0} ${keys ? 1 : 0} > /dev/null 2>&1 < /dev/null &
 # готово, когда плеер написал первую строку Progress (звук пошёл) или умер: без фиксированного ожидания
 i=0
 while [ $i -lt 100 ]; do
@@ -248,6 +277,14 @@ else
   dmix_clean
   echo IDLE
 fi
+`;
+
+// Громкость ползунком приложения, пока трек играет: в $D/lvl её же берёт смотритель после двойного тапа
+const volumeScript = (level) => `D=${STATE_DIR}
+mkdir -p $D
+echo ${masterOf(level)} > $D/lvl
+[ -f $D/vol ] && amixer cset numid=${MASTER} ${masterOf(level)} >/dev/null 2>&1
+echo VOL
 `;
 
 const statusScript = () => `D=${STATE_DIR}
@@ -277,6 +314,6 @@ function progressOf(out) {
 }
 
 module.exports = {
-  MIME, REMOTE_PORT, validHost, masterOf, parseRange, mediaFile, isPlaylist, rewritePlaylist,
+  MIME, REMOTE_PORT, validHost, masterOf, parseRange, mediaFile, isPlaylist, rewritePlaylist, trimPlaylist, volumeScript,
   controlArgs, tunnelArgs, playScript, stopScript, statusScript, listenScript, playResult, isPlaying, progressOf,
 };

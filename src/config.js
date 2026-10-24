@@ -80,7 +80,7 @@ const DEFAULTS = {
   focus: { work: 25, rest: 5, long: 15, every: 4, music: 'wave', onRest: 'barrel' }, // режим фокуса (renderer/focus.js)
   look: {}, // оформление: тема, цвета, шрифты… (значения по умолчанию — renderer/look.js)
   cache: { keep: true, limitMb: 2048 }, // треки сохраняются сами, пока их слушаешь (src/cache.js)
-  speaker: { enabled: false, host: '', level: 0.7, syncMs: 0, display: true, keys: true }, // колонка по SSH (src/speaker.js): host — имя из ~/.ssh/config или адрес, пусто — выключена; level — громкость колонки на время музыки, 0…1
+  speaker: { enabled: false, host: '', syncMs: 0, display: true, keys: true }, // колонка по SSH (src/speaker.js): host — имя из ~/.ssh/config или адрес, пусто — выключена; громкость — ползунком в окне
   mxm: { token: '' }, // токен Musixmatch: выдаётся редко, поэтому храним
 };
 

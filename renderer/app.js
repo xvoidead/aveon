@@ -514,6 +514,7 @@ function applyVolume() {
   setSlider($('#volume'), v);
   setIcon($('#btn-mute'), v === 0 ? '#i-mute' : '#i-vol');
   if (fx.vol) fx.vol.gain.setTargetAtTime(v * v, ctx.currentTime, 0.02); // квадрат ближе к восприятию громкости
+  if (speakerMode) speakerVolume(v); // speaker.js: тем же ползунком и громкость колонки
 }
 
 function dropHls(el) {
@@ -3063,6 +3064,7 @@ makeSlider($('#progress'), {
     $('#time-cur').textContent = fmt(f * d);
   },
   onChange: (f) => {
+    if (speakerMode) { seeking = false; speakerSeek(f * (state.track?.duration || 0)); return; } // speaker.js
     const d = audio.duration;
     if (d && isFinite(d)) audio.currentTime = f * d;
     seeking = false;

@@ -7,9 +7,10 @@ let spkBusy = false;
 // Сдвиг текста относительно позиции колонки, мс (настройка speaker.syncMs): плюс — текст раньше, минус — позже
 const spkSyncMs = () => state.cfg.speaker?.syncMs ?? 0;
 let spkStartAt = 0; // когда трек начался на колонке (Date.now() минус позиция), 0 — не играет
+let spkShown = 0; // последнее показанное время: назад полоса не прыгает
+let spkBase = 0; // с какой секунды колонка начала трек (поток отдаём со сдвигом, см. speaker-core.js)
 let spkSynced = false; // колонка уже сама сообщила позицию этого трека
 let spkWant = null; // трек, который ждёт своей очереди на колонку
-const SPK_LEVELS = [0.3, 0.5, 0.7, 0.85];
 
 function spkTitle() {
   if (!spk.configured) return 'Играть на колонке';
@@ -45,15 +46,37 @@ async function refreshSpeaker() {
 
 // Позиция в треке на колонке: у неё мы позицию не спрашиваем, считаем от момента, когда она заиграла
 function speakerPosition() {
-  if (!spkStartAt) return 0;
+  if (!spkStartAt) return spkBase;
   const d = state.track?.duration || 0;
-  const p = (Date.now() - spkStartAt) / 1000 + spkSyncMs() / 1000;
-  return d ? Math.min(p, d) : p;
+  let p = spkBase + (Date.now() - spkStartAt) / 1000 + spkSyncMs() / 1000;
+  if (d) p = Math.min(p, d);
+  // назад время не идёт: поправка приходит и чуть больше, и чуть меньше прежней, а полоса должна только ползти вперёд
+  spkShown = p > spkShown ? p : spkShown;
+  return spkShown;
+}
+
+// Перемотка: плееру колонки команду не послать, поэтому запускаем его заново, а поток отдаём с нужной секунды
+function speakerSeek(sec) {
+  if (state.track) speakerSend(state.track, Math.max(0, sec));
+}
+
+// Ползунок громкости в окне ведёт и громкость колонки. Шлём не чаще, чем раз в треть секунды: каждый вызов — ssh
+let volTimer = 0;
+let volWant = -1;
+function speakerVolume(v) {
+  volWant = v;
+  if (volTimer) return;
+  volTimer = setTimeout(() => {
+    volTimer = 0;
+    if (speakerMode && spk.playing) api.speaker.volume(volWant).catch(() => {});
+  }, 300);
 }
 
 // Трек кончился на колонке — как 'ended' у обычного плеера
 function speakerEnded() {
   spk = { ...spk, playing: false };
+  spkBase = 0;
+  spkShown = 0;
   if (state.cfg.repeat === 'one' && state.track) speakerSend(state.track);
   else next(true);
 }
@@ -65,26 +88,32 @@ api.speaker.onEvent((ev) => {
   if (ev.type === 'key') { if (ev.key === 'up') next(); else prev(); return; } // двойной тап по громкости на колонке
   if (ev.id !== state.track?.id) return;
   if (ev.type === 'end') { if (!spkBusy) speakerEnded(); return; }
+  if (ev.type === 'base') { spkBase = ev.ms / 1000; return; } // колонка начала не с начала: столько получилось отрезать
+  // Каждая весть колонки чуть уточняет момент старта. Прыгать на новую оценку нельзя: время в окне дёргалось бы
+  // туда-сюда, — поэтому подводим к ней понемногу, а разом только когда расхождение слишком велико (трек начали заново)
   const start = ev.at - ev.ms;
-  spkStartAt = !spkSynced || Math.abs(start - spkStartAt) > 400 ? start : Math.min(spkStartAt, start);
+  if (!spkSynced || Math.abs(start - spkStartAt) > 2000) spkStartAt = start;
+  else spkStartAt += (start - spkStartAt) * 0.15;
   spkSynced = true;
   if (!spk.playing) { spk = { ...spk, online: true, playing: true }; paintSpeaker(); }
 });
 
 // Отправка на колонку: пока идёт одна, новые треки не пересекаются, а остаётся только последний
-async function speakerSend(track) {
-  spkWant = track;
+async function speakerSend(track, at = 0) {
+  spkWant = { track, at };
   if (spkBusy) return;
   spkBusy = true;
   paintSpeaker();
   while (spkWant) {
-    const t = spkWant;
+    const { track: t, at } = spkWant;
     spkWant = null;
     spkStartAt = 0;
     spkSynced = false;
+    spkBase = at;
+    spkShown = at;
     renderProgress();
     try {
-      await api.speaker.play(t);
+      await api.speaker.play(t, at);
       if (!spkSynced) spkStartAt = Date.now(); // грубо, пока колонка сама не сообщила позицию
       spk = { ...spk, online: true, playing: true, track: t.title || '', checked: true };
     } catch (e) {
@@ -94,7 +123,7 @@ async function speakerSend(track) {
       speakerMode = false; // не вышло: возвращаем звук на компьютер и включаем этот же трек у себя
       paintSpeaker();
       refreshSpeaker();
-      loadTrack(t);
+      loadTrack(t, { startAt: at });
       return;
     }
   }
@@ -107,15 +136,17 @@ async function speakerPlayPause() {
   if (spkBusy) return;
   if (spk.playing) {
     spkBusy = true;
+    const at = speakerPosition(); // где остановились, оттуда и продолжим
     try { await api.speaker.stop(); } catch (e) { toast(e.message, 'err'); }
     spk = { ...spk, playing: false };
     spkStartAt = 0;
+    spkBase = at;
     spkBusy = false;
     paintSpeaker();
     updatePlayState();
     renderProgress();
   } else if (state.track) {
-    speakerSend(state.track);
+    speakerSend(state.track, spkBase);
   }
 }
 
@@ -137,7 +168,11 @@ async function speakerModeToggle() {
   if (!spk.online) { await refreshSpeaker(); if (!spk.online) { toast('Колонка не отвечает по SSH', 'err'); return; } }
   speakerMode = true;
   toast('Всё, что включаешь, играет на колонке');
-  if (!audio.paused) { audio.pause(); speakerSend(state.track); } // то, что сейчас играет, переезжает на колонку
+  // трек продолжится на колонке с той же секунды; на паузе — с неё же, когда нажмут «играть»
+  const at = state.track ? audio.currentTime : 0;
+  spkBase = at;
+  spkShown = at;
+  if (!audio.paused) { audio.pause(); speakerSend(state.track, at); }
   paintSpeaker();
   updatePlayState();
 }
@@ -160,15 +195,12 @@ function speakerSection() {
   const [cls, label] = speakerState();
   return `<section class="sec" data-sec="speaker">
     <h3 class="sec-title">Колонка<span class="state ${cls}" id="spk-state">${label}</span></h3>
-    <p class="sec-desc">Яндекс Станция Лайт 2 с доступом по SSH. Кнопка в плеере передаёт ей текущий трек: звук идёт через компьютер, поэтому Авеон должен быть запущен. Прежняя громкость колонки вернётся сама.</p>
+    <p class="sec-desc">Яндекс Станция Лайт 2 с доступом по SSH. Кнопка в плеере передаёт ей текущий трек: звук идёт через компьютер, поэтому Авеон должен быть запущен. Громкостью колонки правит ползунок в окне, прежняя вернётся сама.</p>
     <div class="field"><label>Играть на колонке</label><div class="ctl"><label class="switch"><input type="checkbox" id="spk-on" ${c.enabled ? 'checked' : ''} aria-label="Играть на колонке"><span></span></label></div></div>
     <div class="sub-fields" ${c.enabled ? '' : 'data-off'}>
     <div class="field"><label for="spk-host">Колонка</label><div class="ctl">
       <input class="input" id="spk-host" value="${esc(c.host || '')}" placeholder="lite2 или root@192.168.0.102" spellcheck="false" autocomplete="off">
     </div></div>
-    <div class="field"><label>Громкость колонки</label><div class="ctl"><div class="seg" id="spk-level">
-      ${SPK_LEVELS.map((v) => `<button data-v="${v}" class="${Math.abs((c.level ?? 0.7) - v) < 0.01 ? 'on' : ''}">${Math.round(v * 100)}%</button>`).join('')}
-    </div></div></div>
     <div class="field"><label>Время трека на часах колонки</label><div class="ctl"><label class="switch"><input type="checkbox" id="spk-display" ${c.display !== false ? 'checked' : ''} aria-label="Время трека на часах колонки"><span></span></label></div></div>
     <div class="field"><label>Двойной тап по громкости<br><small>+ следующий трек, − предыдущий</small></label><div class="ctl"><label class="switch"><input type="checkbox" id="spk-keys" ${c.keys !== false ? 'checked' : ''} aria-label="Двойной тап по громкости переключает треки"><span></span></label></div></div>
     <div class="field"><label for="spk-sync">Сдвиг текста и полосы<br><small>плюс — раньше, минус — позже</small></label><div class="ctl">
@@ -210,12 +242,6 @@ function bindSpeaker(body) {
     paintSpeakerSection();
     refreshSpeaker();
   };
-  $('#spk-level button', sec).forEach((b) => {
-    b.onclick = async () => {
-      await saveCfg({ speaker: { level: +b.dataset.v } });
-      $$('#spk-level button', sec).forEach((x) => x.classList.toggle('on', x === b));
-    };
-  });
   $('#spk-display', sec).onchange = (e) => saveCfg({ speaker: { display: e.target.checked } });
   $('#spk-keys', sec).onchange = (e) => saveCfg({ speaker: { keys: e.target.checked } });
   const sync = $('#spk-sync', sec);

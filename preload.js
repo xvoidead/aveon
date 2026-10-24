@@ -26,7 +26,8 @@ contextBridge.exposeInMainWorld('tishe', {
   },
   stream: (track) => call('stream', track),
   speaker: {
-    play: (track) => call('speaker:play', track),
+    play: (track, at) => call('speaker:play', track, at),
+    volume: (level) => call('speaker:volume', level),
     stop: () => call('speaker:stop'),
     status: () => call('speaker:status'),
     onEvent: (cb) => on('speaker:event', cb),
