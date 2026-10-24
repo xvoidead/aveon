@@ -20,4 +20,22 @@ async function request(url, { method = 'GET', headers = {}, body, timeout = 1500
   return json ?? text;
 }
 
-module.exports = { request, HttpError };
+// Сервер перегружен (503, «serveroverloaded», 429): ждём, пока освободится, с нарастающей паузой, но не дольше maxWait.
+// Остальные ошибки (404, нет сети и т. д.) сразу идут наверх.
+const BUSY = new Set([429, 502, 503, 504]);
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+async function requestPatient(url, opts, { maxWait = 90000 } = {}) {
+  const t0 = Date.now();
+  for (let wait = 2000; ; wait = Math.min(wait * 2, 15000)) {
+    try {
+      return await request(url, opts);
+    } catch (e) {
+      if (!(e instanceof HttpError) || !BUSY.has(e.status) || Date.now() - t0 + wait > maxWait) throw e;
+      console.warn(`${new URL(url).host}: HTTP ${e.status}, повтор через ${wait / 1000} с`);
+      await sleep(wait);
+    }
+  }
+}
+
+module.exports = { request, requestPatient, HttpError };
