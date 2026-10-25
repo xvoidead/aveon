@@ -1,6 +1,6 @@
 // Колонка: Яндекс Станция Лайт 2 играет треки авеона. Колонка не умеет TLS и не достаёт до аудио-CDN SoundCloud,
 // поэтому звук отдаёт этот компьютер: локальный сервер на 127.0.0.1 и обратный SSH-туннель (колонка ходит на свой
-// 127.0.0.1:REMOTE_PORT), правило брандмауэра не нужно. Управление по SSH: запуск плеера и громкость (speaker-core.js).
+// 127.0.0.1:<порт, который выдала она сама>), правило брандмауэра не нужно. Управление по SSH: запуск плеера и громкость (speaker-core.js).
 // Настройки: config.speaker { host, level } (раздел «Колонка» в окне). Кнопка в плеере: renderer/speaker.js
 const http = require('http');
 const crypto = require('crypto');
@@ -18,6 +18,8 @@ let deps = null; // { resolveStream, cacheFiles, local } из main.js
 let server = null;
 let port = 0;
 let tunnel = null; // { proc, host, port }
+let ringHex = ''; // цвет кольца колонки: его считает окно из обложки, колонка спрашивает его сама
+let pulse = { id: '', text: '' }; // кадры пульса кольца для трека: строка на кадр 40 мс, их считает окно
 let session = null; // { token, track, stream, streamAt, segs } — играет один трек, новый заменяет прежний
 
 function init(d) { deps = d; }
@@ -62,22 +64,31 @@ function closeTunnel() {
   tunnel = null;
 }
 
-// Туннель поднимается параллельно запуску плеера: порт на колонке ждёт сам скрипт запуска (playScript).
-// Возвращает обещание, которое отвергается, если ssh-туннель умер (порт занят, вход не удался)
+// Туннель: колонка сама выдаёт свободный порт (tunnelArgs, -R 0) и ssh называет его в ответ.
+// Обещание сбывается номером порта и обещанием смерти туннеля (отвергается, если ssh вышел)
 function ensureTunnel(host) {
-  if (tunnel && tunnel.proc.exitCode === null && tunnel.host === host && tunnel.port === port) return tunnel.dead;
+  if (tunnel && tunnel.proc.exitCode === null && tunnel.host === host && tunnel.port === port) return tunnel.ready;
   closeTunnel();
   const proc = spawn('ssh', core.tunnelArgs(host, port), { windowsHide: true, stdio: ['ignore', 'ignore', 'pipe'] });
   let err = '';
-  proc.stderr.on('data', (b) => { err = (err + b).slice(-400); });
   const dead = new Promise((_, reject) => {
     proc.once('error', (e) => reject(new Error('ssh не запустился: ' + e.message)));
     proc.once('exit', (code) => reject(new Error(`SSH-туннель не поднялся (код ${code}): ${err.trim() || 'без сообщения'}`)));
   });
   dead.catch(() => {});
+  const ready = new Promise((resolve, reject) => {
+    const timer = setTimeout(() => { proc.kill(); reject(new Error('Колонка не выдала порт для туннеля за 10 секунд')); }, 10000);
+    proc.stderr.on('data', (b) => {
+      err = (err + b).slice(-400);
+      const remote = core.allocatedPort(err);
+      if (remote) { clearTimeout(timer); resolve({ remote, dead }); }
+    });
+    dead.catch((e) => { clearTimeout(timer); reject(e); });
+  });
+  ready.catch(() => {});
   proc.once('exit', () => { if (tunnel?.proc === proc) tunnel = null; });
-  tunnel = { proc, host, port, dead };
-  return dead;
+  tunnel = { proc, host, port, ready };
+  return ready;
 }
 
 // ---- сервер для колонки ----
@@ -121,6 +132,22 @@ async function onRequest(req, res) {
   const m = /^\/(s|seg)\/([0-9a-f]{32})(?:\/(\d{1,6}))?$/.exec((req.url || '').split('?')[0]);
   const s = session;
   // сообщение от колонки (смотритель в speaker-core.js): /p/<токен>?ms=<позиция> раз в секунду и /e/<токен> — трек кончился, /b/<токен>?k=up|down — двойной тап по громкости
+  // /f/<токен> — кадры пульса кольца этого трека; пока окно их не посчитало (или трек HLS) — пусто
+  const fr = /^\/f\/([0-9a-f]{32})$/.exec(req.url || '');
+  if (fr && req.method === 'GET') {
+    const v = s && s.token === fr[1] && pulse.id === s.track.id ? pulse.text : '';
+    res.writeHead(200, { 'Content-Type': 'text/plain', 'Content-Length': String(Buffer.byteLength(v)) });
+    res.end(v);
+    return;
+  }
+  // /c/<токен> — цвет кольца сверху, окно обновляет его при смене обложки
+  const col = /^\/c\/([0-9a-f]{32})$/.exec(req.url || '');
+  if (col && req.method === 'GET') {
+    const v = s && s.token === col[1] ? ringHex : '';
+    res.writeHead(200, { 'Content-Type': 'text/plain', 'Content-Length': String(v.length) });
+    res.end(v);
+    return;
+  }
   // /o/<токен> — с какой секунды трека начат поток: плеер колонки своё время считает с нуля, а на часах нужно время трека
   const off = /^\/o\/([0-9a-f]{32})$/.exec(req.url || '');
   if (off && req.method === 'GET') {
@@ -268,16 +295,16 @@ async function play(track, at = 0) {
   if (!deps) throw new Error('Модуль колонки не запущен');
   if (!track?.id) throw new Error('Нужен трек');
   const s = { token: crypto.randomBytes(16).toString('hex'), track, stream: null, streamAt: 0, segs: [], seek: at > 1 ? at : 0, base: 0 };
-  // Всё сразу: сервер, туннель, поиск потока и запуск плеера. Плеер сам ждёт порт туннеля и поток (сервер ответит,
-  // когда поток найден), так что запуск занимает столько, сколько самый долгий из шагов, а не сумму
+  // Поиск потока идёт, пока поднимается туннель; плеер запускаем, как только колонка назвала порт.
+  // Плеер сам дождётся потока: сервер ответит ему, когда поток найден
   await ensureServer();
-  const dead = ensureTunnel(host);
   session = s;
-  const url = `http://127.0.0.1:${core.REMOTE_PORT}/s/${s.token}`;
   const resolved = currentStream(s);
   resolved.catch(() => {});
-  const run = ctl(host, core.playScript({ url, level: levelNow(), display: cfg().display !== false, keys: cfg().keys !== false }));
   try {
+    const { remote, dead } = await ensureTunnel(host);
+    const url = `http://127.0.0.1:${remote}/s/${s.token}`;
+    const run = ctl(host, core.playScript({ url, level: levelNow(), display: cfg().display !== false, keys: cfg().keys !== false, ring: cfg().ring !== false }));
     const [, out] = await Promise.race([Promise.all([resolved, run]), dead]);
     const r = core.playResult(out);
     if (!r.ok) throw new Error('Колонка не заиграла: ' + r.error);
@@ -287,6 +314,22 @@ async function play(track, at = 0) {
     throw e;
   }
   return { host, title: track.title || '' };
+}
+
+// Цвет кольца: окно присылает его из акцента обложки, колонка забирает сама
+function ring(hex) {
+  ringHex = /^[0-9a-f]{6}$/i.test(hex || '') ? String(hex).toLowerCase() : '';
+  return { ok: true };
+}
+
+// Кадры пульса: строка на кадр, в каждой девять байт «\xBB\xGG\xRR» трёх светодиодов — их колонка отдаёт
+// в printf как есть. Чужое (не байты в таком виде) не принимаем: строка уходит прямо в оболочку колонки
+const FRAME = /^(?:\\x[0-9a-f]{2}){9}$/;
+function frames(id, text) {
+  const lines = typeof text === 'string' ? text.split('\n') : [];
+  const ok = id && lines.length && lines.length < 50000 && lines.every((l) => FRAME.test(l));
+  pulse = ok ? { id: String(id), text } : { id: '', text: '' };
+  return { ok: !!ok, frames: ok ? lines.length : 0 };
 }
 
 // Ползунок громкости в окне двигает громкость колонки, пока она играет
@@ -330,4 +373,4 @@ function destroy() {
   closeServer();
 }
 
-module.exports = { init, play, volume, stop, status, destroy };
+module.exports = { init, play, volume, ring, frames, stop, status, destroy };

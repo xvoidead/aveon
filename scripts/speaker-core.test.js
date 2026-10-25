@@ -5,7 +5,8 @@ const assert = require('node:assert/strict');
 const S = require('../src/speaker-core.js');
 
 const TOKEN = 'a'.repeat(32);
-const URL_OK = `http://127.0.0.1:${S.REMOTE_PORT}/s/${TOKEN}`;
+const PORT = 33727; // порт, который колонка выдала туннелю
+const URL_OK = `http://127.0.0.1:${PORT}/s/${TOKEN}`;
 
 test('validHost: имя из ssh config и адреса — да, всё похожее на ключ ssh или команду — нет', () => {
   for (const h of ['lite2', 'root@192.168.0.102', 'speaker.local', 'user@fe80::1']) assert.equal(S.validHost(h), true, h);
@@ -91,7 +92,7 @@ test('ssh: туннель выводит порт колонки на наш с�
   const t = S.tunnelArgs('lite2', 54321);
   assert.equal(t[0], '-N');
   assert.equal(t.at(-1), 'lite2');
-  assert.equal(t[t.indexOf('-R') + 1], `${S.REMOTE_PORT}:127.0.0.1:54321`);
+  assert.equal(t[t.indexOf('-R') + 1], '0:127.0.0.1:54321', 'порт на колонке выбирает она сама');
   assert.ok(t.includes('BatchMode=yes') && t.includes('ExitOnForwardFailure=yes'));
   const c = S.controlArgs('lite2');
   assert.deepEqual(c.slice(-3), ['lite2', 'sh', '-s']);
@@ -100,11 +101,12 @@ test('ssh: туннель выводит порт колонки на наш с�
 
 test('playScript: только свой адрес, громкость ставится до запуска плеера, смотритель вложен целиком', () => {
   for (const bad of [
-    `http://127.0.0.1:${S.REMOTE_PORT}/s/${TOKEN}; reboot`,
-    `http://127.0.0.1:${S.REMOTE_PORT}/s/${TOKEN}\nreboot`,
-    `http://127.0.0.1:9999/s/${TOKEN}`,
-    `http://evil.example:${S.REMOTE_PORT}/s/${TOKEN}`,
-    `http://127.0.0.1:${S.REMOTE_PORT}/s/xyz`,
+    `http://127.0.0.1:${PORT}/s/${TOKEN}; reboot`,
+    `http://127.0.0.1:${PORT}/s/${TOKEN}\nreboot`,
+    `http://127.0.0.1:99999/s/${TOKEN}`,
+    `http://127.0.0.1:0/s/${TOKEN}`,
+    `http://evil.example:${PORT}/s/${TOKEN}`,
+    `http://127.0.0.1:${PORT}/s/xyz`,
     '',
   ]) assert.throws(() => S.playScript({ url: bad, level: 0.7 }), /bad play url/, JSON.stringify(bad));
 
@@ -116,7 +118,7 @@ test('playScript: только свой адрес, громкость став�
   assert.ok(sh.includes('--gst-launch "uridecodebin uri=$1 ! audioconvert ! audioresample ! alsasink"'));
   assert.ok(sh.includes("trap 'KILLED=1; kill $G 2>/dev/null' TERM INT"));
   // рукопожатие: позиция раз в секунду и конец трека — на наш сервер через туннель, а при остановке «конец» не шлётся
-  assert.ok(sh.includes(`B=http://127.0.0.1:${S.REMOTE_PORT}`) && sh.includes('$B/p/$T?ms=$P') && sh.includes('[ -z "$KILLED" ] && wget'));
+  assert.ok(sh.includes('B=$(dirname "$(dirname "$1")")') && sh.includes('$B/p/$T?ms=$P') && sh.includes('[ -z "$KILLED" ] && wget'));
   assert.ok(sh.includes('rm -f $D/vol $D/pid'), 'громкость возвращается');
   assert.ok(S.playScript({ url: URL_OK, level: 0.5 }).includes('amixer cset numid=186 128'));
 });
@@ -139,8 +141,7 @@ test('осиротевший dmix: убирается только при nattch
 });
 
 test('listenScript: порт туннеля в /proc/net/tcp ищется шестнадцатеричным, только в состоянии LISTEN', () => {
-  assert.equal(S.REMOTE_PORT, 0x4d4e);
-  const sh = S.listenScript();
+  const sh = S.listenScript(0x4d4e);
   assert.ok(sh.includes("':4D4E 00000000:0000 0A '"));
   assert.ok(sh.includes('echo UP') && sh.includes('echo DOWN'));
 });
@@ -194,4 +195,36 @@ test('часы колонки показывают время трека, а н�
   assert.ok(sh.includes('$B/o/$T'), 'сдвиг берётся с нашего сервера');
   assert.ok(sh.includes('show $(((P + OFF) / 1000))'), 'на часы идёт позиция плюс сдвиг');
   assert.ok(sh.indexOf('OFF=\n') < sh.indexOf('$B/o/$T'), 'сдвиг спрашивается один раз за трек');
+});
+
+test('кольцо колонки: цвет приходит от окна, рисуется байтами B,G,R и гаснет в конце', () => {
+  const sh = S.playScript({ url: URL_OK, level: 0.5, display: true, keys: true, ring: true });
+  assert.ok(sh.includes('$B/c/$T'), 'цвет спрашивается у окна');
+  assert.ok(sh.includes("printf '\\x%02x\\x%02x\\x%02x' $B $G $R") && sh.includes('> /dev/fb0'), 'пиксель идёт B,G,R');
+  assert.ok(sh.includes('led.sh ring 000000'), 'после трека кольцо гаснет');
+  assert.ok(sh.includes(`run.sh ${URL_OK} 1 1 1`), 'кольцо включается аргументом');
+  assert.ok(S.playScript({ url: URL_OK, level: 0.5, display: true, keys: true, ring: false }).includes(`run.sh ${URL_OK} 1 1 0`));
+});
+
+test('allocatedPort: порт, который колонка выдала туннелю, берётся из ответа ssh', () => {
+  assert.equal(S.allocatedPort('Warning: Permanently added x\r\nAllocated port 33727 for remote forward to 127.0.0.1:51203\r\n'), 33727);
+  assert.equal(S.allocatedPort('Warning: Permanently added x\r\n'), 0, 'пока не назван');
+  assert.equal(S.allocatedPort('Allocated port 99999 for remote forward to 127.0.0.1:1'), 0, 'вне диапазона');
+  assert.equal(S.allocatedPort(undefined), 0);
+  // скрипт запуска ждёт именно этот порт: 33727 = 0x83BF
+  assert.ok(S.playScript({ url: URL_OK, level: 0.5 }).includes(':83BF 00000000:0000 0A '));
+});
+
+test('пульс кольца: кадры берутся у окна, показываются по позиции трека, ровный цвет их не перебивает', () => {
+  const sh = S.playScript({ url: URL_OK, level: 0.5, display: true, keys: true, ring: true });
+  const run = sh.split("<<'EOF'\n")[1].split('\nEOF\n')[0];
+  assert.ok(run.indexOf('rm -f $D/frames $D/frames.part $D/pos') < run.indexOf('maind --gst-launch'), 'старые кадры убираются до запуска плеера');
+  assert.ok(run.includes('$B/f/$T'), 'кадры спрашиваются у окна');
+  assert.ok(run.includes('> $D/pos'), 'смотритель отдаёт позицию трека');
+  assert.ok(run.includes('printf "$FR" > /dev/fb0'), 'кадр уходит в кольцо');
+  assert.ok(run.includes('[ ! -s $D/frames ] && sh $D/led.sh ring $RING'), 'при пульсе ровный цвет не рисуется');
+  assert.ok(run.indexOf('kill $PL') > run.indexOf('wait $G 2>/dev/null'), 'пульс гасится после плеера');
+  // без кольца — никакого пульса
+  const off = S.playScript({ url: URL_OK, level: 0.5, display: true, keys: true, ring: false });
+  assert.ok(off.includes(`run.sh ${URL_OK} 1 1 0`));
 });

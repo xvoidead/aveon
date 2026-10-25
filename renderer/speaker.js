@@ -60,6 +60,113 @@ function speakerSeek(sec) {
   if (state.track) speakerSend(state.track, Math.max(0, sec));
 }
 
+// Кольцо сверху светится цветом обложки и отдаётся колонке, она спросит его сама.
+// Цвет берём из палитры обложки (extras.js → lastPalette), а не акцент интерфейса --amber: тот осветлён
+// для читаемости текста, и на светодиоде из ржаво-красной обложки выходил белёсо-розовый
+const RING_PEAK = 72; // самый яркий канал из 255 — «нежно»
+const RING_GAMMA = 2.2; // светодиод светит линейно, глаз видит по гамме: без поправки слабые каналы разбавляют цвет
+
+// h — градусы, s и l — 0…1 → [r, g, b] 0…1
+function hslRgb(h, s, l) {
+  const k = (n) => (n + h / 30) % 12;
+  const a = s * Math.min(l, 1 - l);
+  return [0, 8, 4].map((n) => l - a * Math.max(-1, Math.min(k(n) - 3, 9 - k(n), 1)));
+}
+
+// Цвет обложки для светодиода: доли каналов [r, g, b], самый яркий — 1
+function ringLin(p) {
+  // яркая обложка — её насыщенный акцентный тон; блёклая (чёрно-белая) — едва тёплый белый того же оттенка
+  const h = p.vivid ? p.accentHue : p.bgHue;
+  const s = p.vivid ? Math.min(1, Math.max(0.75, p.accentSat)) : Math.min(0.2, p.bgSat);
+  const lin = hslRgb(h, s, 0.5).map((c) => c ** RING_GAMMA);
+  const top = Math.max(...lin) || 1;
+  return lin.map((c) => c / top);
+}
+
+const ringColor = (p) => ringLin(p).map((c) => Math.round(c * RING_PEAK).toString(16).padStart(2, '0')).join('');
+
+// ---- пульс кольца в такт ----
+// Трек раскодируем здесь целиком (он и так у нас), берём низы — бочку и бас — и на каждый кадр 40 мс считаем силу
+// удара: вспышка сразу, гаснет за пару десятых. Колонке уходят готовые кадры (цвет обложки × удар, с гаммой),
+// она лишь показывает их по своей позиции в треке. HLS целиком не раскодировать — тогда кольцо светится ровно
+const PULSE_FPS = 25;
+const PULSE_RATE = 8000; // для низов хватает; раскодировать так в разы быстрее
+const PULSE_FLOOR = 0.12; // в тишине кольцо тлеет, а не гаснет совсем
+const PULSE_DECAY = 0.8; // за кадр: вспышка гаснет примерно за 0.2 с
+
+async function pulseEnvelope(track) {
+  const st = await api.stream(track);
+  if (!st?.url || st.hls) return null;
+  const data = await (await fetch(st.url)).arrayBuffer();
+  const audio = await new OfflineAudioContext(1, 1, PULSE_RATE).decodeAudioData(data);
+  const off = new OfflineAudioContext(1, Math.ceil(audio.duration * PULSE_RATE), PULSE_RATE);
+  const src = off.createBufferSource();
+  src.buffer = audio;
+  const low = off.createBiquadFilter();
+  low.type = 'lowpass';
+  low.frequency.value = 160;
+  src.connect(low).connect(off.destination);
+  src.start();
+  const x = (await off.startRendering()).getChannelData(0);
+  const hop = PULSE_RATE / PULSE_FPS;
+  const n = Math.floor(x.length / hop);
+  const e = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    let sum = 0;
+    for (let j = i * hop; j < (i + 1) * hop; j++) sum += x[j] * x[j];
+    e[i] = Math.sqrt(sum / hop);
+  }
+  // громкость — по 95-му проценту: пара громких мест не делает весь трек тусклым
+  const top = [...e].sort((a, b) => a - b)[Math.floor(n * 0.95)] || 1;
+  const out = new Float32Array(n);
+  let prev = 0;
+  let env = 0;
+  for (let i = 0; i < n; i++) {
+    const level = Math.min(1, e[i] / top);
+    const hit = Math.max(0, level - prev) * 2.2; // рост низов — это удар
+    prev = level;
+    env = Math.max(Math.min(1, 0.35 * level + hit), env * PULSE_DECAY);
+    out[i] = PULSE_FLOOR + (1 - PULSE_FLOOR) * env;
+  }
+  return out;
+}
+
+// Кадры для колонки: строка на кадр, «\xBB\xGG\xRR» трёх светодиодов (колонка отдаёт её в printf как есть)
+function pulseFrames(env, lin) {
+  const hx = (v) => '\\x' + Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+  return Array.from(env, (b) => {
+    const k = b ** 1.6 * RING_PEAK; // яркость тоже по гамме, иначе тихие места почти не отличить от громких
+    const one = hx(lin[2] * k) + hx(lin[1] * k) + hx(lin[0] * k);
+    return one + one + one;
+  }).join('\n');
+}
+
+let pulseFor = '';
+async function speakerPulse(track) {
+  if (state.cfg.speaker?.ring === false || state.cfg.speaker?.pulse === false || !track?.id) return;
+  if (pulseFor === track.id) return; // перемотка того же трека — кадры уже у колонки
+  pulseFor = track.id;
+  try {
+    const env = await pulseEnvelope(track);
+    if (!env || state.track?.id !== track.id) return;
+    // цвет берём в конце: пока считали, обложка нового трека уже успела дать палитру
+    const lin = typeof lastPalette !== 'undefined' && lastPalette ? ringLin(lastPalette) : [1, 1, 1];
+    await api.speaker.frames(track.id, pulseFrames(env, lin));
+  } catch (e) {
+    pulseFor = '';
+    console.warn('пульс кольца:', e.message);
+  }
+}
+
+let ringLast = '';
+function ringProbe() {
+  if (typeof lastPalette === 'undefined' || !lastPalette) return; // обложки ещё нет — кольцо не трогаем
+  const hex = ringColor(lastPalette);
+  if (hex === ringLast) return;
+  ringLast = hex;
+  api.speaker.ring(hex).catch(() => {});
+}
+
 // Ползунок громкости в окне ведёт и громкость колонки. Шлём не чаще, чем раз в треть секунды: каждый вызов — ssh
 let volTimer = 0;
 let volWant = -1;
@@ -116,6 +223,7 @@ async function speakerSend(track, at = 0) {
       await api.speaker.play(t, at);
       if (!spkSynced) spkStartAt = Date.now(); // грубо, пока колонка сама не сообщила позицию
       spk = { ...spk, online: true, playing: true, track: t.title || '', checked: true };
+      speakerPulse(t); // кадры пульса считаются, пока трек уже играет: колонка заберёт их сама, когда будут
     } catch (e) {
       toast(`Колонка: ${e.message}`, 'err');
       spkWant = null;
@@ -202,6 +310,8 @@ function speakerSection() {
       <input class="input" id="spk-host" value="${esc(c.host || '')}" placeholder="lite2 или root@192.168.0.102" spellcheck="false" autocomplete="off">
     </div></div>
     <div class="field"><label>Время трека на часах колонки</label><div class="ctl"><label class="switch"><input type="checkbox" id="spk-display" ${c.display !== false ? 'checked' : ''} aria-label="Время трека на часах колонки"><span></span></label></div></div>
+    <div class="field"><label>Кольцо под цвет обложки</label><div class="ctl"><label class="switch"><input type="checkbox" id="spk-ring" ${c.ring !== false ? 'checked' : ''} aria-label="Кольцо колонки светится под цвет обложки"><span></span></label></div></div>
+    <div class="field"><label>Кольцо пульсирует в такт</label><div class="ctl"><label class="switch"><input type="checkbox" id="spk-pulse" ${c.pulse !== false ? 'checked' : ''} aria-label="Кольцо колонки пульсирует в такт музыке"><span></span></label></div></div>
     <div class="field"><label>Двойной тап по громкости<br><small>+ следующий трек, − предыдущий</small></label><div class="ctl"><label class="switch"><input type="checkbox" id="spk-keys" ${c.keys !== false ? 'checked' : ''} aria-label="Двойной тап по громкости переключает треки"><span></span></label></div></div>
     <div class="field"><label for="spk-sync">Сдвиг текста и полосы<br><small>плюс — раньше, минус — позже</small></label><div class="ctl">
       <input type="range" id="spk-sync" min="-1500" max="1500" step="50" value="${c.syncMs ?? 0}"><output id="spk-sync-v">${c.syncMs ?? 0} мс</output>
@@ -244,6 +354,8 @@ function bindSpeaker(body) {
   };
   $('#spk-display', sec).onchange = (e) => saveCfg({ speaker: { display: e.target.checked } });
   $('#spk-keys', sec).onchange = (e) => saveCfg({ speaker: { keys: e.target.checked } });
+  $('#spk-ring', sec).onchange = (e) => saveCfg({ speaker: { ring: e.target.checked } });
+  $('#spk-pulse', sec).onchange = (e) => saveCfg({ speaker: { pulse: e.target.checked } });
   const sync = $('#spk-sync', sec);
   sync.oninput = () => { $('#spk-sync-v', sec).textContent = `${sync.value} мс`; };
   sync.onchange = () => saveCfg({ speaker: { syncMs: +sync.value } });
@@ -255,6 +367,7 @@ function bindSpeaker(body) {
 }
 
 setInterval(() => { if (speakerMode && spk.playing && spkStartAt) renderProgress(); }, 500);
+setInterval(() => { if (speakerMode && state.cfg.speaker?.ring !== false) ringProbe(); }, 1500);
 // Связь проверяем раз в полминуты, а пока колонка играет за нас — каждые 2 секунды: так видно позицию и конец трека
 setInterval(() => { if (!document.hidden && spk.configured) refreshSpeaker(); }, 30000);
 setInterval(() => { if (speakerMode && spk.playing && !spkBusy) refreshSpeaker(); }, 2000);

@@ -7,8 +7,6 @@ const MIME = {
   '.opus': 'audio/ogg', '.m4a': 'audio/mp4', '.aac': 'audio/aac', '.webm': 'audio/webm', '.weba': 'audio/webm',
 };
 
-// Порт на колонке, куда обратный SSH-туннель выводит наш сервер. Не порт самой колонки: у Яндекса заняты 9850…9926
-const REMOTE_PORT = 19790;
 const STATE_DIR = '/tmp/aveon-speaker';
 const MASTER = 186; // numid «Master Playback Volume» (softvol 0…255) у Станции Лайт 2
 
@@ -95,11 +93,20 @@ const BASE = ['-o', 'BatchMode=yes', '-o', 'ConnectTimeout=8'];
 // Скрипт идёт в stdin: так не нужно экранировать кавычки для удалённой оболочки
 const controlArgs = (host) => [...BASE, host, 'sh', '-s'];
 
-// Колонка ходит на свой 127.0.0.1:REMOTE_PORT, туннель приводит её к нашему серверу на localPort
+// Обратный туннель: колонка ходит на свой 127.0.0.1:<порт>, а туннель приводит её к нашему серверу на localPort.
+// Порт на колонке выбирает она сама (-R 0) и называет его в ответ: так туннели разных окон и осиротевший
+// ssh после жёсткого завершения Авеона никогда не делят один порт
 const tunnelArgs = (host, localPort) => [
   '-N', ...BASE, '-o', 'ExitOnForwardFailure=yes', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=3',
-  '-R', `${REMOTE_PORT}:127.0.0.1:${localPort}`, host,
+  '-R', `0:127.0.0.1:${localPort}`, host,
 ];
+
+// «Allocated port 33727 for remote forward to 127.0.0.1:51203» — так ssh называет выданный порт
+function allocatedPort(stderr) {
+  const m = /Allocated port (\d{1,5}) for remote forward/.exec(String(stderr || ''));
+  const p = m ? Number(m[1]) : 0;
+  return p > 0 && p < 65536 ? p : 0;
+}
 
 // ---- скрипты для колонки (busybox sh) ----
 
@@ -153,6 +160,15 @@ case "$1" in
     mi=$(date -u +%M)
     draw $((h / 10)) $((h % 10)) $(echo $mi | cut -c1) $(echo $mi | cut -c2) 1
     ;;
+  ring)
+    # кольцо сверху — это кадровый буфер 3x1 на 24 бита, пиксель идёт байтами B,G,R
+    H=$2
+    R=$(printf '%d' "0x$(echo $H | cut -c1-2)")
+    G=$(printf '%d' "0x$(echo $H | cut -c3-4)")
+    B=$(printf '%d' "0x$(echo $H | cut -c5-6)")
+    PX=$(printf '\\x%02x\\x%02x\\x%02x' $B $G $R)
+    printf "$PX$PX$PX" > /dev/fb0 2>/dev/null
+    ;;
 esac`;
 
 // Смотритель: играет поток и сам возвращает громкость, когда трек закончился или плеер остановили.
@@ -162,10 +178,11 @@ export LD_LIBRARY_PATH=/system/vendor/quasar/libs GST_PLUGIN_PATH=/system/vendor
 D=${STATE_DIR}
 ${DMIX_CLEAN}
 echo $$ > $D/pid
+rm -f $D/frames $D/frames.part $D/pos # от прошлого трека: кадры пульса и позиция у каждого трека свои
 /system/vendor/quasar/maind --gst-launch "uridecodebin uri=$1 ! audioconvert ! audioresample ! alsasink" > $D/gst.log 2>&1 < /dev/null &
 G=$!
 T=$(basename "$1")
-B=http://127.0.0.1:${REMOTE_PORT}
+B=$(dirname "$(dirname "$1")")
 KILLED=
 trap 'KILLED=1; kill $G 2>/dev/null' TERM INT
 # рукопожатие: колонка сама сообщает компьютеру позицию трека (строка Progress в логе плеера, раз в секунду)
@@ -175,6 +192,8 @@ LOG=/data/quasar/daemons_logs/maind.log
   # двойной тап по громкости: два «Button click» одной кнопки не позже чем через 0.8 с — /b/<токен>?k=up|down
   LASTB=$(tail -n 40 $LOG 2>/dev/null | grep 'Button click: volume_' | tail -n 1)
   OFF=
+  RING=
+  N=0
   PK=
   PT=0
   while kill -0 $G 2>/dev/null; do
@@ -206,24 +225,74 @@ LOG=/data/quasar/daemons_logs/maind.log
       [ -z "$OFF" ] && OFF=$(wget -q -T 2 -O - "$B/o/$T" 2>/dev/null)
       [ -z "$OFF" ] && OFF=0
       [ "$2" = 1 ] && sh $D/led.sh show $(((P + OFF) / 1000))
+      # позиция трека для пульса кольца: миллисекунды трека и когда это было по часам колонки (сотые секунды)
+      read U _ < /proc/uptime
+      echo "$((P + OFF)) $((\${U%.*} * 100 + 1\${U#*.} - 100))" > $D/pos
+    fi
+    # кольцо сверху светится под обложку: цвет считает окно, мы спрашиваем его раз в две секунды
+    # и перерисовываем — у кольца свои анимации, одиночная запись живёт до ближайшей из них
+    if [ "$4" = 1 ]; then
+      N=$((N + 1))
+      if [ $((N % 20)) = 0 ]; then
+        C=$(wget -q -T 2 -O - "$B/c/$T" 2>/dev/null)
+        case "$C" in [0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]) RING=$C ;; esac
+      fi
+      # пока идёт пульс в такт, ровный цвет не рисуем — он бы его перебивал
+      [ $((N % 5)) = 0 ] && [ -n "$RING" ] && [ ! -s $D/frames ] && sh $D/led.sh ring $RING
     fi
     sleep 0.1
   done
 ) &
+# Пульс кольца в такт: кадры по 40 мс (цвет обложки × сила удара) считает компьютер, здесь их только показываем
+# строго по позиции трека. Отстали — пропускаем кадры, спешим — ждём. Время, паузы и запись в кольцо — встроенные
+# команды оболочки, лишних процессов нет: 25 кадров в секунду колонке ничего не стоят
+PL=
+if [ "$4" = 1 ]; then
+(
+  F=$D/frames
+  mkfifo $D/tick 2>/dev/null
+  # кадров может ещё не быть: компьютер считает их, пока трек уже играет; для HLS их не будет вовсе
+  while kill -0 $G 2>/dev/null && [ ! -s $F ]; do
+    wget -q -T 5 -O $F.part "$B/f/$T" 2>/dev/null && [ -s $F.part ] && mv $F.part $F
+    [ -s $F ] || read -t 2 X <> $D/tick
+  done
+  N=-1
+  while kill -0 $G 2>/dev/null && read -r FR; do
+    N=$((N + 1))
+    while :; do
+      read U _ < /proc/uptime
+      NOW=$((\${U%.*} * 100 + 1\${U#*.} - 100))
+      { read PMS PAT < $D/pos; } 2>/dev/null || { read -t 0.04 X <> $D/tick; continue; }
+      WANT=$(((PMS + (NOW - PAT) * 10) / 40))
+      [ $N -le $WANT ] && break
+      read -t 0.02 X <> $D/tick
+    done
+    [ $N -lt $WANT ] && continue
+    printf "$FR" > /dev/fb0
+  done < $F
+) &
+PL=$!
+fi
 wait $G
 wait $G 2>/dev/null
+[ -n "$PL" ] && kill $PL 2>/dev/null
 dmix_clean
 [ "$2" = 1 ] && sh $D/led.sh clock
+[ "$4" = 1 ] && sh $D/led.sh ring 000000
+rm -f $D/frames $D/frames.part $D/pos
 # трек кончился сам (не остановили): сразу даём знать, чтобы Авеон включил следующий
 [ -z "$KILLED" ] && wget -q -T 2 -O /dev/null "$B/e/$T" 2>/dev/null
 V=$(cat $D/vol 2>/dev/null)
 [ -n "$V" ] && amixer cset numid=${MASTER} "$V" >/dev/null 2>&1
 rm -f $D/vol $D/pid`;
 
-const PLAY_URL = new RegExp(`^http://127\\.0\\.0\\.1:${REMOTE_PORT}/s/[0-9a-f]{32}$`);
+const PLAY_URL = /^http:\/\/127\.0\.0\.1:(\d{1,5})\/s\/[0-9a-f]{32}$/;
 
-function playScript({ url, level, display, keys }) {
-  if (!PLAY_URL.test(url)) throw new Error('bad play url');
+function playScript({ url, level, display, keys, ring }) {
+  const m = PLAY_URL.exec(url || '');
+  const remote = m ? Number(m[1]) : 0;
+  if (!(remote > 0 && remote < 65536)) throw new Error('bad play url');
+  const HEX_PORT = portHex(remote);
   return `D=${STATE_DIR}
 mkdir -p $D
 ${DMIX_CLEAN}
@@ -244,13 +313,13 @@ ${LED}
 LEDEOF
 echo ${masterOf(level)} > $D/lvl
 amixer cset numid=${MASTER} ${masterOf(level)} >/dev/null 2>&1
-# туннель с компьютера поднимается параллельно этому скрипту: ждём его порт здесь, а не отдельными запросами по ssh
+# порт туннеля к этому моменту уже слушает (ssh назвал его, только когда колонка его открыла) — проверяем на всякий случай
 i=0
 while ! grep -qi ':${HEX_PORT} 00000000:0000 0A ' /proc/net/tcp && [ $i -lt 80 ]; do sleep 0.1; i=$((i + 1)); done
 grep -qi ':${HEX_PORT} 00000000:0000 0A ' /proc/net/tcp || { echo "FAIL tunnel"; exit 1; }
 : > $D/gst.log
 rm -f $D/pid
-setsid sh $D/run.sh ${url} ${display ? 1 : 0} ${keys ? 1 : 0} > /dev/null 2>&1 < /dev/null &
+setsid sh $D/run.sh ${url} ${display ? 1 : 0} ${keys ? 1 : 0} ${ring ? 1 : 0} > /dev/null 2>&1 < /dev/null &
 # готово, когда плеер написал первую строку Progress (звук пошёл) или умер: без фиксированного ожидания
 i=0
 while [ $i -lt 100 ]; do
@@ -295,8 +364,8 @@ else echo IDLE; fi
 `;
 
 // Вывел ли туннель наш порт на колонке: в /proc/net/tcp порт стоит в шестнадцатеричном виде, 0A — LISTEN
-const HEX_PORT = REMOTE_PORT.toString(16).toUpperCase().padStart(4, '0');
-const listenScript = () => `grep -qi ':${HEX_PORT} 00000000:0000 0A ' /proc/net/tcp && echo UP || echo DOWN
+const portHex = (p) => p.toString(16).toUpperCase().padStart(4, '0');
+const listenScript = (port) => `grep -qi ':${portHex(port)} 00000000:0000 0A ' /proc/net/tcp && echo UP || echo DOWN
 `;
 
 function playResult(out) {
@@ -314,6 +383,6 @@ function progressOf(out) {
 }
 
 module.exports = {
-  MIME, REMOTE_PORT, validHost, masterOf, parseRange, mediaFile, isPlaylist, rewritePlaylist, trimPlaylist, volumeScript,
+  MIME, validHost, masterOf, allocatedPort, parseRange, mediaFile, isPlaylist, rewritePlaylist, trimPlaylist, volumeScript,
   controlArgs, tunnelArgs, playScript, stopScript, statusScript, listenScript, playResult, isPlaying, progressOf,
 };
