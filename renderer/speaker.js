@@ -61,7 +61,7 @@ function speakerSeek(sec) {
 }
 
 // Кольцо сверху светится цветом обложки и отдаётся колонке, она спросит его сама.
-// Цвет берём из палитры обложки (extras.js → lastPalette), а не акцент интерфейса --amber: тот осветлён
+// Цвет берём из палитры обложки самого трека (trackPalette ниже), а не акцент интерфейса --amber: тот осветлён
 // для читаемости текста, и на светодиоде из ржаво-красной обложки выходил белёсо-розовый
 const RING_PEAK = 72; // самый яркий канал из 255 — «нежно»
 const RING_GAMMA = 2.2; // светодиод светит линейно, глаз видит по гамме: без поправки слабые каналы разбавляют цвет
@@ -141,17 +141,38 @@ function pulseFrames(env, lin) {
   }).join('\n');
 }
 
+// Палитра обложки именно этого трека. Общая палитра оформления (extras.js → lastPalette) не годится: она
+// меняется с задержкой, а у обложки без CORS остаётся от прошлого трека — и кольцо светилось чужим цветом
+const ringPalettes = new Map(); // id трека → палитра или null (обложки нет или её не прочитать)
+const RING_NEUTRAL = { vivid: false, bgHue: 30, bgSat: 0.1 }; // тогда кольцо тлеет тёплым белым, а не чужим цветом
+
+function trackPalette(track) {
+  if (!track?.id) return Promise.resolve(null);
+  if (ringPalettes.has(track.id)) return Promise.resolve(ringPalettes.get(track.id));
+  return new Promise((resolve) => {
+    const done = (p) => {
+      ringPalettes.set(track.id, p);
+      if (ringPalettes.size > 64) ringPalettes.delete(ringPalettes.keys().next().value);
+      resolve(p);
+    };
+    if (!track.cover) { done(null); return; }
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => { try { done(analyzeCover(img)); } catch { done(null); } }; // extras.js
+    img.onerror = () => done(null);
+    img.src = track.cover;
+  });
+}
+
 let pulseFor = '';
 async function speakerPulse(track) {
   if (state.cfg.speaker?.ring === false || state.cfg.speaker?.pulse === false || !track?.id) return;
   if (pulseFor === track.id) return; // перемотка того же трека — кадры уже у колонки
   pulseFor = track.id;
   try {
-    const env = await pulseEnvelope(track);
+    const [env, pal] = await Promise.all([pulseEnvelope(track), trackPalette(track)]);
     if (!env || state.track?.id !== track.id) return;
-    // цвет берём в конце: пока считали, обложка нового трека уже успела дать палитру
-    const lin = typeof lastPalette !== 'undefined' && lastPalette ? ringLin(lastPalette) : [1, 1, 1];
-    await api.speaker.frames(track.id, pulseFrames(env, lin));
+    await api.speaker.frames(track.id, pulseFrames(env, ringLin(pal || RING_NEUTRAL)));
   } catch (e) {
     pulseFor = '';
     console.warn('пульс кольца:', e.message);
@@ -159,10 +180,11 @@ async function speakerPulse(track) {
 }
 
 let ringLast = '';
-function ringProbe() {
-  if (typeof lastPalette === 'undefined' || !lastPalette) return; // обложки ещё нет — кольцо не трогаем
-  const hex = ringColor(lastPalette);
-  if (hex === ringLast) return;
+async function ringProbe() {
+  const track = state.track;
+  if (!track) return;
+  const hex = ringColor((await trackPalette(track)) || RING_NEUTRAL);
+  if (hex === ringLast || state.track !== track) return;
   ringLast = hex;
   api.speaker.ring(hex).catch(() => {});
 }

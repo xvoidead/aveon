@@ -192,6 +192,7 @@ LOG=/data/quasar/daemons_logs/maind.log
   # двойной тап по громкости: два «Button click» одной кнопки не позже чем через 0.8 с — /b/<токен>?k=up|down
   LASTB=$(tail -n 40 $LOG 2>/dev/null | grep 'Button click: volume_' | tail -n 1)
   OFF=
+  MISS=0
   RING=
   N=0
   PK=
@@ -220,7 +221,10 @@ LOG=/data/quasar/daemons_logs/maind.log
     if [ -n "$L" ] && [ "$L" != "$LAST" ]; then
       LAST=$L
       P=$(echo "$L" | awk '{for(i=1;i<=NF;i++) if($i=="Progress:"){v=$(i+1); sub("ms","",v); print v}}')
-      wget -q -T 2 -O /dev/null "$B/p/$T?ms=$P" 2>/dev/null
+      # окна больше нет (закрыто жёстко, упало): плеер уже скачал трек и играл бы его вслепую, без управления
+      # и с чужими кадрами на кольце. Пять вестей подряд не дошли — останавливаемся сами
+      if wget -q -T 2 -O /dev/null "$B/p/$T?ms=$P" 2>/dev/null; then MISS=0; else MISS=$((MISS + 1)); fi
+      [ $MISS -ge 5 ] && { kill $G 2>/dev/null; break; }
       # плеер считает время своего куска с нуля: с какой секунды трека он начат, знает компьютер — спрашиваем один раз
       [ -z "$OFF" ] && OFF=$(wget -q -T 2 -O - "$B/o/$T" 2>/dev/null)
       [ -z "$OFF" ] && OFF=0

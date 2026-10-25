@@ -228,3 +228,9 @@ test('пульс кольца: кадры берутся у окна, показ
   const off = S.playScript({ url: URL_OK, level: 0.5, display: true, keys: true, ring: false });
   assert.ok(off.includes(`run.sh ${URL_OK} 1 1 0`));
 });
+
+test('окно пропало: пять вестей подряд не дошли — колонка останавливается сама, а не играет вслепую', () => {
+  const sh = S.playScript({ url: URL_OK, level: 0.5, display: true, keys: true, ring: true });
+  assert.ok(sh.includes('then MISS=0; else MISS=$((MISS + 1)); fi'), 'промахи считаются');
+  assert.ok(sh.includes('[ $MISS -ge 5 ] && { kill $G 2>/dev/null; break; }'), 'после пяти — плеер останавливается');
+});
