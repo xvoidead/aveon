@@ -5,7 +5,7 @@
 // Общие глобальные из app.js: state, api, $, $$, esc, toast, ask, saveCfg, VIEWS, NAMES, IS_MOBILE, openView.
 
 const LOOK_DEFAULTS = {
-  skin: 'glass',         // дизайн целиком, см. SKINS; по умолчанию — «Стекло» (кто выбирал сам, остаётся на своём)
+  skin: 'aveon',         // дизайн целиком, см. SKINS; по умолчанию — «Авеон» (кто выбирал сам, остаётся на своём)
   glassMode: 'auto',     // «Стекло»: auto — как в системе, light | dark
   theme: 'oak',          // см. THEMES; custom — свой оттенок фона
   hue: 25,               // custom: оттенок фона 0…360
@@ -40,7 +40,7 @@ const LOOK_DEFAULTS = {
   badge: true,           // плашка «в бочке» на обложке
   vinyl: true,           // обложка крутится как пластинка, пока играет (scratch.js)
   scratch: true,         // обложку можно схватить и скретчить
-  dock: 'left',          // где плеер на компьютере: left | right | bottom | top
+  dock: 'auto',          // где плеер на компьютере: auto — как задумано в дизайне (SKINS → dock), left | right | bottom | top
   reactGain: 100,        // реакция на звук: чувствительность, % (спектр, остров, обои, пульс)
   reactSmooth: 70,       // плавность: 0 — дёргается за каждым ударом, 90 — течёт медленно
   reactCover: false,     // обложка в бочке пульсирует на басах
@@ -51,7 +51,7 @@ const LOOK_DEFAULTS = {
   fsMotion: true,        // фон медленно плывёт
   fsClock: false,        // часы в углу
   fsLyrics: true,        // текст песни во весь экран
-  designs: [],           // свои дизайны (designer.js, design-core.js); выбранный — skin: 'd:<id>'
+  sideRail: false,       // «Авеон»: панель разделов свёрнута в ленту значков (кнопка в панели, Ctrl+B)
 };
 
 // Фон: [оттенок, насыщенность %] — светлоты те же, что у палитры из обложки (extras.js → setTheme)
@@ -73,9 +73,22 @@ const THEMES = {
 // акцент из обложки. Весь вид — в styles.css (html.skin-form)
 // У дизайна может быть: display/text — шрифты по умолчанию (ключи FONTS; свой выбор в настройках главнее),
 // radius — множитель скруглений, palette — свои цвета вместо темы (тогда и «фон в цвет обложки» выключен),
-// accent — свой акцент вместо цвета обложки.
+// accent — свой акцент вместо цвета обложки, dock — где плеер, пока в настройках «как в дизайне»,
+// base — дизайн-основа: на <html> встаёт и её класс, её правила работают снизу (у «Авеона» — «Стекло»).
 // Сам вид — в styles.css под html.skin-<id>
 const SKINS = {
+  // Авеон: слева панель разделов, по центру музыка, справа «сейчас играет» — панель в цвет обложки.
+  // Стоит на «Стекле» (готовая размытая обложка, квадратная обложка без спектра), сверху — свой слой aveon.css
+  aveon: {
+    name: 'Авеон', desc: 'Разделы слева, плеер справа, всё в цвет обложки', display: 'unbounded', text: 'manrope', dock: 'right', base: 'glass',
+    live: true, // плеер живёт под музыку: басы и громкость (--beat, --level) — reactLoop ниже
+    rail: true, // панель разделов умеет сворачиваться в ленту значков (applyRail)
+    palettes: {
+      light: { '--oak': '#f4f4f6', '--oak-2': '#ebebef', '--rivet': '#ffffff', '--rivet-2': '#e1e1e7', '--hoop-dim': '#c6c6cf', '--hoop': '#8b8b96', '--text': '#17171c', '--text-2': '#4c4c57', '--text-3': '#6e6e7a', '--voice': '#5847d6', '--danger': '#c4302b' },
+      dark: { '--oak': '#101013', '--oak-2': '#16161a', '--rivet': '#1d1d22', '--rivet-2': '#2a2a31', '--hoop-dim': '#44444d', '--hoop': '#8b8b96', '--text': '#f2f2f5', '--text-2': '#b9b9c3', '--text-3': '#8a8a96', '--voice': '#a89bff' },
+    },
+    ambient: true, noViz: true, noVinyl: true,
+  },
   barrel: { name: 'Бочка', desc: 'Круглая обложка в обручах, вкладки сверху' },
   form: { name: 'Форма', desc: 'Панель навигации слева, карточки, живые формы и волны', display: 'manrope', text: 'manrope', radius: 1.5 },
   // Дзен: светлая бумага, тушь, энсо вокруг обложки и красная печать — единственный цвет
@@ -109,7 +122,38 @@ darkQuery.addEventListener('change', () => { if (SKINS[look.skin]?.palettes && l
 
 const ACCENTS = ['#f0a63a', '#ff7b6b', '#f5d547', '#7ed49a', '#5cc8e8', '#9aa8ff', '#c792ea', '#ff8ac6', '#e8e1d5'];
 
-const FONTS = DesignCore.FONTS; // общие со своими дизайнами (design-core.js)
+// Шрифты на выбор (раздел «Шрифты»). files — стили @fontsource, которые ensureFont подключает, только когда шрифт выбран
+const FONTS = {
+  unbounded: { name: 'Unbounded', css: '"Unbounded", "Segoe UI", sans-serif' },
+  manrope: { name: 'Manrope', css: '"Manrope", "Segoe UI", sans-serif' },
+  jost: { name: 'Jost', css: '"Jost", "Segoe UI", sans-serif' },
+  onest: { name: 'Onest', css: '"Onest", "Segoe UI", sans-serif' },
+  inter: { name: 'Inter', css: '"Inter", "Segoe UI", sans-serif', files: ['inter/400', 'inter/500', 'inter/600', 'inter/700'] },
+  montserrat: { name: 'Montserrat', css: '"Montserrat", "Segoe UI", sans-serif', files: ['montserrat/400', 'montserrat/500', 'montserrat/600', 'montserrat/700'] },
+  rubik: { name: 'Rubik', css: '"Rubik", "Segoe UI", sans-serif', files: ['rubik/400', 'rubik/500', 'rubik/600', 'rubik/700'] },
+  nunito: { name: 'Nunito', css: '"Nunito", "Segoe UI", sans-serif', files: ['nunito/400', 'nunito/500', 'nunito/600', 'nunito/700'] },
+  comfortaa: { name: 'Comfortaa', css: '"Comfortaa", "Segoe UI", sans-serif', files: ['comfortaa/400', 'comfortaa/500', 'comfortaa/600', 'comfortaa/700'] },
+  raleway: { name: 'Raleway', css: '"Raleway", "Segoe UI", sans-serif', files: ['raleway/400', 'raleway/500', 'raleway/600', 'raleway/700'] },
+  exo2: { name: 'Exo 2', css: '"Exo 2", "Segoe UI", sans-serif', files: ['exo-2/400', 'exo-2/500', 'exo-2/600', 'exo-2/700'] },
+  oswald: { name: 'Oswald', css: '"Oswald", "Segoe UI", sans-serif', files: ['oswald/400', 'oswald/500', 'oswald/600', 'oswald/700'] },
+  ubuntu: { name: 'Ubuntu', css: '"Ubuntu", "Segoe UI", sans-serif', files: ['ubuntu/400', 'ubuntu/500', 'ubuntu/700'] },
+  system: { name: 'Системный', css: 'system-ui, "Segoe UI", Roboto, sans-serif' },
+  playfair: { name: 'Playfair Display', css: '"Playfair Display", Georgia, "Times New Roman", serif', files: ['playfair-display/400', 'playfair-display/500', 'playfair-display/600', 'playfair-display/700'] },
+  ptserif: { name: 'PT Serif', css: '"PT Serif", Georgia, "Times New Roman", serif', files: ['pt-serif/400', 'pt-serif/700'] },
+  robotoslab: { name: 'Roboto Slab', css: '"Roboto Slab", Georgia, "Times New Roman", serif', files: ['roboto-slab/400', 'roboto-slab/500', 'roboto-slab/600', 'roboto-slab/700'] },
+  lora: { name: 'Lora', css: '"Lora", Georgia, "Times New Roman", serif', files: ['lora/400', 'lora/500', 'lora/600', 'lora/700'] },
+  yeseva: { name: 'Yeseva One', css: '"Yeseva One", Georgia, "Times New Roman", serif', files: ['yeseva-one/400'] },
+  serif: { name: 'Georgia', css: 'Georgia, "Times New Roman", "Noto Serif", serif' },
+  jetbrains: { name: 'JetBrains Mono', css: '"JetBrains Mono", "Cascadia Mono", Consolas, monospace', files: ['jetbrains-mono/400', 'jetbrains-mono/500', 'jetbrains-mono/600', 'jetbrains-mono/700'] },
+  firacode: { name: 'Fira Code', css: '"Fira Code", "Cascadia Mono", Consolas, monospace', files: ['fira-code/400', 'fira-code/500', 'fira-code/600', 'fira-code/700'] },
+  mono: { name: 'Cascadia Mono', css: '"Cascadia Mono", Consolas, "Roboto Mono", monospace' },
+  russo: { name: 'Russo One', css: '"Russo One", "Segoe UI", sans-serif', files: ['russo-one/400'] },
+  pixel: { name: 'Press Start 2P', css: '"Press Start 2P", "Segoe UI", sans-serif', files: ['press-start-2p/400'] },
+  lobster: { name: 'Lobster', css: '"Lobster", "Segoe UI", sans-serif', files: ['lobster/400'] },
+  pacifico: { name: 'Pacifico', css: '"Pacifico", "Segoe UI", sans-serif', files: ['pacifico/400'] },
+  caveat: { name: 'Caveat', css: '"Caveat", "Segoe UI", sans-serif', files: ['caveat/400', 'caveat/500', 'caveat/600', 'caveat/700'] },
+  marck: { name: 'Marck Script', css: '"Marck Script", "Segoe UI", sans-serif', files: ['marck-script/400'] },
+};
 
 // Шрифт подключаем, только когда его выбрали: стили @fontsource лежат в node_modules, как у встроенных в index.html
 const fontLinks = new Set();
@@ -136,25 +180,38 @@ const lookStyle = document.createElement('style');
 lookStyle.id = 'look-vars';
 document.head.appendChild(lookStyle);
 
-// Свой дизайн: правила из design-core.js → designCss. Отдельный <style>, чтобы менять его, не трогая переменные
-const designStyle = document.createElement('style');
-designStyle.id = 'look-design';
-document.head.appendChild(designStyle);
-
-// Дизайн на экране: черновик из редактора (designer.js) или сохранённый и выбранный
-let designDraft = null;
-function activeDesign(l = look) {
-  if (designDraft) return designDraft;
-  if (typeof l.skin !== 'string' || !l.skin.startsWith('d:')) return null;
-  const found = (l.designs || []).find((d) => d?.id === l.skin.slice(2));
-  return found ? DesignCore.cleanDesign(found) : null;
-}
-// Готовый дизайн под экраном: основа своего, выбранный готовый; свой удалили (например, на другом устройстве) — по умолчанию
+// Дизайн на экране. 'd:<id>' остался от убранного конструктора своих дизайнов — такие показываем дизайном по умолчанию.
+// На телефоне «Авеона» нет (там своя раскладка, mobile.css) — вместо него «Стекло», на котором он стоит
 function baseSkinId(l = look) {
-  const d = activeDesign(l);
-  if (d) return d.base;
-  if (SKINS[l.skin]) return l.skin;
-  return String(l.skin).startsWith('d:') ? LOOK_DEFAULTS.skin : 'barrel';
+  const id = SKINS[l.skin] ? l.skin : String(l.skin).startsWith('d:') ? LOOK_DEFAULTS.skin : 'barrel';
+  return IS_MOBILE && SKINS[id].base ? SKINS[id].base : id;
+}
+// Где плеер: выбранное в настройках, а пока там «как в дизайне» — как задумано в дизайне
+const dockSide = (l = look) => (l.dock === 'auto' ? SKINS[baseSkinId(l)].dock || 'left' : l.dock);
+
+// Панель разделов лентой значков (aveon.css → html.side-rail): свернул сам — или само, когда ей негде быть
+// во всю ширину: узкое окно, плеер полосой снизу или сверху (side-rail-forced — тогда и кнопки развернуть нет)
+const narrowQuery = matchMedia('(max-width: 1100px)');
+function applyRail() {
+  const root = document.documentElement;
+  const can = !IS_MOBILE && !!SKINS[baseSkinId()].rail;
+  const forced = can && (narrowQuery.matches || ['bottom', 'top'].includes(dockSide()));
+  root.classList.toggle('side-rail', can && (forced || !!look.sideRail));
+  root.classList.toggle('side-rail-forced', forced);
+  const btn = document.getElementById('side-toggle');
+  if (btn) {
+    const label = look.sideRail ? 'Развернуть панель' : 'Свернуть панель';
+    btn.setAttribute('aria-label', label);
+    btn.title = `${label} (Ctrl+B)`;
+    btn.setAttribute('aria-expanded', String(!look.sideRail));
+  }
+  requestAnimationFrame(() => moveSourceInk?.(true)); // app.js: плашка выбранного раздела — под новую ширину
+}
+narrowQuery.addEventListener('change', applyRail);
+function toggleSideRail() {
+  if (IS_MOBILE || !SKINS[baseSkinId()].rail) return;
+  saveLook({ sideRail: !look.sideRail });
+  rerenderLook?.(); // в настройках — тот же переключатель
 }
 
 function themeVars(l) {
@@ -175,53 +232,45 @@ function applyLook() {
   look = lookCfg();
   window.LOOK = look;
   const root = document.documentElement;
-  const design = activeDesign();
   const skinId = baseSkinId();
   const skin = SKINS[skinId];
   const mode = skinMode(skin);
   const palette = mode ? skin.palettes[mode] : skin.palette;
   const vars = palette ? { ...palette } : themeVars(look);
   if (look.voice) vars['--voice'] = look.voice;
-  // Свой дизайн: его цвета главнее темы и основы; акцент фиксированный, только если он не «из обложки»
-  const own = design ? DesignCore.paletteVars(design) : {};
-  Object.assign(vars, own);
-  const fixedAccent = design ? (design.accentFromCover ? null : own['--amber'] || skin.accent) : skin.accent;
+  const fixedAccent = skin.accent;
   if (look.accentMode === 'fixed') vars['--amber'] = look.accent;
   else if (fixedAccent) vars['--amber'] = fixedAccent;
   // extras.js → setTheme: палитра обложки не перекрашивает фон, акцент и голоса дизайнов со своими цветами;
   // на светлом фоне акцент из обложки темнее, а фон сцены — готовая размытая обложка (ambientFrom)
-  window.SKIN_FIXED = !!palette || (!!design && DesignCore.fixesBg(design));
+  window.SKIN_FIXED = !!palette;
   window.SKIN_ACCENT = !!fixedAccent;
-  window.SKIN_VOICE = !!own['--voice'];
+  window.SKIN_VOICE = false;
   window.SKIN_LIGHT = mode === 'light';
   window.SKIN_AMBIENT = !!skin.ambient;
+  window.SKIN_LIVE = !!skin.live && look.motion !== 'off'; // reactLoop: пульс без отдельных галочек «реакции»
   // Спектр и вращение пластинки дизайну не нужны — выключаем в том, что читают их циклы (app.js, scratch.js),
   // сами настройки не трогаем: в другом дизайне они вернутся
   if (skin.noViz || skin.noVinyl) {
     window.LOOK = { ...look, ...(skin.noViz ? { viz: false } : {}), ...(skin.noVinyl ? { vinyl: false, scratch: false } : {}) };
   }
-  const display = design?.fonts.display || (skin.display && look.display === LOOK_DEFAULTS.display ? skin.display : look.display);
-  const text = design?.fonts.text || (skin.text && look.text === LOOK_DEFAULTS.text ? skin.text : look.text);
+  const display = skin.display && look.display === LOOK_DEFAULTS.display ? skin.display : look.display;
+  const text = skin.text && look.text === LOOK_DEFAULTS.text ? skin.text : look.text;
   ensureFont(display);
   ensureFont(text);
-  if (design) for (const v of Object.values(design.parts)) if (v.font) ensureFont(v.font);
   vars['--display'] = (FONTS[display] || FONTS.unbounded).css;
   vars['--ui'] = (FONTS[text] || FONTS.onest).css;
   vars['--lyrics-scale'] = String(look.lyricsSize / 100);
   vars['--wall-blur'] = `${look.wallBlur}px`;
   vars['--wall-dim'] = String(look.wallDim / 100);
   lookStyle.textContent = `:root { ${Object.entries(vars).map(([k, v]) => `${k}: ${v};`).join(' ')} }`;
-  const css = design ? DesignCore.designCss(design) : '';
-  if (designStyle.textContent !== css) designStyle.textContent = css;
 
   // Размер интерфейса: CSS zoom масштабирует всё сразу, и раскладка остаётся живой
   root.style.zoom = look.scale === 100 ? '' : String(look.scale / 100);
   root.style.setProperty('--ui-zoom', String(look.scale / 100)); // 100vh внутри zoom — в пикселях без него (styles.css, обложка «Стекла»)
+  const dock = dockSide();
   const cls = {
-    ...Object.fromEntries(Object.keys(SKINS).filter((id) => id !== 'barrel').map((id) => [`skin-${id}`, skinId === id])),
-    'skin-design': !!design,
-    // что-то сдвинуто или увеличено: области перетаскивания окна считаются без translate/scale — styles.css
-    'design-moved': !!design && Object.entries(design.parts || {}).some(([id, v]) => v.move || (v.size && DesignCore.PARTS.find((p) => p.id === id)?.scaleSize)),
+    ...Object.fromEntries(Object.keys(SKINS).filter((id) => id !== 'barrel').map((id) => [`skin-${id}`, skinId === id || skin.base === id])),
     'glass-light': mode === 'light', 'glass-dark': mode === 'dark',
     'look-compact': look.density === 'compact', 'look-cozy': look.density === 'cozy',
     'look-no-covers': !look.covers, 'look-no-album': !look.albumCol, 'look-no-time': !look.timeCol,
@@ -235,12 +284,13 @@ function applyLook() {
     // префикс look-: классы на <html> не должны совпадать с классами элементов (у часов — .fs-clock)
     'look-fs-cinema': look.fsStyle === 'cinema', 'look-fs-gradient': look.fsBg === 'gradient', 'look-fs-plain': look.fsBg === 'plain',
     'look-fs-motion': look.fsMotion, 'look-fs-clock': look.fsClock, 'look-fs-no-lyrics': !look.fsLyrics,
-    'dock-right': !IS_MOBILE && look.dock === 'right', 'dock-bottom': !IS_MOBILE && look.dock === 'bottom', 'dock-top': !IS_MOBILE && look.dock === 'top',
+    'dock-right': !IS_MOBILE && dock === 'right', 'dock-bottom': !IS_MOBILE && dock === 'bottom', 'dock-top': !IS_MOBILE && dock === 'top',
   };
   for (const [k, on] of Object.entries(cls)) root.classList.toggle(k, on);
-  applyRadius((look.radius / 100) * (skin.radius || 1) * (design ? design.radius / 100 : 1));
+  applyRadius((look.radius / 100) * (skin.radius || 1));
   requestAnimationFrame(() => moveSourceInk?.(true)); // app.js: вкладки то сверху, то слева
   applySources();
+  applyRail();
   reapplyTheme?.(); // extras.js: палитра из обложки знает, трогать ли акцент
 }
 
@@ -364,13 +414,11 @@ function lookCode() {
   return `AVL1.${btoa(unescape(encodeURIComponent(JSON.stringify(rest))))}`;
 }
 async function pasteLook() {
-  const code = await ask({ title: 'Вставить код', text: 'Код оформления начинается с AVL1., код дизайна — с AVD1. Своя картинка фона останется как есть.', ok: 'Применить', value: '' });
+  const code = await ask({ title: 'Вставить код', text: 'Код оформления начинается с AVL1. Своя картинка фона останется как есть.', ok: 'Применить', value: '' });
   if (!code) return;
-  if (code.trim().startsWith(DesignCore.CODE_PREFIX)) { await importDesign(code); return; } // designer.js
   try {
     const data = JSON.parse(decodeURIComponent(escape(atob(code.trim().replace(/^AVL1\./, '')))));
     const clean = Object.fromEntries(Object.entries(data).filter(([k]) => k in LOOK_DEFAULTS && k !== 'wallpaper'));
-    if ('designs' in clean) clean.designs = (Array.isArray(clean.designs) ? clean.designs : []).slice(0, DesignCore.MAX_DESIGNS).map((d) => DesignCore.cleanDesign(d));
     await saveLook(clean);
     rerenderLook();
     toast('Оформление применено');
@@ -390,32 +438,26 @@ const range = (key, label, min, max, step, val, unit) => `<div class="field"><la
 // Только на компьютере: где стоит плеер (остров, мини-плеер и прочее — в разделе «Остров и окна», desk.js)
 function dockSection(l) {
   if (IS_MOBILE) return '';
+  const rail = SKINS[baseSkinId(l)].rail ? sw('sideRail', 'Свернуть панель разделов', l.sideRail) : '';
   return `<section class="sec" data-sec="dock">
     <h3 class="sec-title">Где плеер</h3>
-    <div class="field"><label>Плеер</label><div class="ctl">${seg('dock', [['left', 'Слева'], ['right', 'Справа'], ['bottom', 'Снизу'], ['top', 'Сверху']], l.dock)}</div></div>
+    ${rail}
+    <div class="field"><label>Плеер</label><div class="ctl">${seg('dock', [['left', 'Слева'], ['right', 'Справа'], ['bottom', 'Снизу'], ['top', 'Сверху']], dockSide(l))}</div></div>
   </section>`;
 }
 
-// Выбор дизайна: карточки с маленьким макетом каждого; свои — тем же макетом в своих цветах (designer.js)
+// Выбор дизайна: карточки с маленьким макетом каждого. На телефоне — без дизайнов с основой (их там заменяет основа)
 function skinSection(l) {
-  const mock = (id, d) => `<span class="skin-mock is-${id}" aria-hidden="true"${d ? ` style="${Object.entries(DesignCore.paletteVars(d)).map(([k, v]) => `${k}:${v}`).join(';')}"` : ''}>
+  const mock = (id) => `<span class="skin-mock is-${id}" aria-hidden="true">
     <span class="sm-rail"><i></i><i></i><i></i><i></i></span>
     <span class="sm-stage"><span class="sm-cover"></span><span class="sm-t"></span><span class="sm-a"></span><span class="sm-bar"></span><span class="sm-play"></span></span>
-    <span class="sm-lib"><span class="sm-h"${d ? ` data-label="${esc(d.name)}"` : ''}></span>${'<span class="sm-row"><i></i><b></b></span>'.repeat(5)}</span>
+    <span class="sm-lib"><span class="sm-h"></span>${'<span class="sm-row"><i></i><b></b></span>'.repeat(5)}</span>
   </span>`;
-  const designs = (l.designs || []).map((d) => DesignCore.cleanDesign(d));
-  const card = (d) => `<div class="look-skin look-design${l.skin === `d:${d.id}` ? ' on' : ''}" role="button" tabindex="0" data-design="${d.id}">
-    ${mock(d.base, d)}<span class="skin-name">${esc(d.name)}</span><small>На основе «${SKINS[d.base].name}»</small>
-    <button class="icon-btn small look-design-more" data-design-more="${d.id}" aria-label="Ещё: «${esc(d.name)}»" aria-haspopup="menu" aria-expanded="false"><svg><use href="#i-more"/></svg></button></div>`;
   return `<section class="sec" data-sec="skin">
     <h3 class="sec-title">Дизайн</h3>
     <p class="sec-desc">Внешний вид всего плеера. Акцент, шрифты и остальное ниже работают во всех.</p>
-    <div class="look-skins">${Object.entries(SKINS).map(([id, s]) => `<button class="look-skin${l.skin === id ? ' on' : ''}" data-skin="${id}">
+    <div class="look-skins">${Object.entries(SKINS).filter(([, s]) => !(IS_MOBILE && s.base)).map(([id, s]) => `<button class="look-skin${baseSkinId(l) === id ? ' on' : ''}" data-skin="${id}">
       ${mock(id)}<span class="skin-name">${s.name}</span><small>${s.desc}</small></button>`).join('')}</div>
-    <h4 class="look-sub">Мои дизайны</h4>
-    <div class="look-skins">${designs.map(card).join('')}<button class="look-skin look-design-new" id="look-design-new">
-      <span class="skin-mock look-design-plus" aria-hidden="true"><svg><use href="#i-plus"/></svg></span>
-      <span class="skin-name">Создать дизайн</span><small>Цвета, шрифты и каждая часть плеера — без кода</small></button></div>
     ${SKINS[baseSkinId(l)]?.palettes ? `<div class="field"><label>Тема</label><div class="ctl">${seg('glassMode', [['auto', 'Как в системе'], ['light', 'Светлая'], ['dark', 'Тёмная']], l.glassMode)}</div></div>` : ''}
   </section>`;
 }
@@ -567,13 +609,6 @@ function bindLook(body) {
     .forEach((s) => { s.dataset.lookRoot = '1'; });
 
   $$('[data-skin]', body).forEach((b) => { b.onclick = async () => { await saveLook({ skin: b.dataset.skin }); rerenderLook(); }; });
-  $$('[data-design]', body).forEach((c) => {
-    const pick = async () => { await saveLook({ skin: `d:${c.dataset.design}` }); rerenderLook(); };
-    c.onclick = (e) => { if (!e.target.closest('[data-design-more]')) pick(); };
-    c.onkeydown = (e) => { if ((e.key === 'Enter' || e.key === ' ') && e.target === c) { e.preventDefault(); pick(); } };
-  });
-  $$('[data-design-more]', body).forEach((b) => { b.onclick = (e) => { e.stopPropagation(); designMenu(b.dataset.designMore, b); }; });
-  $('#look-design-new', body).onclick = () => openDesigner(null); // designer.js
   $$('[data-theme]', body).forEach((b) => { b.onclick = async () => { await saveLook({ theme: b.dataset.theme }); rerenderLook(); }; });
   $$('[data-look-seg]', body).forEach((g) => {
     $$('button', g).forEach((b) => { b.onclick = async () => { await saveLook({ [g.dataset.lookSeg]: b.dataset.v }); rerenderLook(); }; });
@@ -647,12 +682,12 @@ function bindLook(body) {
   };
   $('#look-paste', body).onclick = pasteLook;
   $('#look-reset', body).onclick = async () => {
-    const ok = await ask({ title: 'Сбросить оформление?', text: 'Тема, цвета, шрифты, размеры и вкладки вернутся как было. Картинка фона уберётся, свои дизайны останутся.', ok: 'Сбросить', input: false, danger: true });
+    const ok = await ask({ title: 'Сбросить оформление?', text: 'Дизайн, тема, цвета, шрифты, размеры и вкладки вернутся как было. Картинка фона уберётся.', ok: 'Сбросить', input: false, danger: true });
     if (ok === null) return;
     await api.store.set('wallpaper', null).catch(() => {});
     wallpaperUrl = '';
     wallEl.style.backgroundImage = '';
-    await saveLook({ ...LOOK_DEFAULTS, designs: look.designs });
+    await saveLook({ ...LOOK_DEFAULTS });
     rerenderLook();
   };
 }
@@ -675,7 +710,7 @@ function reactStep(prev, x) {
 
 function reactLoop() {
   if (window.WIN_MOVING) { requestAnimationFrame(reactLoop); return; } // окно тащат — пульс замер (app.js)
-  const on = look.reactCover || look.reactGlow || look.reactHoops;
+  const on = look.reactCover || look.reactGlow || look.reactHoops || window.SKIN_LIVE;
   const root = stageStyle();
   if (on && fx.analyser && !audio.paused && !document.hidden) {
     const data = reactBins.subarray(0, fx.analyser.frequencyBinCount);

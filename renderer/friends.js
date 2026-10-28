@@ -493,9 +493,11 @@ function placeFriends() {
   if (friendsEl.hidden) return;
   const r = friendsBtn.getBoundingClientRect();
   const w = friendsEl.offsetWidth, h = friendsEl.offsetHeight, edge = 12;
-  const left = Math.min(Math.max(edge, r.right - w), innerWidth - w - edge);
+  let left = Math.min(Math.max(edge, r.right - w), innerWidth - w - edge);
   let top = r.bottom + 8;
   if (top + h > innerHeight - edge) top = Math.max(edge, innerHeight - edge - h);
+  // кнопка у левого края окна (панель разделов «Авеона») — панель открывается справа от неё, низом к кнопке
+  if (r.right - w < edge) { left = Math.min(r.right + 8, innerWidth - w - edge); top = Math.max(edge, Math.min(r.bottom - h, innerHeight - edge - h)); }
   friendsEl.style.left = `${left}px`;
   friendsEl.style.top = `${top}px`;
 }

@@ -893,19 +893,27 @@ function prev(force = false) {
 // ---------- сейчас играет ----------
 
 
+let nowAt = { track: null, queue: null, pos: -1 }; // прошлый показанный трек и его место в очереди (showNow)
 function showNow(track, stream) {
   state.via = stream?.via || null;
   $('#now-title').textContent = track.title;
   $('#now-title').toggleAttribute('data-explicit', !!track.explicit); // значок 18+ (styles.css)
-  // новый трек: класс fresh на миг — по нему дизайны проигрывают свою анимацию (в «Дзене» энсо и печать)
+  // новый трек: класс fresh на миг — по нему дизайны проигрывают свою анимацию (в «Дзене» энсо и печать).
+  // showNow зовут дважды на трек (сразу и когда пришёл поток) — анимация только на первый раз
   const barrelEl = $('#barrel');
-  barrelEl.classList.remove('fresh');
-  void barrelEl.offsetWidth;
-  barrelEl.classList.add('fresh');
+  if (track !== nowAt.track) {
+    // откуда въезжает новая обложка (aveon.css): назад по очереди — слева, вперёд или новый список — справа
+    barrelEl.dataset.dir = state.queue === nowAt.queue && state.pos < nowAt.pos ? 'prev' : 'next';
+    nowAt = { track, queue: state.queue, pos: state.pos };
+    barrelEl.classList.remove('fresh');
+    void barrelEl.offsetWidth;
+    barrelEl.classList.add('fresh');
+  }
   $('#btn-now-album').disabled = false;
   $('#btn-now-sc').disabled = false;
   $('#btn-now-sc').hidden = track.source === 'sc'; // из SoundCloud и так — кнопку прячем
   renderNowLike();
+  window.renderUpNext?.(); // upnext.js: «дальше» — от нового места в очереди
   $('#now-artist').innerHTML = track.artist ? artistLinks(track.artist) : 'Исполнитель неизвестен'; // имя — ссылка на артиста
   $('#now-cover').innerHTML = track.cover ? `<img src="${esc(track.cover)}" alt="">` : '<span class="porthole-empty">♪</span>';
   const via = $('#now-via');
@@ -1851,7 +1859,10 @@ function animateViewSwitch(from, to) {
     el.classList.remove('tab-in-r', 'tab-in-l');
     void el.offsetWidth; // перезапуск анимации, если переключают быстро
     el.classList.add(cls);
-    el.addEventListener('animationend', () => el.classList.remove(cls), { once: true });
+    // снимаем по таймеру, а не по animationend: оно всплывает и от строк, которые в «Авеоне» въезжают лесенкой
+    // дольше самого блока (aveon.css), и обрезало бы их. Таймер свой у каждого блока — быстрое переключение его сбрасывает
+    clearTimeout(el._tabIn);
+    el._tabIn = setTimeout(() => el.classList.remove(cls), 1000);
   }
 }
 
@@ -3010,12 +3021,14 @@ function toggleShuffle() {
   saveCfg({ shuffle: state.cfg.shuffle });
   if (state.queue.length) buildOrder(state.order[state.pos]);
   renderModes();
+  window.renderUpNext?.();
 }
 
 function cycleRepeat() {
   state.cfg.repeat = { off: 'all', all: 'one', one: 'off' }[state.cfg.repeat];
   saveCfg({ repeat: state.cfg.repeat });
   renderModes();
+  window.renderUpNext?.(); // upnext.js: с повтором всего очередь идёт по кругу
 }
 
 function renderModes() {
@@ -3099,8 +3112,9 @@ document.addEventListener('keydown', (e) => {
     return;
   }
   // клавиши — по месту на клавиатуре (e.code), а не по букве: работают на любой раскладке
-  if (e.ctrlKey && e.code === 'KeyF') { e.preventDefault(); closeSettings(); searchInput.focus(); searchInput.select(); return; }
+  if (e.ctrlKey && (e.code === 'KeyF' || e.code === 'KeyK')) { e.preventDefault(); closeSettings(); searchInput.focus(); searchInput.select(); return; }
   if (e.ctrlKey && e.code === 'Comma') { e.preventDefault(); openSettings(); return; }
+  if (e.ctrlKey && e.code === 'KeyB') { e.preventDefault(); toggleSideRail(); return; } // look.js: панель разделов «Авеона»
   if (typing) return;
   if (e.code === 'Space') { e.preventDefault(); togglePlay(); }
   else if (e.ctrlKey && e.key === 'ArrowRight') next();
@@ -3120,6 +3134,8 @@ document.addEventListener('keydown', (e) => {
 // ---------- окно ----------
 
 $$('[data-win]').forEach((b) => { b.onclick = () => api.win.action(b.dataset.win); });
+$('#open-settings-side').onclick = () => openSettings(); // панель разделов «Авеона» (aveon.css)
+$('#side-toggle').onclick = () => toggleSideRail(); // look.js
 
 // Кнопки окна прячутся и проявляются, когда курсор подходит к правому верхнему углу (зона — в main.js)
 let winHideTimer = 0;
