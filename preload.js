@@ -170,6 +170,11 @@ contextBridge.exposeInMainWorld('tishe', {
     state: () => call('dl:state'),
     onEvent: (cb) => on('cache:changed', cb),
   },
+  voice: {
+    status: () => call('voice:status'),
+    download: () => call('voice:download'),
+    onProgress: (cb) => on('voice:progress', cb),
+  },
   cache: {
     info: () => call('cache:info'),
     clear: (kind) => call('cache:clear', kind),

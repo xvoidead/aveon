@@ -1,0 +1,686 @@
+/* =====================================================================================
+   ДИЗАЙН «АВЕОН» (look.js → skin: 'aveon', на <html> — skin-aveon и skin-glass: он стоит на «Стекле»)
+   Три зоны окна, как у настольного плеера:
+   · слева — панель разделов прямо на фоне окна (это .lib-top, вынесенная position: fixed);
+     уже 1100 px она складывается в узкую ленту значков, подписи выезжают при наведении;
+   · по центру — музыка: лист с волосяной рамкой, поиск сверху (Ctrl+K / Ctrl+F);
+   · справа — «сейчас играет» (.stage): обложка-конверт и всё управление на листе цвета обложки —
+     сверху просвечивает та же готовая размытая обложка (extras.js → --ambient), книзу лист плотнеет.
+   Яркое здесь одно — лист «сейчас играет». Остальное спокойное: графит, тонкие линии, акцент из
+   обложки только на том, что активно (играющая строка, включённые кнопки, фокус).
+   «В бочке» (идёт разговор, --m → 1): конверт отступает вглубь, по краю — кольцо цвета голосов.
+   Селекторы — html.skin-aveon.skin-aveon: на ступень сильнее правил «Стекла», которые остаются снизу.
+   ===================================================================================== */
+
+html.skin-aveon.skin-aveon {
+  --side: 232px;                      /* панель разделов */
+  --np: clamp(300px, 27vw, 372px);    /* «сейчас играет» */
+  --gap: 8px;
+  --ground: var(--oak);               /* фон окна, на нём панель разделов */
+  --sheet: var(--oak-2);              /* лист музыки и лист «сейчас играет» */
+  --line: rgb(255 255 255 / .065);
+  --line-2: rgb(255 255 255 / .11);
+  --hover: rgb(255 255 255 / .045);
+  --ink: rgb(255 255 255 / .075);     /* выбранный раздел */
+  --ease: cubic-bezier(.2, .8, .2, 1);
+  --cover-shadow: 0 30px 60px -22px rgb(0 0 0 / .8), 0 12px 24px -14px rgb(0 0 0 / .55);
+  --pop-shadow: 0 24px 64px rgb(0 0 0 / .6), 0 0 0 1px rgb(255 255 255 / .08);
+  --card-shadow: none;
+
+  &.glass-light {
+    --ground: var(--oak-2);
+    --sheet: var(--rivet);
+    --line: rgb(0 0 0 / .07);
+    --line-2: rgb(0 0 0 / .12);
+    --hover: rgb(0 0 0 / .04);
+    --ink: rgb(0 0 0 / .065);
+    --cover-shadow: 0 26px 50px -22px rgb(40 30 60 / .45), 0 10px 20px -14px rgb(0 0 0 / .3);
+    --pop-shadow: 0 24px 60px rgb(0 0 0 / .16), 0 0 0 1px rgb(0 0 0 / .07);
+  }
+
+  & body { letter-spacing: 0; font-feature-settings: "ss01", "tnum" 0; }
+  & ::selection { background: color-mix(in srgb, var(--amber) 32%, transparent); }
+  & :focus-visible { outline: 2px solid color-mix(in srgb, var(--amber) 75%, var(--text)); outline-offset: 2px; }
+  & ::-webkit-scrollbar { width: 10px; height: 10px; }
+  & ::-webkit-scrollbar-thumb { border: 3px solid transparent; border-radius: 99px; background: var(--fill-2) padding-box; }
+  & ::-webkit-scrollbar-thumb:hover { background-color: var(--hoop-dim); }
+
+  /* ---------------------------------------------------------------------------------
+     ОКНО: три зоны на компьютере (плеер слева или справа)
+     --------------------------------------------------------------------------------- */
+  &:not(.mobile) body {
+    padding: var(--gap) var(--gap) var(--gap) var(--side);
+    column-gap: var(--gap);
+    grid-template-columns: var(--np) minmax(0, 1fr);
+    background: var(--ground);
+  }
+  &.dock-right:not(.mobile) body { grid-template-columns: minmax(0, 1fr) var(--np); }
+  &:is(.dock-bottom, .dock-top):not(.mobile) body { grid-template-columns: minmax(0, 1fr); row-gap: var(--gap); }
+
+  /* кнопки окна — над листом справа: тише, чем в базе, и со скруглённым углом листа */
+  & .win-buttons { padding: 0; }
+  & .win-buttons button { width: 42px; height: 34px; color: var(--text-3); }
+  & .win-buttons button:hover { background: var(--hover); color: var(--text); }
+  & .win-buttons .win-close { border-top-right-radius: 12px; }
+  & .win-buttons .win-close:hover { background: #c4302b; color: #fff; }
+
+  /* ---------------------------------------------------------------------------------
+     ПАНЕЛЬ РАЗДЕЛОВ
+     --------------------------------------------------------------------------------- */
+  &:not(.mobile) .lib-top {
+    position: fixed; z-index: 6; left: 0; top: 0; bottom: 64px; width: var(--side);
+    flex-direction: column; align-items: stretch; gap: 2px; padding: 14px 10px 8px 12px;
+  }
+  /* знак и имя — первой строкой, за неё тоже тянут окно */
+  &:not(.mobile) .lib-top::before {
+    content: "авеон"; flex: none; display: block; height: 30px; margin: 0 0 18px 4px; padding-left: 38px;
+    background: url("assets/icon.png") left center / 28px 28px no-repeat;
+    font: 700 17px/30px var(--display); letter-spacing: -0.04em; color: var(--text); text-transform: lowercase;
+    white-space: nowrap; overflow: hidden; -webkit-app-region: drag;
+  }
+  &:not(.mobile) .sources {
+    flex-direction: column; align-items: stretch; flex: 0 1 auto; gap: 1px; padding: 0; width: 100%;
+    background: none; border-radius: 0; overflow: hidden auto;
+  }
+  &:not(.mobile) .source {
+    z-index: 1; display: flex; align-items: center; gap: 12px; height: 36px; max-width: none; padding: 0 10px;
+    border-radius: 9px; font: 600 13.5px/1 var(--ui); letter-spacing: -0.005em; color: var(--text-2);
+    overflow: hidden; text-overflow: ellipsis; transition: color .15s ease, background-color .15s ease;
+  }
+  &:not(.mobile) .source::before {
+    content: ""; flex: none; width: 20px; height: 20px; background: currentColor; opacity: .82;
+    -webkit-mask: var(--ico) center / 19px 19px no-repeat; mask: var(--ico) center / 19px 19px no-repeat;
+    transition: opacity .15s ease, transform .3s var(--ease);
+  }
+  &:not(.mobile) .source::after { display: none; }
+  &:not(.mobile) .source:hover { color: var(--text); background: var(--hover); }
+  &:not(.mobile) .source:active::before { transform: scale(.88); }
+  &:not(.mobile) .source.active { color: var(--text); background: none; }
+  &:not(.mobile) .source.active::before { opacity: 1; background: color-mix(in srgb, var(--amber) 80%, var(--text)); }
+  /* выбранный раздел — плашка, переезжает по вертикали (app.js → moveSourceInk, --ink-y) */
+  &:not(.mobile) .source-ink {
+    z-index: 0; left: 0; right: 0; top: 0; bottom: auto; width: auto; height: 36px; border-radius: 9px;
+    background: var(--ink); box-shadow: inset 0 0 0 1px var(--line); transform: translateY(var(--ink-y, 0px));
+    transition: transform .38s var(--ease), opacity .2s ease;
+  }
+  &:not(.mobile) .sources-more { display: none; }
+  /* друзья и настройки — внизу панели, такими же строками */
+  &:not(.mobile) .lib-top :is(#open-friends, #open-settings-side) {
+    display: flex; justify-content: flex-start; gap: 12px; width: 100%; height: 36px; margin: 0; padding: 0 10px;
+    border-radius: 9px; background: none; color: var(--text-2); font: 600 13.5px/1 var(--ui);
+  }
+  &:not(.mobile) .lib-top #open-friends { margin-top: auto; }
+  &:not(.mobile) .lib-top :is(#open-friends, #open-settings-side):hover { background: var(--hover); color: var(--text); }
+  &:not(.mobile) .lib-top :is(#open-friends, #open-settings-side)[aria-expanded="true"] { background: var(--ink); color: var(--text); }
+  &:not(.mobile) .lib-top :is(#open-friends, #open-settings-side) svg { width: 20px; height: 20px; opacity: .82; }
+  &:not(.mobile) .lib-top #open-friends::after { content: "друзья"; }
+  &:not(.mobile) .lib-top #open-settings-side::after { content: "настройки"; }
+  &:not(.mobile) .lib-top #open-friends .badge { top: 9px; left: 24px; right: auto; box-shadow: 0 0 0 2px var(--ground); }
+
+  /* аккаунт — под панелью разделов, в самом низу (это #open-profile из низа «сейчас играет») */
+  &:not(.mobile) .stage-account {
+    position: fixed; z-index: 6; left: 10px; right: auto; top: auto; bottom: 10px; width: calc(var(--side) - 20px); margin: 0; padding: 0;
+  }
+  &:not(.mobile) .me {
+    width: 100%; max-width: none; height: 46px; padding: 6px 10px 6px 6px; gap: 10px; border-radius: 12px;
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  &:not(.mobile) .me:hover, &:not(.mobile) .me[aria-expanded="true"] { background: var(--hover); }
+  &:not(.mobile) .me-text { display: flex; }
+  &:not(.mobile) .me-text b { font: 700 13px/1.25 var(--ui); color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  &:not(.mobile) .me-text small { font-size: 11.5px; color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  &:not(.mobile) .me-avatar { width: 34px; height: 34px; border-radius: 10px; position: relative; overflow: visible; }
+  &:not(.mobile) .me-avatar img { border-radius: 10px; }
+  &:not(.mobile) .me-avatar::after {
+    content: ""; position: absolute; right: -2px; bottom: -2px; width: 9px; height: 9px; border-radius: 50%;
+    background: #32d74b; box-shadow: 0 0 0 2px var(--ground);
+  }
+  &:not(.mobile) .me:has(.me-text small.err) .me-avatar::after { background: var(--danger); }
+
+  /* ---------------------------------------------------------------------------------
+     ЛИСТ МУЗЫКИ
+     --------------------------------------------------------------------------------- */
+  &:not(.mobile) .library {
+    padding: 18px 28px 0; border-radius: 14px; background: var(--sheet);
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  /* плеер слева: кнопки окна над правым краем листа — поиску оставляем место под ними */
+  &:not(.mobile, .dock-right) .library { padding-top: 40px; }
+  &:not(.mobile) .library:has(> .lyrics:not([hidden])) { background-attachment: scroll; }
+
+  & .search {
+    position: relative; height: 40px; margin: 0; padding: 0 12px 0 13px; gap: 10px;
+    border: 0; border-radius: 11px; background: var(--fill); box-shadow: inset 0 0 0 1px var(--line);
+    transition: box-shadow .15s ease, background-color .15s ease;
+  }
+  & .search:hover { background: color-mix(in srgb, var(--fill) 70%, var(--fill-2)); }
+  & .search:focus-within { background: var(--sheet); box-shadow: inset 0 0 0 1px var(--line-2), 0 0 0 3px color-mix(in srgb, var(--amber) 28%, transparent); }
+  & .search svg { width: 17px; height: 17px; color: var(--text-3); }
+  & .search input { font: 500 14px var(--ui); }
+  /* подсказка клавиш — пока поле пустое и не в фокусе */
+  &:not(.mobile) .search::after {
+    content: "ctrl k"; flex: none; padding: 3px 7px; border-radius: 6px; pointer-events: none;
+    font: 600 11px/1 var(--ui); letter-spacing: .02em; color: var(--text-3); box-shadow: inset 0 0 0 1px var(--line-2);
+  }
+  &:not(.mobile) .search:is(:focus-within, :has(input:not(:placeholder-shown)))::after { display: none; }
+
+  /* плейлисты раздела — полка вкладок под поиском */
+  & .collections-wrap { margin-top: 14px; }
+  & .collections { gap: 6px; }
+  & .chip {
+    height: 30px; padding: 0 12px; gap: 7px; border: 0; border-radius: 8px;
+    background: none; color: var(--text-2); font-weight: 600; font-size: 13px; box-shadow: inset 0 0 0 1px var(--line-2);
+    transition: background-color .15s ease, color .15s ease, box-shadow .15s ease;
+  }
+  & .chip:hover { background: var(--hover); color: var(--text); }
+  & .chip.active { background: var(--text); color: var(--sheet); box-shadow: none; }
+  & .chip img { width: 20px; height: 20px; margin-left: -6px; border-radius: 5px; }
+  & .chip .count { font-variant-numeric: tabular-nums; }
+  & .coll-arrow { top: -1px; width: 32px; height: 32px; background: var(--rivet-2); box-shadow: 0 6px 18px rgb(0 0 0 / .35); }
+
+  & .lib-head { margin: 28px 0 14px; gap: 12px 16px; }
+  & .lib-head h1 { font: 700 30px/1.08 var(--display); letter-spacing: -0.045em; }
+  & .lib-head p { margin-top: 8px; font-size: 13px; font-weight: 500; color: var(--text-3); font-variant-numeric: tabular-nums; }
+
+  & .btn {
+    height: 34px; padding: 0 14px; gap: 7px; border: 0; border-radius: 9px;
+    background: var(--fill); color: var(--text); font: 600 13px var(--ui); box-shadow: inset 0 0 0 1px var(--line);
+  }
+  & .btn:hover { background: var(--fill-2); }
+  & .btn.primary { background: var(--text); color: var(--sheet); box-shadow: none; }
+  & .btn.primary:hover { opacity: 1; filter: none; background: color-mix(in srgb, var(--text) 88%, var(--amber)); }
+  & .btn.icon-only { width: 34px; }
+  & .btn.danger { color: var(--danger); }
+  & .icon-btn:hover { background: var(--hover); }
+
+  /* ---- список треков: строки на всю ширину, играющая отмечена полосой цвета обложки ---- */
+  & .tracklist { margin: 0 -16px; padding: 0 6px 28px 0; }
+  & .row {
+    --c-num: 40px; gap: 14px; padding: 6px 10px; border-radius: 9px; min-height: 52px;
+    transition: background-color .12s ease;
+  }
+  & .row:hover { background: var(--hover); }
+  & .row.playing { background: color-mix(in srgb, var(--amber) 9%, transparent); box-shadow: inset 2px 0 0 var(--amber); }
+  & .row.playing .t-title { color: color-mix(in srgb, var(--amber) 80%, var(--text)); }
+  & .row .num { width: 40px; height: 40px; }
+  & .row .num :is(img, .ph) { width: 40px; height: 40px; border-radius: 6px; }
+  & .row .play-hover { border-radius: 6px; background: rgb(0 0 0 / .5); color: #fff; }
+  & .row .play-hover .bars i { background: #fff; } /* эквалайзер играющей строки (app.js) — белым по обложке */
+  & .row .num .ph { background: var(--fill-2); font: 600 13px var(--ui); }
+  & .t-title { font: 600 14px/1.3 var(--ui); letter-spacing: -0.008em; }
+  & :is(.t-artist, .t-album) { font-size: 12.5px; color: var(--text-3); }
+  & .t-artist .a-link:hover { color: var(--text); text-decoration: underline; text-underline-offset: 2px; }
+  & .col-time { font-size: 12.5px; color: var(--text-3); }
+  & .row-more { opacity: 0; transition: opacity .12s ease; }
+  & .row:is(:hover, :focus-within, .playing) .row-more { opacity: 1; }
+  & .tag.e18, & .now-title[data-explicit]::after { border-radius: 4px; background: var(--fill-2); color: var(--text-2); }
+  & .empty h3 { font: 700 20px/1.25 var(--display); letter-spacing: -0.035em; }
+  & .empty p { color: var(--text-2); }
+
+  /* ---- главная ---- */
+  & .h-hello h1 { font: 700 34px/1.05 var(--display); letter-spacing: -0.05em; }
+  & .h-hello p { color: var(--text-3); font-weight: 500; }
+  & .h-wave {
+    border-radius: 14px; background: var(--fill); box-shadow: inset 0 0 0 1px var(--line);
+    transition: box-shadow .2s ease, background-color .2s ease;
+  }
+  & .h-wave::before { inset: 0 0 0 30%; opacity: .9; }
+  & .h-wave:hover, & .h-wave:focus-visible { box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--amber) 50%, transparent); }
+  & .h-wave-go { width: 52px; height: 52px; border-radius: 15px; background: var(--text); color: var(--sheet); box-shadow: none; }
+  & .h-wave-text b { font: 700 22px var(--display); letter-spacing: -0.045em; }
+  & .h-head h2 { font: 700 17px var(--display); letter-spacing: -0.035em; }
+  & .h-more { font-weight: 600; color: var(--text-3); }
+  & .h-tile { border-radius: 10px; background: var(--fill); box-shadow: inset 0 0 0 1px var(--line); transition: background-color .15s ease; }
+  & .h-tile:hover { background: var(--fill-2); }
+  & .h-tile-pic { border-radius: 8px 0 0 8px; }
+  & .h-tile-text b { font-weight: 700; }
+  /* карточки плейлистов: без подложки — обложка и подпись, при наведении обложка чуть поднимается */
+  & .h-card { border-radius: 10px; }
+  & .h-card-pic { border-radius: 8px; background: var(--fill); box-shadow: inset 0 0 0 1px var(--line); transition: transform .25s var(--ease), box-shadow .25s ease; }
+  & .h-card:hover .h-card-pic { transform: translateY(-3px); box-shadow: 0 16px 30px -18px rgb(0 0 0 / .7), inset 0 0 0 1px var(--line); }
+  & .h-artist-pic { box-shadow: inset 0 0 0 1px var(--line); transition: transform .25s var(--ease); }
+  & .h-artist:hover .h-artist-pic { transform: translateY(-3px); }
+
+  /* ---- волна ---- */
+  & .wave-air { border-radius: 16px; box-shadow: inset 0 0 0 1px var(--line); }
+  & .wave-word { font-weight: 700; letter-spacing: -0.06em; }
+  & .wave-go { border-radius: 18px; background: var(--text); color: var(--sheet); }
+  & .wave-now b { font-weight: 700; letter-spacing: -0.035em; }
+  & .wave-word-opt { border-radius: 9px; box-shadow: inset 0 0 0 1px var(--line); }
+  & .wave-rate .icon-btn { border-radius: 11px; }
+
+  /* ---- артисты, альбомы, дискография ---- */
+  & .artist-card { border-radius: 12px; }
+  & .artist-card:hover { background: var(--hover); }
+  & .artist-card-name { font-weight: 700; }
+  & .disc-card { border-radius: 12px; }
+  & .disc-card:hover { background: var(--hover); }
+  & .disc-pic { border-radius: 8px; box-shadow: inset 0 0 0 1px var(--line); }
+  & .disc-h { font-weight: 700; letter-spacing: -0.035em; }
+
+  /* ---- текст песни и профиль поверх листа ---- */
+  /* вкладки здесь не над листом, а в панели слева — текст закрывает весь лист (в базе отступ 84 px под вкладки) */
+  &:not(.mobile) .lyrics { inset: 0; padding: 18px 28px 0; border-radius: 14px; }
+  &:not(.mobile, .dock-right) .lyrics { padding-top: 40px; }
+  & .lyric { font-weight: 700; letter-spacing: -0.045em; }
+  & .profile { background: var(--sheet); border-radius: 14px; }
+  & :is(.pf-hero, .pf-card) { border-radius: 14px; background: var(--fill); box-shadow: inset 0 0 0 1px var(--line); }
+
+  /* ---------------------------------------------------------------------------------
+     «СЕЙЧАС ИГРАЕТ»: лист цвета обложки
+     --------------------------------------------------------------------------------- */
+  &:not(.mobile, .dock-bottom, .dock-top) .stage {
+    padding: 22px 22px 16px; border: 0; border-radius: 14px; background: var(--sheet);
+    box-shadow: inset 0 0 0 1px var(--line);
+    /* всё остальное на листе по высоте — обложке достаётся остаток (styles.css → .barrel) */
+    --reserve: 366px;
+  }
+  &.dock-right:not(.mobile, .dock-bottom, .dock-top) .stage { padding-top: 46px; --reserve: 390px; }
+  &:not(.mobile, .dock-bottom, .dock-top) .stage:has(.call:not(.off)) { --reserve: 486px; }
+  &.dock-right:not(.mobile, .dock-bottom, .dock-top) .stage:has(.call:not(.off)) { --reserve: 510px; }
+  /* сверху просвечивает обложка и цвет из неё, книзу лист плотнеет — кнопки всегда на ровном */
+  &:not(.mobile, .dock-bottom, .dock-top) .stage::before {
+    border-radius: inherit;
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--sheet) 22%, transparent) 0%, color-mix(in srgb, var(--sheet) 70%, transparent) 46%, var(--sheet) 82%),
+      radial-gradient(130% 70% at 50% 0%, color-mix(in srgb, var(--amber) 34%, transparent), transparent 72%),
+      var(--ambient, none) center top / cover no-repeat,
+      var(--sheet);
+  }
+  &.glass-light:not(.mobile, .dock-bottom, .dock-top) .stage::before {
+    background:
+      linear-gradient(180deg, color-mix(in srgb, var(--sheet) 30%, transparent) 0%, color-mix(in srgb, var(--sheet) 78%, transparent) 46%, var(--sheet) 82%),
+      radial-gradient(130% 70% at 50% 0%, color-mix(in srgb, var(--amber) 26%, transparent), transparent 72%),
+      var(--ambient, none) center top / cover no-repeat,
+      var(--sheet);
+  }
+  &.look-stage-flat:not(.mobile, .dock-bottom, .dock-top) .stage::before { background: var(--sheet); }
+  &:not(.mobile, .dock-bottom, .dock-top) .stage-top { display: none; }
+
+  /* обложка — конверт пластинки: почти квадратные углы, глубокая тень */
+  /* обложка растёт первой (flex 6 против 1 у «дальше») до ширины листа; что осталось по высоте — списку «дальше» */
+  &:not(.mobile, .dock-bottom, .dock-top) .stage > .barrel {
+    --barrel-max: min(340px, calc(var(--np) - 44px));
+    flex: 6 1 0; min-height: 120px; margin: 0 auto;
+  }
+  & .porthole, & .porthole::after { border-radius: 9px; }
+  & .porthole {
+    box-shadow: var(--cover-shadow); background: var(--fill-2);
+    scale: calc(1 - var(--m) * .07); transition: scale .6s var(--ease), box-shadow .6s ease;
+  }
+  & .porthole::after {
+    box-shadow: inset 0 0 0 1px rgb(255 255 255 / .07), inset 0 0 0 calc(var(--m) * 3px) var(--voice);
+    transition: box-shadow .4s ease;
+  }
+  & .porthole img { filter: saturate(calc(1 - var(--m) * .55)) brightness(calc(1 - var(--m) * .3)); transform: none; }
+  & .porthole-empty { font: 700 46px var(--display); color: var(--text-3); opacity: .7; }
+  & .in-barrel {
+    bottom: 12px; padding: 5px 11px; border-radius: 8px; font: 700 11.5px var(--ui); letter-spacing: .01em;
+    background: var(--voice); color: #0d0b1f; box-shadow: 0 6px 16px -6px color-mix(in srgb, var(--voice) 80%, transparent);
+  }
+
+  &:not(.mobile, .dock-bottom, .dock-top) .now { margin-top: 22px; column-gap: 12px; }
+  & .now-title { font: 700 19px/1.22 var(--display); letter-spacing: -0.04em; -webkit-line-clamp: 2; }
+  & .now-artist { margin-top: 5px; font: 600 14px/1.3 var(--ui); color: var(--text-2); }
+  & .now-artist :is(a, .a-link):hover { color: var(--text); }
+  & .now-via { margin-top: 3px; font-size: 12px; color: var(--text-3); }
+  & .now-actions { gap: 6px; }
+  & .now-actions .icon-btn { width: 34px; height: 34px; border-radius: 10px; background: var(--fill); }
+  & .now-actions .icon-btn:hover { background: var(--fill-2); }
+  & #btn-like[aria-pressed="true"] { color: color-mix(in srgb, var(--amber) 85%, var(--text)); background: color-mix(in srgb, var(--amber) 18%, transparent); }
+
+  /* перемотка: тонкая линия; время — под ней, моноширинными цифрами */
+  &:not(.mobile, .dock-bottom, .dock-top) .progress-row { margin-top: 18px; row-gap: 2px; }
+  & .progress-row .time { font: 600 11.5px var(--ui); color: var(--text-3); font-variant-numeric: tabular-nums; }
+  & .slider::before, & :is(.slider-buf, .slider-fill) { height: 4px; border-radius: 2px; }
+  & .slider::before { background: var(--fill-2); }
+  & .slider-fill { background: var(--text); }
+  & .volume .slider-fill { background: var(--text-2); }
+  & .slider-knob { width: 12px; height: 12px; margin-left: -6px; background: var(--text); box-shadow: 0 0 0 4px color-mix(in srgb, var(--text) 14%, transparent); }
+  & .slider.progress:hover::before, & .slider.progress:hover :is(.slider-fill, .slider-buf) { height: 6px; }
+
+  &:not(.mobile, .dock-bottom, .dock-top) .controls { margin-top: 8px; padding: 0; }
+  & .controls .icon-btn { width: 42px; height: 42px; border-radius: 12px; color: var(--text); }
+  & :is(#btn-shuffle, #btn-repeat) { color: var(--text-3); }
+  & :is(#btn-shuffle, #btn-repeat).on { color: color-mix(in srgb, var(--amber) 85%, var(--text)); }
+  & :is(#btn-shuffle, #btn-repeat).on::after { bottom: 4px; }
+  & :is(#btn-prev, #btn-next) svg { width: 24px; height: 24px; }
+  /* «играть» — клавиша: скруглённый квадрат, при нажатии проседает */
+  & .play-btn {
+    width: 58px; height: 58px; border-radius: 18px; background: var(--text); color: var(--sheet);
+    box-shadow: 0 10px 24px -10px rgb(0 0 0 / .6); transition: transform .18s var(--ease), border-radius .3s var(--ease), background-color .2s ease;
+  }
+  & .play-btn:hover { transform: none; background: color-mix(in srgb, var(--text) 90%, var(--amber)); }
+  & .play-btn:active { transform: scale(.94); }
+  & .play-btn svg { width: 24px; height: 24px; }
+  & body:not(.paused) .play-btn { border-radius: 50%; }
+
+  &:not(.mobile, .dock-bottom, .dock-top) .volume-row { margin-top: 10px; gap: 2px; }
+  & .volume-row .icon-btn { border-radius: 9px; color: var(--text-3); }
+  & .volume-row .icon-btn:hover { color: var(--text); }
+  & .volume-row .icon-btn[aria-pressed="true"] { color: color-mix(in srgb, var(--amber) 85%, var(--text)); background: color-mix(in srgb, var(--amber) 14%, transparent); }
+
+  /* «дальше»: сколько влезет под кнопками; последний трек гаснет, а не обрезается (upnext.js) */
+  &:not(.mobile, .dock-bottom, .dock-top) .stage > .upnext {
+    display: flex; flex: 1 1 0; flex-direction: column; min-height: 0; margin: 16px -8px 0; overflow: hidden;
+    -webkit-mask: linear-gradient(#000 calc(100% - 28px), transparent); mask: linear-gradient(#000 calc(100% - 28px), transparent);
+  }
+  &:not(.mobile, .dock-bottom, .dock-top) .stage > .upnext[hidden] { display: none; }
+  /* места меньше, чем на заголовок и одну строку, — список не показываем совсем */
+  &:not(.mobile, .dock-bottom, .dock-top) .stage > .upnext { container-type: size; }
+  @container (max-height: 76px) { & :is(.upnext-head, .upnext-list) { display: none; } }
+  & .upnext-head { flex: none; margin: 0 8px 6px; font: 700 12.5px/1.2 var(--ui); color: var(--text-3); }
+  & .upnext-list { display: flex; flex-direction: column; gap: 1px; margin: 0; padding: 0; list-style: none; }
+  & .upnext-row {
+    display: flex; align-items: center; gap: 10px; width: 100%; height: 44px; padding: 0 8px; border-radius: 9px; text-align: left;
+    transition: background-color .12s ease;
+  }
+  & .upnext-row:hover { background: var(--hover); }
+  & .upnext-row:disabled { cursor: default; background: none; }
+  & .upnext-pic { position: relative; display: grid; place-items: center; width: 32px; height: 32px; flex: none; overflow: hidden; border-radius: 6px; background: var(--fill-2); color: var(--text-3); }
+  & .upnext-pic img { width: 100%; height: 100%; object-fit: cover; }
+  & .upnext-pic i { font-style: normal; font-size: 13px; }
+  & .upnext-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+  & .upnext-text :is(b, small) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  & .upnext-text b { font: 600 13px var(--ui); color: var(--text); }
+  & .upnext-text small { font-size: 12px; color: var(--text-3); }
+  & body.keep-titles .upnext-text :is(b, small) { text-transform: none; }
+
+  /* низ листа: «слушать вместе» и звонок — тихие плитки */
+  &:not(.mobile, .dock-bottom, .dock-top) .stage-foot { gap: 8px; padding-top: 14px; }
+  & .stage-foot > .together-chip {
+    min-height: 42px; border-radius: 11px; background: var(--fill); font-size: 13px; font-weight: 600;
+    box-shadow: inset 0 0 0 1px var(--line);
+  }
+  & .stage-foot > .together-chip:is(:hover, [aria-expanded="true"]) { background: var(--fill-2); }
+  & .call { padding: 12px 14px 14px; border-radius: 12px; background: var(--fill); box-shadow: inset 0 0 0 1px var(--line); }
+  & .call.off { padding-top: 0; padding-bottom: 0; background: none; box-shadow: none; }
+  & .call-state { font-weight: 700; font-size: 13px; }
+  & .meter-label { font-size: 12px; font-weight: 600; color: var(--text-3); }
+  & :is(.meter, .meter-fill) { height: 4px; border-radius: 2px; }
+  & .meter-fill { background: var(--voice); }
+
+  /* переключатели: компактнее, чем в «Стекле» */
+  & .switch { width: 38px; height: 22px; }
+  & .switch span { border-radius: 11px; }
+  & .switch span::after { width: 18px; height: 18px; }
+  & .switch input:checked + span::after { transform: translateX(16px); }
+
+  /* ---------------------------------------------------------------------------------
+     ОКНА, МЕНЮ, НАСТРОЙКИ
+     --------------------------------------------------------------------------------- */
+  & .modal { background: rgb(0 0 0 / .42); }
+  &.glass-light .modal { background: rgb(20 20 30 / .22); }
+  & .sheet { border-radius: 16px; background: var(--sheet); box-shadow: var(--pop-shadow); }
+  & .sheet-head h2 { font: 700 22px var(--display); letter-spacing: -0.045em; }
+  & .settings-sheet { width: min(1000px, calc(100vw - 64px)); height: min(720px, calc(100vh - 64px)); }
+  & .set-nav { background: var(--ground); border-right: 1px solid var(--line); }
+  & .set-tab { border-radius: 9px; font-weight: 600; }
+  & .set-tab:hover { background: var(--hover); }
+  & .set-tab.on { background: var(--ink); color: var(--text); box-shadow: inset 0 0 0 1px var(--line); }
+  & .set-tab.on svg { color: color-mix(in srgb, var(--amber) 80%, var(--text)); }
+  & .set-search { height: 40px; padding: 0 12px; gap: 9px; border: 0; border-radius: 10px; background: var(--fill); box-shadow: inset 0 0 0 1px var(--line); }
+  & .set-search svg { width: 17px; height: 17px; }
+  & .set-search input { font: 500 14px var(--ui); }
+  & .set-tab { width: 100%; }
+  & .settings-sheet .sec { border-radius: 12px; background: var(--fill); box-shadow: inset 0 0 0 1px var(--line); }
+  & .sec-title { font: 700 16px var(--display); letter-spacing: -0.04em; }
+  & .seg { border-radius: 10px; }
+  & .seg button { border-radius: 7px; }
+  & :is(.input, select.input) { border-radius: 9px; box-shadow: inset 0 0 0 1px var(--line); }
+  & :is(.menu, .together) { border-radius: 14px; background: var(--sheet); box-shadow: var(--pop-shadow); }
+  & .menu { padding: 5px; min-width: 210px; }
+  & .menu-item { border-radius: 8px; font-weight: 600; font-size: 13px; }
+  & .menu-item:hover, & .menu-item:focus-visible { background: var(--hover); }
+  & .toast { border-radius: 12px; font-weight: 600; }
+
+  /* выбор дизайна: карточка «Авеона» первой и крупнее — это дизайн по умолчанию */
+  & .look-skin { border-radius: 12px; }
+
+  /* ---------------------------------------------------------------------------------
+     ВХОД
+     --------------------------------------------------------------------------------- */
+  & .auth { background: radial-gradient(90% 70% at 50% 0%, color-mix(in srgb, var(--amber) 18%, transparent), transparent 70%), var(--ground); }
+  & .auth-form { border-radius: 20px; background: var(--sheet); box-shadow: var(--pop-shadow); }
+  & .auth-form::before { border-radius: 14px; }
+  & .auth-title { font-weight: 700; letter-spacing: -0.05em; }
+  & .auth-field .input { border-radius: 11px; }
+  & .auth-go { border-radius: 12px; }
+
+  /* ---------------------------------------------------------------------------------
+     ПЛЕЕР СНИЗУ ИЛИ СВЕРХУ: полоса во всю ширину листа музыки
+     --------------------------------------------------------------------------------- */
+  /* свободное место пополам между названием и кнопками (в базе кнопки росли в 1.4 раза быстрее названия) */
+  &:is(.dock-bottom, .dock-top):not(.mobile) .stage {
+    grid-template-columns: 64px minmax(150px, 1fr) minmax(240px, 1fr) auto auto auto;
+    border: 0; border-radius: 14px; background: var(--sheet); box-shadow: inset 0 0 0 1px var(--line);
+  }
+  &:is(.dock-bottom, .dock-top):not(.mobile) .stage::before { border-radius: inherit; }
+  &:is(.dock-bottom, .dock-top):not(.mobile) .porthole { scale: none; }
+  &:is(.dock-bottom, .dock-top):not(.mobile) .play-btn { width: 46px; height: 46px; border-radius: 14px; }
+  &:is(.dock-bottom, .dock-top):not(.mobile) .now-title { font-size: 15px; -webkit-line-clamp: 1; line-clamp: 1; }
+  &:is(.dock-bottom, .dock-top):not(.mobile) .now-artist { margin-top: 2px; font-size: 13px; }
+  /* как в плеере сбоку: «нравится» и «ещё» у названия, а во весь экран, режимы, альбом и SoundCloud — в «ещё» */
+  &:is(.dock-bottom, .dock-top):not(.mobile) .now { display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: 8px; align-items: center; }
+  &:is(.dock-bottom, .dock-top):not(.mobile) .now > :not(.now-actions) { grid-column: 1; }
+  &:is(.dock-bottom, .dock-top):not(.mobile) .now-actions { display: flex; gap: 4px; grid-column: 2; grid-row: 1 / span 3; }
+  &:is(.dock-bottom, .dock-top):not(.mobile) .now-actions .icon-btn { width: 30px; height: 30px; border-radius: 9px; background: none; }
+  &:is(.dock-bottom, .dock-top):not(.mobile) .now-actions .icon-btn:hover { background: var(--hover); }
+  &:is(.dock-bottom, .dock-top):not(.mobile) :is(#btn-fs, #btn-modes, #btn-now-album, #btn-now-sc) { display: none; }
+  &:is(.dock-bottom, .dock-top):not(.mobile) .volume-row .volume { width: 72px; }
+  &:is(.dock-bottom, .dock-top):not(.mobile) .stage > .stage-foot { max-width: 220px; min-width: 0; }
+  &:is(.dock-bottom, .dock-top):not(.mobile) .stage-foot :is(.call, .call-head) { min-width: 0; max-width: 100%; }
+  &:is(.dock-bottom, .dock-top):not(.mobile) .stage-foot .call > .call-head { flex: 1 1 auto; }
+  &:is(.dock-bottom, .dock-top):not(.mobile) .stage-foot .call-state { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  &.dock-top:not(.mobile) .library { padding-top: 18px; }
+  &.dock-top:not(.mobile) .stage { padding-right: 140px; } /* кнопки окна стоят над полосой плеера */
+}
+
+/* ---------------------------------------------------------------------------------
+   СВЁРНУТАЯ ПАНЕЛЬ (look.js → applyRail ставит html.side-rail): от неё остаётся лента значков,
+   подпись раздела выезжает плашкой поверх листа при наведении или фокусе.
+   Сворачивают кнопкой в панели или Ctrl+B; сама — в узком окне и когда плеер полосой снизу или сверху
+   (тогда html.side-rail-forced, и кнопки развернуть нет)
+   --------------------------------------------------------------------------------- */
+html.skin-aveon.skin-aveon:not(.mobile) {
+  & body { transition: padding-left .32s var(--ease); }
+  & .lib-top { transition: width .32s var(--ease), padding .32s var(--ease); }
+  & .stage-account { transition: width .32s var(--ease), left .32s var(--ease); }
+}
+html.skin-aveon.skin-aveon.side-rail:not(.mobile) {
+  --side: 64px;
+  & .lib-top { padding: 14px 8px 8px; }
+  & .lib-top::before { width: 28px; margin: 0 auto 18px; padding: 0; color: transparent; background-position: center; }
+  & .sources { overflow: visible; }
+  /* подпись начинается за краем значка (14 + 20 + 20 > 48) — в ленте её не видно совсем */
+  & :is(.source, .lib-top #open-friends, .lib-top #open-settings-side) {
+    width: 48px; gap: 20px; padding: 0 14px; overflow: hidden; white-space: nowrap; text-overflow: clip;
+    transition: width .22s var(--ease), gap .22s var(--ease), background-color .15s ease, color .15s ease, box-shadow .15s ease;
+  }
+  & :is(.source, .lib-top #open-friends, .lib-top #open-settings-side):is(:hover, :focus-visible) {
+    width: max-content; min-width: 48px; gap: 12px; padding-right: 16px; z-index: 3;
+    background: var(--rivet-2); color: var(--text); box-shadow: var(--pop-shadow);
+  }
+  & .source-ink { width: 48px; right: auto; }
+  & .stage-account { left: 8px; width: 48px; }
+  & .me { height: 48px; padding: 6px; justify-content: center; box-shadow: none; }
+  & .me-text { display: none; }
+}
+
+/* свернуть / развернуть — нажатием на знак: прозрачная кнопка лежит поверх знака (.lib-top::before).
+   Когда лента вынужденная (узкое окно, плеер полосой), кнопки нет и знак — просто знак */
+#side-toggle { display: none; }
+html.skin-aveon.skin-aveon:not(.mobile, .side-rail-forced) #side-toggle {
+  display: block; position: absolute; z-index: 2; top: 14px; left: 14px; width: 104px; height: 30px; padding: 0;
+  border-radius: 8px; background: none; cursor: pointer;
+}
+html.skin-aveon.skin-aveon:not(.mobile, .side-rail-forced) #side-toggle svg { display: none; }
+html.skin-aveon.skin-aveon.side-rail:not(.mobile, .side-rail-forced) #side-toggle { left: 16px; width: 32px; }
+html.skin-aveon.skin-aveon:not(.mobile, .side-rail-forced) .lib-top::before { transition: opacity .15s ease, transform .15s ease; }
+html.skin-aveon.skin-aveon:not(.mobile, .side-rail-forced) .lib-top:has(#side-toggle:hover)::before { opacity: .78; }
+html.skin-aveon.skin-aveon:not(.mobile, .side-rail-forced) .lib-top:has(#side-toggle:active)::before { transform: scale(.96); }
+@media (max-width: 980px) {
+  html.skin-aveon.skin-aveon:not(.mobile) { --np: 284px; }
+  html.skin-aveon.skin-aveon:not(.mobile) .library { padding-left: 22px; padding-right: 22px; }
+  html.skin-aveon.skin-aveon:not(.mobile) .row { --c-album: 0px; }
+  html.skin-aveon.skin-aveon:not(.mobile) .row .col-album { display: none; }
+}
+/* низкое окно: обложка уже ужимается сама, а здесь — плотнее всё вокруг неё */
+@media (max-height: 700px) {
+  html.skin-aveon.skin-aveon:not(.mobile, .dock-bottom, .dock-top) .now { margin-top: 14px; }
+  html.skin-aveon.skin-aveon:not(.mobile, .dock-bottom, .dock-top) .stage { --reserve: 322px; }
+  html.skin-aveon.skin-aveon.dock-right:not(.mobile, .dock-bottom, .dock-top) .stage { --reserve: 346px; }
+  html.skin-aveon.skin-aveon:not(.mobile, .dock-bottom, .dock-top) .stage:has(.call:not(.off)) { --reserve: 380px; }
+  html.skin-aveon.skin-aveon.dock-right:not(.mobile, .dock-bottom, .dock-top) .stage:has(.call:not(.off)) { --reserve: 404px; }
+  html.skin-aveon.skin-aveon:not(.mobile) .lib-head { margin-top: 18px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html.skin-aveon.skin-aveon :is(.source, .source-ink, .porthole, .play-btn, .h-card-pic, .h-artist-pic) { transition: none; }
+}
+html.skin-aveon.skin-aveon.look-still :is(.source-ink, .porthole, .play-btn, .h-card-pic, .h-artist-pic) { transition: none; }
+
+/* «дальше» — только в «Авеоне» с плеером сбоку: в остальных дизайнах для него нет места */
+html:not(.skin-aveon) .upnext, html:is(.mobile, .dock-bottom, .dock-top) .upnext { display: none; }
+
+/* кнопка настроек в панели разделов — только у «Авеона»; в остальных дизайнах настройки — в профиле */
+#open-settings-side { display: none; }
+html.skin-aveon:not(.mobile) #open-settings-side { display: flex; }
+
+/* миниатюра в выборе дизайна: лента разделов, лист с треками, справа «сейчас играет» */
+.skin-mock.is-aveon { grid-template-columns: 14% 1fr 34%; gap: 3px; padding: 3px; background: #101013; box-shadow: inset 0 0 0 1px #2a2a31; }
+.skin-mock.is-aveon .sm-rail { display: flex; flex-direction: column; align-items: center; gap: 6px; padding-top: 10px; }
+.skin-mock.is-aveon .sm-rail i { width: 9px; height: 9px; border-radius: 3px; background: #44444d; }
+.skin-mock.is-aveon .sm-rail i:first-child { background: #f2f2f5; }
+.skin-mock.is-aveon .sm-lib { order: 1; padding: 10px 9px; border-radius: 6px; background: #16161a; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .06); }
+.skin-mock.is-aveon .sm-stage {
+  order: 2; align-items: stretch; gap: 4px; padding: 10px 7px 0; border-radius: 6px;
+  background: linear-gradient(180deg, #4a2f63 0%, #16161a 72%);
+}
+.skin-mock.is-aveon .sm-cover { width: 100%; aspect-ratio: 1; height: auto; border-radius: 3px; background: linear-gradient(135deg, #e0627a, #6c3fc1); box-shadow: 0 6px 12px -6px rgb(0 0 0 / .7); }
+.skin-mock.is-aveon .sm-t { width: 80%; margin-top: 5px; background: #f2f2f5; }
+.skin-mock.is-aveon .sm-a { width: 50%; background: #8a8a96; }
+.skin-mock.is-aveon .sm-bar { width: 100%; background: linear-gradient(90deg, #f2f2f5 40%, #2a2a31 40%); }
+.skin-mock.is-aveon .sm-play { display: block; width: 14px; height: 14px; margin: 3px auto 0; border-radius: 4px; background: #f2f2f5; }
+.skin-mock.is-aveon .sm-h::before { content: "Авеон"; font: 700 11px "Unbounded", sans-serif; letter-spacing: -0.04em; color: #f2f2f5; }
+.skin-mock.is-aveon .sm-row i { border-radius: 2px; background: #2a2a31; }
+.skin-mock.is-aveon .sm-row b { background: #44444d; }
+.skin-mock.is-aveon .sm-row:nth-child(4) { box-shadow: inset 1.5px 0 0 #e0627a; }
+.skin-mock.is-aveon .sm-row:nth-child(4) b { background: #e0627a; }
+
+/* =====================================================================================
+   ДВИЖЕНИЕ «АВЕОНА». Только в ответ на действие или чтобы показать состояние, ничего не крутится просто так.
+   · смена трека (app.js → showNow ставит .barrel.fresh и data-dir): новый конверт выезжает «из стопки»
+     с той стороны, куда переключили, по нему пробегает блик, название и исполнитель проявляются следом,
+     лист под ними перетекает в новый цвет;
+   · «нравится» лопается сердцем, выбранный раздел подпрыгивает, «дальше» въезжает лесенкой,
+     окна и меню раскрываются из точки, где их открыли.
+   Анимации → «спокойно» (look-calm): остаются только плавные переходы цвета и пульс свечения;
+   «выключено» (look-still) и системное «уменьшить движение» — ничего не двигается.
+   Двигаем только transform и opacity — дёшево для компьютера.
+   ===================================================================================== */
+@keyframes av-sleeve-next { from { opacity: 0; transform: translateX(64px) rotate(8deg) scale(.84); } 55% { opacity: 1; } }
+@keyframes av-sleeve-prev { from { opacity: 0; transform: translateX(-64px) rotate(-8deg) scale(.84); } 55% { opacity: 1; } }
+/* старая обложка уходит в стопку: тень конверта на миг под новым */
+@keyframes av-sleeve-shadow { from { box-shadow: -36px 18px 0 -10px color-mix(in srgb, var(--text) 10%, transparent), var(--cover-shadow); } }
+@keyframes av-sheen { from { transform: translateX(-120%) skewX(-18deg); } to { transform: translateX(220%) skewX(-18deg); } }
+@keyframes av-rise { from { opacity: 0; transform: translateY(16px); filter: blur(8px); } }
+@keyframes av-fade { from { opacity: .35; } }
+@keyframes av-pop { 0% { transform: scale(1); } 35% { transform: scale(1.28); } 65% { transform: scale(.9); } 100% { transform: none; } }
+@keyframes av-heart { 0% { transform: scale(.6); } 40% { transform: scale(1.35); } 70% { transform: scale(.92); } 100% { transform: none; } }
+@keyframes av-ring { from { opacity: .7; transform: scale(.5); } to { opacity: 0; transform: scale(1.5); } }
+@keyframes av-step { from { opacity: 0; transform: translateX(22px); } }
+/* разделы стоят столбиком: ниже по списку — содержимое въезжает снизу, выше — сверху (app.js → animateViewSwitch) */
+@keyframes av-view-down { from { opacity: 0; transform: translateY(26px) scale(.985); filter: blur(6px); } }
+@keyframes av-view-up { from { opacity: 0; transform: translateY(-26px) scale(.985); filter: blur(6px); } }
+@keyframes av-in { from { opacity: 0; transform: translateY(14px); } }
+@keyframes av-open { from { opacity: 0; transform: translateY(6px) scale(.97); } }
+
+@media (prefers-reduced-motion: no-preference) {
+  /* ---- полный набор ---- */
+  html.skin-aveon.skin-aveon:not(.look-still, .look-calm) {
+    /* смена трека: конверт въезжает с пружинкой */
+    & .barrel.fresh .porthole { animation: av-sleeve-next .7s cubic-bezier(.22, 1.3, .36, 1) both, av-sleeve-shadow .7s ease-out both; }
+    & .barrel.fresh[data-dir="prev"] .porthole { animation-name: av-sleeve-prev, av-sleeve-shadow; }
+    /* блик по новой обложке — один проход (у «Стекла» ::before у обложки выключен, здесь он свой) */
+    & .porthole::before {
+      content: ""; display: block; position: absolute; inset: 0 auto 0 0; z-index: 2; width: 45%; pointer-events: none;
+      opacity: 0; background: linear-gradient(90deg, transparent, rgb(255 255 255 / .45), transparent);
+    }
+    & .barrel.fresh .porthole::before { opacity: 1; animation: av-sheen .9s cubic-bezier(.4, 0, .2, 1) .25s both; }
+    /* название и исполнитель — следом за обложкой */
+    & .stage:has(.barrel.fresh) :is(.now-title, .now-artist, .now-via) { animation: av-rise .5s cubic-bezier(.2, .8, .2, 1) both; }
+    & .stage:has(.barrel.fresh) .now-title { animation-delay: .08s; }
+    & .stage:has(.barrel.fresh) .now-artist { animation-delay: .15s; }
+    & .stage:has(.barrel.fresh) .now-via { animation-delay: .2s; }
+
+    /* «нравится»: сердце лопается, от него расходится кольцо */
+    & #btn-like { overflow: visible; }
+    & #btn-like[aria-pressed="true"] svg { animation: av-heart .5s cubic-bezier(.3, 1.4, .5, 1); }
+    & #btn-like[aria-pressed="true"]::before {
+      content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+      box-shadow: 0 0 0 2px color-mix(in srgb, var(--amber) 70%, var(--text)); animation: av-ring .55s ease-out both;
+    }
+
+    /* перемешивание и повтор вздрагивают, когда их включают */
+    & :is(#btn-shuffle, #btn-repeat).on svg { animation: av-pop .4s cubic-bezier(.3, 1.4, .5, 1); }
+    /* выбранный раздел: значок подпрыгивает */
+    &:not(.mobile) .source.active::before { animation: av-pop .42s cubic-bezier(.3, 1.4, .5, 1); }
+
+    /* «дальше»: строки въезжают лесенкой (upnext.js → --i) */
+    & .upnext-list > li { animation: av-step .4s cubic-bezier(.2, .8, .2, 1) both; animation-delay: calc(var(--i, 0) * 45ms + 120ms); }
+
+    /* переход между разделами: въезд по вертикали, а строки списка и секции главной — лесенкой */
+    & .tab-in-r { animation-name: av-view-down; animation-duration: .42s; }
+    & .tab-in-l { animation-name: av-view-up; animation-duration: .42s; }
+    & .tracklist:is(.tab-in-r, .tab-in-l) .row:nth-child(-n+14) { animation: av-in .45s cubic-bezier(.2, .8, .2, 1) both; }
+    & .tracklist:is(.tab-in-r, .tab-in-l) .row:nth-child(1) { animation-delay: 40ms; }
+    & .tracklist:is(.tab-in-r, .tab-in-l) .row:nth-child(2) { animation-delay: 68ms; }
+    & .tracklist:is(.tab-in-r, .tab-in-l) .row:nth-child(3) { animation-delay: 96ms; }
+    & .tracklist:is(.tab-in-r, .tab-in-l) .row:nth-child(4) { animation-delay: 124ms; }
+    & .tracklist:is(.tab-in-r, .tab-in-l) .row:nth-child(5) { animation-delay: 152ms; }
+    & .tracklist:is(.tab-in-r, .tab-in-l) .row:nth-child(6) { animation-delay: 180ms; }
+    & .tracklist:is(.tab-in-r, .tab-in-l) .row:nth-child(7) { animation-delay: 208ms; }
+    & .tracklist:is(.tab-in-r, .tab-in-l) .row:nth-child(8) { animation-delay: 236ms; }
+    & .tracklist:is(.tab-in-r, .tab-in-l) .row:nth-child(9) { animation-delay: 264ms; }
+    & .tracklist:is(.tab-in-r, .tab-in-l) .row:nth-child(10) { animation-delay: 292ms; }
+    & .tracklist:is(.tab-in-r, .tab-in-l) .row:nth-child(11) { animation-delay: 320ms; }
+    & .tracklist:is(.tab-in-r, .tab-in-l) .row:nth-child(12) { animation-delay: 348ms; }
+    & .tracklist:is(.tab-in-r, .tab-in-l) .row:nth-child(13) { animation-delay: 376ms; }
+    & .tracklist:is(.tab-in-r, .tab-in-l) .row:nth-child(14) { animation-delay: 404ms; }
+    & .home:is(.tab-in-r, .tab-in-l) > * { animation: av-in .5s cubic-bezier(.2, .8, .2, 1) both; }
+    & .home:is(.tab-in-r, .tab-in-l) > :nth-child(1) { animation-delay: 60ms; }
+    & .home:is(.tab-in-r, .tab-in-l) > :nth-child(2) { animation-delay: 130ms; }
+    & .home:is(.tab-in-r, .tab-in-l) > :nth-child(3) { animation-delay: 200ms; }
+    & .home:is(.tab-in-r, .tab-in-l) > :nth-child(4) { animation-delay: 270ms; }
+    & .home:is(.tab-in-r, .tab-in-l) > :nth-child(5) { animation-delay: 340ms; }
+    & .home:is(.tab-in-r, .tab-in-l) > :nth-child(6) { animation-delay: 410ms; }
+    & .home:is(.tab-in-r, .tab-in-l) > :nth-child(7) { animation-delay: 480ms; }
+    & :is(.artist-grid, .disc-grid):is(.tab-in-r, .tab-in-l) > * { animation: av-in .45s cubic-bezier(.2, .8, .2, 1) both; }
+
+    /* окна и меню раскрываются */
+    & .sheet { animation: av-open .24s cubic-bezier(.2, .9, .3, 1); }
+    & :is(.menu, .together) { transform-origin: top center; animation: av-open .16s cubic-bezier(.2, .9, .3, 1); }
+    & .toast { animation: av-open .22s cubic-bezier(.2, .9, .3, 1); }
+
+    /* карточки на главной: при наведении обложка чуть ярче, при нажатии проседает */
+    & :is(.h-card, .h-tile, .artist-card, .disc-card):active { transform: scale(.98); transition: transform .1s ease; }
+    & .h-card:hover .h-card-pic img { filter: brightness(1.06); }
+    & .btn:active, & .chip:active { transform: scale(.96); }
+  }
+
+  /* ---- жизнь под музыку (look.js → SKIN_LIVE: --beat и --level на .stage) ----
+     за конвертом дышит свечение цвета обложки, сам конверт качается на басах */
+  html.skin-aveon.skin-aveon:not(.look-still, .mobile, .dock-bottom, .dock-top) .stage > .barrel::before {
+    content: ""; position: absolute; inset: -16%; z-index: -1; pointer-events: none; border-radius: 50%;
+    background: radial-gradient(closest-side, color-mix(in srgb, var(--amber) 62%, transparent), transparent);
+    opacity: calc(.18 + var(--level, 0) * .9); transform: scale(calc(.88 + var(--beat, 0) * .22));
+  }
+  html.skin-aveon.skin-aveon:not(.look-still, .look-calm, .mobile, .dock-bottom, .dock-top) .stage > .barrel { scale: calc(1 + var(--beat, 0) * .035); }
+  html.skin-aveon.skin-aveon:not(.look-still, .look-calm, .mobile, .dock-bottom, .dock-top) .play-btn {
+    box-shadow: 0 10px 24px -10px rgb(0 0 0 / .6), 0 0 0 calc(var(--beat, 0) * 7px) color-mix(in srgb, var(--text) 16%, transparent);
+  }
+
+  /* ---- «спокойно» и полный: лист плавно перетекает в цвет новой обложки ---- */
+  html.skin-aveon.skin-aveon:not(.look-still, .mobile, .dock-bottom, .dock-top) .stage:has(.barrel.fresh)::before { animation: av-fade .9s ease-out both; }
+
+}

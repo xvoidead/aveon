@@ -45,9 +45,11 @@ const resolve = require('./src/resolve');
 const cache = require('./src/cache');
 const cacheFiles = require('./src/cache-files');
 const speaker = require('./src/speaker');
+const voice = require('./src/voice');
 
 const { resolveStream, sharedStream, matchCache } = resolve;
 resolve.init(local);
+ym.onLocalLikes(() => account.likesChanged()); // лайки, которые Яндекс не принял, — в аккаунт
 speaker.init({ resolveStream, cacheFiles, local, onEvent: (ev) => send('speaker:event', ev) });
 
 const SOURCES = { sc, ym, sp };
@@ -173,6 +175,7 @@ function send(channel, payload) {
 // media://cover/?p=<путь>  — обложка из тегов
 // media://art/?f=<имя>     — своя обложка, заданная в редакторе тегов
 // media://cache/?f=<имя>   — трек из кэша (src/cache.js)
+// media://voice/model      — модель распознавания речи (src/voice.js)
 function registerMediaProtocol() {
   protocol.handle('media', async (req) => {
     const u = new URL(req.url);
@@ -180,6 +183,10 @@ function registerMediaProtocol() {
       const art = local.readArt(u.searchParams.get('f'));
       if (!art) return new Response('no art', { status: 404 });
       return new Response(art.data, { headers: { 'Content-Type': art.type, 'Cache-Control': 'max-age=31536000', 'Access-Control-Allow-Origin': '*' } });
+    }
+    if (u.hostname === 'voice') {
+      const f = voice.fileOf();
+      return f ? serveFile(f, req) : new Response('no model', { status: 404 });
     }
     if (u.hostname === 'cache') {
       const f = cacheFiles.fileOf(u.searchParams.get('f'));
@@ -298,6 +305,10 @@ function registerIpc() {
   handle('speaker:frames', (id, text) => speaker.frames(id, text));
   handle('speaker:stop', () => speaker.stop());
   handle('speaker:status', () => speaker.status());
+
+  // Голосовое управление (src/voice.js, renderer/voice.js): модель качается один раз по кнопке в настройках
+  handle('voice:status', () => voice.status());
+  handle('voice:download', () => voice.download((p) => send('voice:progress', p)));
 
   handle('albums:list', () => albums.list());
   handle('albums:get', (id) => {

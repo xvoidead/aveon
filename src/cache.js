@@ -73,6 +73,23 @@ function has(track) {
   return !!(track && index?.tracks[trackKey(track)]);
 }
 
+// Копия взята из базы FckCensor, а не запиканный поток Яндекса
+function isUncensored(track) {
+  return !!(track && index?.tracks[trackKey(track)]?.uncensored);
+}
+
+// Выкинуть копию трека, чтобы скачать его заново. Возвращает, был ли он в «Скачанных»
+async function drop(track) {
+  const key = trackKey(track);
+  const e = index?.tracks[key];
+  if (!e) return false;
+  delete index.tracks[key];
+  save();
+  await io.remove(e.name).catch(() => {});
+  if (e.cover) await io.remove(e.cover).catch(() => {});
+  return !!e.pinned;
+}
+
 // Поток уже найден и играет — докачиваем его целиком в фоне. pin — это скачивание для офлайна:
 // идёт первым в очереди, не вытесняется лимитом, а промис ждёт конца загрузки
 function remember(track, stream, { pin = false } = {}) {
@@ -113,6 +130,7 @@ async function pump() {
       index.tracks[key] = {
         name, size, at: Date.now(), title: track.title || '', artist: track.artist || '',
         ...(stream.via ? { via: stream.via } : {}),
+        ...(stream.uncensored ? { uncensored: true } : {}),
       };
       if (item.pin) await pinExisting(track);
       save();
@@ -293,6 +311,6 @@ async function settingsChanged() {
 function emit(ev) { notify(ev); }
 
 module.exports = {
-  init, emit, cachedStream, has, remember, unpin, downloads, downloadedKeys, pendingKeys,
+  init, emit, cachedStream, has, isUncensored, drop, remember, unpin, downloads, downloadedKeys, pendingKeys,
   lyricsGet, lyricsPut, info, clear, settingsChanged,
 };

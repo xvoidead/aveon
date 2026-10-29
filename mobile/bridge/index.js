@@ -25,6 +25,7 @@ const local = require('./local.js');
 
 const { SOURCES, resolveStream, sharedStream, matchCache } = resolve;
 resolve.init(local);
+ym.onLocalLikes(() => account.likesChanged());
 
 // ---- события «главного процесса» → окно ----
 const listeners = new Map();

@@ -110,7 +110,7 @@ map $http_upgrade $connection_upgrade { default upgrade; '' close; }
 | `POST` | `/api/me/password` | `{old, new}`; остальные сессии закрываются |
 | `POST` | `/api/me/delete` | `{password}`; удаляет аккаунт и все данные |
 | `GET` | `/api/sync` | все документы пользователя |
-| `PUT` | `/api/sync/{kind}/{key}` | `{data, base_rev}`; `kind` — `albums`, `settings`, `stats` или `keys`. Если на сервере ревизия уже другая, ответ 409 с текущими данными. Документ до 5 МБ, у пользователя до 32 документов и 40 МБ всего — иначе 413 |
+| `PUT` | `/api/sync/{kind}/{key}` | `{data, base_rev}`; `kind` — `albums`, `settings`, `stats`, `keys` или `likes`. Если на сервере ревизия уже другая, ответ 409 с текущими данными. Документ до 5 МБ, у пользователя до 32 документов и 40 МБ всего — иначе 413 |
 
 ## друзья
 

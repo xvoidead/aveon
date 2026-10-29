@@ -1,8 +1,17 @@
 // «Остров» — капсула поверх всех окон и рабочего стола (как Dynamic Island): что играет, живой спектр,
-// бочка. При наведении раскрывается с кнопками. Окно прозрачное и пропускает клики мимо капсулы.
+// бочка. По нажатию раскрывается с кнопками. Окно прозрачное и пропускает клики мимо капсулы.
 // Состояние присылает окно плеера (renderer/island-feed.js), нарисован остров в renderer/island.html.
-const { BrowserWindow, screen } = require('electron');
-const hoverWatch = require('./hover');
+//
+// Ядро устроено так, чтобы остров не залипал:
+// - мышь решает только главный процесс (ниже, «мышь»): по часам смотрит, где курсор и где капсула, и
+//   включает или выключает пропуск кликов. Без пересылки движения мыши (forward) — она ставила на всю
+//   систему перехватчик мыши в главном процессе: любая заминка в нём — и мышь тормозила везде, а Windows
+//   молча снимала перехватчик. Состояние «ловим / пропускаем» раз в секунду подтверждаем заново;
+// - окно острова после перезагрузки или замены получает всё заново: место, состояние, «раскрыт ли»,
+//   где капсула. Старое место капсулы забываем, пока новое окно не пришлёт своё;
+// - сторож (ниже) лечит по лестнице: перерисовать → перезагрузить → заменить окно целиком. Если окно
+//   не загрузилось или зависло — тоже заменяем, а не ждём вечно; сон компьютера застывшим не считаем.
+const { BrowserWindow, screen, powerMonitor } = require('electron');
 const games = require('./games');
 const path = require('path');
 const config = require('./config');
@@ -13,9 +22,12 @@ const SIZE = { width: 780, height: 420 }; // с запасом: свёрнута
 let win = null;
 let main = null;
 let last = null; // последнее состояние из окна плеера
-let ready = false;
+let ready = false; // окно острова загрузилось и слушает
+let shown = false; // остров виден (прячем прозрачностью, см. conceal)
 
 const cfg = () => ({ enabled: true, pos: 'top', onlyAway: true, ...(config.get().island || {}) });
+const alive = () => !!win && !win.isDestroyed();
+const send = (ch, v) => { if (alive() && ready) win.webContents.send(ch, v); };
 
 // На каком экране остров. Плеер перед глазами — на его экране (там и настройки мини-экрана);
 // плеер свёрнут или позади — там, где курсор: с двумя мониторами игра обычно не на экране плеера
@@ -56,9 +68,10 @@ function baseWindow(pos, d) {
 }
 
 // Место острова: край экрана (pos) плюс свой сдвиг x/y. Ограничиваем по капсуле, а не по окну —
-// так её можно поставить вплотную к любому краю
+// так её можно поставить вплотную к любому краю. Окно уже там — не трогаем (лишний SetWindowPos
+// прозрачному окну — лишняя перерисовка)
 function place() {
-  if (!win || win.isDestroyed()) return;
+  if (!alive()) return;
   const c = placeCfg();
   const d = editing ? edit.display : display();
   placedOn = d.id;
@@ -69,37 +82,37 @@ function place() {
   let py = base.y + inner.y + (c.y || 0);
   px = Math.max(0, Math.min(px, b.width - PILL.w));
   py = Math.max(0, Math.min(py, b.height - PILL.h));
-  win.setBounds({ x: Math.round(b.x + px - inner.x), y: Math.round(b.y + py - inner.y), ...SIZE });
+  const to = { x: Math.round(b.x + px - inner.x), y: Math.round(b.y + py - inner.y), ...SIZE };
+  const now = win.getBounds();
+  if (now.x !== to.x || now.y !== to.y || now.width !== to.width || now.height !== to.height) win.setBounds(to);
 }
 
 // ---- редактор места (src/islandedit.js) ----
 // Пока редактор открыт, настоящий остров виден и едет за мышью: место берём из edit.place, а не из
 // настроек; мышь остров не ловит — нажатия проходят в окно редактора под ним
 let editing = false;
+let demo = false; // редактор показывает остров раскрытым
 const edit = { display: null, place: null, onRect: null, onAccent: null };
 const placeCfg = () => (editing && edit.place ? { ...cfg(), ...edit.place } : cfg());
 
-function sendConfig() {
-  if (win && !win.isDestroyed() && ready) win.webContents.send('island:config', placeCfg());
-}
+const sendConfig = () => send('island:config', placeCfg());
 
 // opts.display — экран редактора; opts.onRect(r) — где капсула на нём сейчас (раскрылась, выросла
 // под длинное название), чтобы редактор знал, за что её можно взять; opts.onAccent(c) — сменился
 // акцент играющего трека (им рисуется сетка)
 function setEditing(on, opts = {}) {
   editing = on;
+  demo = false;
   edit.display = on ? opts.display : null;
   edit.place = null;
   edit.onRect = on ? opts.onRect : null;
   edit.onAccent = on ? opts.onAccent : null;
-  if (win && !win.isDestroyed() && ready) {
-    win.webContents.send('island:preview', on); // ничего не играет — капсула всё равно видна
-    win.webContents.send('island:demo', false);
-  }
+  send('island:preview', on || Date.now() < previewUntil); // ничего не играет — капсула всё равно видна
+  send('island:demo', false);
   sendConfig();
   update();
   place();
-  if (win && !win.isDestroyed()) hoverWatch.setOff(win, on || !shown);
+  track();
 }
 
 // Капсулу в редакторе передвинули: px, py — левый верхний угол капсулы 280×36 на экране
@@ -116,20 +129,20 @@ function editMove(px, py) {
 
 // Окно редактора с тем же уровнем «поверх всех» по нажатию встаёт выше острова — поднимаем остров
 function editRaise() {
-  if (editing && win && !win.isDestroyed()) win.moveTop();
+  if (editing && alive()) win.moveTop();
 }
 
 // Показать остров раскрытым — видно, в какую сторону он откроется
 function editOpen(on) {
-  if (editing && win && !win.isDestroyed() && ready) win.webContents.send('island:demo', !!on);
+  if (!editing) return;
+  demo = !!on;
+  send('island:demo', demo);
 }
 
-// Где капсула на экране редактора — по тому, что прислало окно острова (popup:rect → src/hover.js)
+// Где капсула на экране редактора — по тому, что прислало окно острова (popup:rect)
 function editRect() {
-  if (!editing || !edit.onRect || !win || win.isDestroyed()) return;
-  const r = hoverWatch.rect(win);
-  if (!r) return;
-  const wb = win.getContentBounds(), db = edit.display.bounds;
+  if (!editing || !edit.onRect || !alive() || !ptr.rect) return;
+  const wb = win.getContentBounds(), db = edit.display.bounds, r = ptr.rect;
   edit.onRect({ x: wb.x - db.x + r.x, y: wb.y - db.y + r.y, w: r.w, h: r.h });
 }
 
@@ -176,19 +189,122 @@ function preview() {
   clearTimeout(previewTimer);
   previewTimer = setTimeout(() => {
     previewUntil = 0;
-    if (win && !win.isDestroyed() && ready) win.webContents.send('island:preview', false);
+    if (!editing) send('island:preview', false);
     update();
   }, 2600);
   ensure();
   place();
-  if (ready) win.webContents.send('island:preview', true);
+  send('island:preview', true);
   update();
 }
 
+// ---- мышь ----
+// Окно больше капсулы: поля под тень и раскрытие пропускают клики насквозь, а мышь окно ловит, только
+// пока курсор над капсулой (или над каплями рядом). Где капсула, присылает окно острова (popup:rect),
+// а где курсор — смотрим отсюда по часам: события мыши самого прозрачного окна при переключении
+// «пропускать / ловить» врут (ложный mouseleave, сброшенный :hover).
+// Зашёл на капсулу — окну «pointer: true» (подсветка); ушёл (с задержкой: раскрытая капсула растёт
+// ~0,4 с, её граница догоняет курсор) — «pointer: false», остров сворачивается
+const EVERY = 30;
+const MARGIN_IN = 4, MARGIN_OUT = 16; // зайти — на 4 px от капсулы, уйти — отойдя на 16 (у края не мигает)
+const LEAVE = 350;
+const ptr = {
+  rect: null, // {x, y, w, h} — капсула в окне; null — окно ещё не сказало
+  extra: [], // капли рядом: над ними ловим мышь, но «зашёл» не считаем
+  inside: false, // курсор на капсуле (с задержкой на уход)
+  outSince: 0,
+  open: false, // остров говорит, что раскрыт (island:hover)
+  outSent: 0, // когда последний раз сказали «ушёл» раскрытому острову
+  catching: null, // ловит ли окно мышь сейчас (null — не знаем, выставим заново)
+  assertAt: 0,
+};
+const within = (r, x, y, m) => x >= r.x - m && x < r.x + r.w + m && y >= r.y - m && y < r.y + r.h + m;
+
+function catchMouse(on) {
+  const now = Date.now();
+  // подтверждаем раз в секунду, даже если не менялось: стиль окна мог сбросить кто-то ещё
+  if (on === ptr.catching && now - ptr.assertAt < 1000) return;
+  if (on !== ptr.catching) log('island.mouse', on ? 'ловим' : 'насквозь');
+  ptr.catching = on;
+  ptr.assertAt = now;
+  win.setIgnoreMouseEvents(!on); // без forward: движение мыши острову не нужно, решаем здесь
+}
+
+function setInside(on) {
+  if (on === ptr.inside) return;
+  ptr.inside = on;
+  log('island.inside', on, 'rect', ptr.rect);
+  send('island:pointer', on);
+  if (!on) ptr.outSent = Date.now();
+}
+
+function track() {
+  if (!alive()) return;
+  // спрятан, грузится, в редакторе — мышь не ловим вовсе
+  if (!shown || !ready || editing) {
+    ptr.outSince = 0;
+    if (ptr.inside) { ptr.inside = false; ptr.outSent = Date.now(); }
+    catchMouse(false);
+    return;
+  }
+  const now = Date.now();
+  let inside = false, extra = false;
+  if (ptr.rect) {
+    const p = screen.getCursorScreenPoint();
+    const b = win.getContentBounds();
+    const x = p.x - b.x, y = p.y - b.y;
+    inside = within(ptr.rect, x, y, ptr.inside ? MARGIN_OUT : MARGIN_IN);
+    extra = ptr.extra.some((r) => within(r, x, y, 0));
+  }
+  if (inside) ptr.outSince = 0;
+  else if (ptr.inside) {
+    if (!ptr.outSince) ptr.outSince = now;
+    if (now - ptr.outSince < LEAVE) inside = true;
+  }
+  setInside(inside);
+  // остров раскрыт, а курсора на нём давно нет: «ушёл» потерялся (перезагрузка, гонка) — напоминаем
+  if (ptr.open && !ptr.inside && now - ptr.outSent > 1000) {
+    ptr.outSent = now;
+    send('island:pointer', false);
+  }
+  catchMouse(inside || extra);
+}
+setInterval(track, EVERY);
+
+// Окно острова говорит, где капсула (на каждом кадре, пока она меняет размер, и раз в 150 мс)
+function setRect(r) {
+  const ok = (v) => v && [v.x, v.y, v.w, v.h].every(Number.isFinite);
+  ptr.rect = ok(r) ? { x: r.x, y: r.y, w: r.w, h: r.h } : null;
+  ptr.extra = Array.isArray(r?.extra) ? r.extra.filter(ok).slice(0, 4) : [];
+  editRect(); // открыт редактор места — он узнает, что капсула выросла или раскрылась
+}
+
+// Остров раскрылся (нажатием) или свернулся. Раскрылся — значит, курсор на нём: ловим мышь сразу,
+// не дожидаясь часов; если курсор на самом деле снаружи, через LEAVE часы скажут «ушёл»
+function hover(open) {
+  ptr.open = !!open;
+  if (!open || !shown || editing) return;
+  ptr.inside = true;
+  ptr.outSince = 0;
+  track();
+}
+
+// Новое окно или перезагрузка: всё, что знали о мыши, — от старого
+function forgetPointer() {
+  ptr.rect = null;
+  ptr.extra = [];
+  ptr.inside = false;
+  ptr.outSince = 0;
+  ptr.open = false;
+  ptr.catching = null;
+}
+
 function ensure() {
-  if (win && !win.isDestroyed()) return;
+  if (alive()) return;
   ready = false;
-  win = new BrowserWindow({
+  shown = false;
+  forgetPointer();
+  const w = new BrowserWindow({
     ...SIZE,
     show: false,
     frame: false,
@@ -211,54 +327,110 @@ function ensure() {
       backgroundThrottling: false,
     },
   });
-  // заход курсора на капсулу решает главный процесс: события мыши в прозрачном окне врут при
-  // переключении «пропускать клики / ловить» (ложный mouseleave — капсула закрывалась и клики уходили)
-  hoverWatch.watch(win, { leaveDelay: 350, onInside: (on) => { if (ready && !win.isDestroyed()) win.webContents.send('island:pointer', on); } });
+  win = w;
+  w.setIgnoreMouseEvents(true);
+  ptr.catching = false;
   level();
-  win.loadFile(path.join(__dirname, '..', 'renderer', 'island.html'));
-  // on, а не once: после перезагрузки сторожем (ниже) остров снова получает место и состояние
-  win.webContents.on('did-finish-load', () => {
-    ready = true;
-    lastBeat = Date.now();
-    win.webContents.send('island:config', placeCfg());
-    if (editing) win.webContents.send('island:preview', true);
-    if (last) win.webContents.send('island:state', last);
-    update();
+  const wc = w.webContents;
+  // где капсула — прямо из этого окна (main.js шлёт popup:rect ещё и в src/hover.js, тому остров не нужен)
+  wc.ipc.on('popup:rect', (e, r) => setRect(r));
+  wc.on('did-start-loading', () => {
+    ready = false;
+    loadingSince = Date.now();
+    forgetPointer(); // старое место капсулы — от прошлой страницы; новая пришлёт своё
   });
-  win.webContents.on('render-process-gone', (e, d) => { log('island.gone', d.reason, d.exitCode); revive('gone'); });
-  win.webContents.on('unresponsive', () => log('island.unresponsive'));
-  win.webContents.on('responsive', () => log('island.responsive'));
-  win.on('closed', () => { win = null; ready = false; shown = false; });
+  // on, а не once: после перезагрузки сторожем остров снова получает всё
+  wc.on('did-finish-load', () => {
+    ready = true;
+    loadingSince = 0;
+    lastBeat = Date.now();
+    wc.send('island:config', placeCfg());
+    if (editing || Date.now() < previewUntil) wc.send('island:preview', true);
+    if (last) wc.send('island:state', last);
+    if (editing && demo) wc.send('island:demo', true);
+    if (shown) conceal(false); // окно уже было видно — сбросить «спрятан» и в самом острове
+    update();
+    track();
+  });
+  wc.on('did-fail-load', (e, code, desc) => { if (code !== -3) log('island.fail-load', code, desc); }); // -3 — прервали новой загрузкой
+  wc.on('render-process-gone', (e, d) => { log('island.gone', d.reason, d.exitCode); revive('gone'); });
+  wc.on('unresponsive', () => { log('island.unresponsive'); hungSince = Date.now(); });
+  wc.on('responsive', () => { log('island.responsive'); hungSince = 0; });
+  w.on('closed', () => {
+    if (win !== w) return;
+    win = null;
+    ready = false;
+    shown = false;
+  });
+  w.loadFile(path.join(__dirname, '..', 'renderer', 'island.html'));
   place();
 }
 
-// Сторож: остров из цикла отрисовки раз в секунду говорит «живой» (renderer/island.js → tick).
-// Замолчал, пока виден, — окно перестало выводить кадры (капсула застыла: ни трека, ни анимаций).
-// Сначала просим перерисовать окно, не помогло — перезагружаем остров. Всё — в журнал острова
+// ---- сторож ----
+// Остров из цикла отрисовки раз в секунду говорит «живой» (renderer/island.js → tick). Замолчал, пока
+// виден, — окно перестало выводить кадры или повисло. Лечим по лестнице: попросить перерисовать окно →
+// перезагрузить → заменить окно целиком. Повис (unresponsive) или не загрузился за 8 с — сразу замена.
+// Компьютер спал или экран заблокирован — кадров и не должно было быть: ждём заново. Всё — в журнал
 let lastBeat = Date.now();
 let stalls = 0;
+let loadingSince = 0;
+let hungSince = 0;
+let asleep = false;
+let replacedAt = 0;
 function beat() {
   if (stalls) log('island.beat после', stalls, 'попыток');
   lastBeat = Date.now();
   stalls = 0;
 }
 function revive(why) {
-  if (!win || win.isDestroyed()) return;
+  if (!alive()) return;
   log('island.revive', why);
-  ready = false;
   lastBeat = Date.now();
-  win.webContents.reload();
+  win.webContents.reload(); // did-start-loading сбросит ready и мышь
+}
+// Заменить окно: старое уничтожаем, новое создаём и показываем со всем, что знаем
+function replace(why) {
+  log('island.replace', why);
+  replacedAt = Date.now();
+  stalls = 0;
+  hungSince = 0;
+  loadingSince = 0;
+  const old = win;
+  win = null;
+  ready = false;
+  shown = false;
+  if (old && !old.isDestroyed()) old.destroy();
+  update(); // нужен — ensure() создаст новое, did-finish-load покажет
 }
 setInterval(() => {
-  if (!win || win.isDestroyed() || !ready || !shown || Date.now() - lastBeat < 3000) return;
+  if (!alive() || asleep) return;
+  const now = Date.now();
+  if (now - replacedAt < 10000) return; // только что заменили — даём загрузиться
+  if (loadingSince && now - loadingSince > 8000) return replace('не загрузился');
+  if (hungSince && now - hungSince > 4000) return replace('повис');
+  if (!ready || !shown || now - lastBeat < 3000) return;
   stalls++;
-  log('island.stall', Math.round((Date.now() - lastBeat) / 1000), 'с, попытка', stalls);
+  log('island.stall', Math.round((now - lastBeat) / 1000), 'с, попытка', stalls);
   if (stalls === 1) win.webContents.invalidate();
-  else if (stalls === 2 || stalls % 20 === 0) revive('stall'); // не помогает — не перезагружаем по кругу, раз в ~30 с
+  else if (stalls === 2) revive('stall');
+  else if (stalls >= 4) replace('stall'); // перезагрузка не помогла (на 3-м ждём, пока она догрузится)
 }, 1500);
 
+function sleepWake() {
+  powerMonitor.on('suspend', () => { asleep = true; });
+  powerMonitor.on('lock-screen', () => { asleep = true; });
+  const wake = () => {
+    asleep = false;
+    lastBeat = Date.now();
+    stalls = 0;
+    if (alive()) { level(); place(); win.webContents.invalidate(); } // после сна прозрачное окно бывает пустым
+  };
+  powerMonitor.on('resume', wake);
+  powerMonitor.on('unlock-screen', wake);
+}
+
 function level() {
-  if (!win || win.isDestroyed()) return;
+  if (!alive()) return;
   win.setAlwaysOnTop(true, 'screen-saver'); // выше и полноэкранных окон; в играх прячет «прятать в играх»
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true });
 }
@@ -267,8 +439,8 @@ function level() {
 // обратно, пока он виден. Фокус не забирает. Над эксклюзивным полноэкранным режимом (не «без рамки»)
 // окно не нарисовать никак — там помогает только режим «оконный без рамки» в самой игре
 setInterval(() => {
-  if (!win || win.isDestroyed() || !shown) return;
-  if (hoverWatch.isInside(win)) return; // курсор на острове — не трогаем окно, чтобы не сорвать клик
+  if (!alive() || !shown) return;
+  if (ptr.inside || ptr.open || ptr.catching) return; // курсор на острове — не трогаем окно, чтобы не сорвать клик
   if (!editing && display().id !== placedOn) place(); // курсор ушёл на другой монитор — остров за ним
   win.setAlwaysOnTop(true, 'screen-saver');
   win.moveTop();
@@ -287,17 +459,20 @@ function wanted() {
 }
 
 // Остров прячем не hide(), а полной прозрачностью: окно с focusable: false после hide() и
-// showInactive() перестаёт получать клики (проверено — движение мыши доходит, нажатия нет),
-// и кнопки острова ломались после каждого события и смены окна
-let shown = false;
+// showInactive() перестаёт получать клики (проверено — движение мыши доходит, нажатия нет).
+// Спрятанный остров ещё и сворачивается и забывает «раскрыт» (island:pointer 'reset')
+function conceal(hide) {
+  if (hide) send('island:pointer', 'reset');
+  win.setOpacity(hide ? 0 : 1);
+}
+
 function update() {
   if (!wanted()) {
-    if (win && !win.isDestroyed() && shown) {
+    if (alive() && shown) {
       shown = false;
-      hoverWatch.setOff(win, true); // мышь не ловим, клики насквозь
-      // острову — свернуться и забыть «раскрыт»
-      if (ready) win.webContents.send('island:pointer', 'reset');
-      win.setOpacity(0);
+      ptr.open = false;
+      track(); // мышь не ловим, клики насквозь
+      conceal(true);
     }
     return;
   }
@@ -307,9 +482,9 @@ function update() {
   lastBeat = Date.now(); // пока был прозрачным, кадров могло не быть — ждём заново
   stalls = 0;
   place();
-  win.setOpacity(1);
-  hoverWatch.setOff(win, editing); // в редакторе мышь не ловим: нажатия — редактору
+  conceal(false);
   if (!win.isVisible()) win.showInactive(); // только в первый раз — дальше окно не прячется
+  track();
 }
 
 function init(mainWindow) {
@@ -318,23 +493,19 @@ function init(mainWindow) {
   screen.on('display-metrics-changed', place);
   screen.on('display-added', place);
   screen.on('display-removed', place);
+  sleepWake();
   games.start(() => cfg().enabled && !!cfg().hideInGames, () => update());
 }
 
 function state(s) {
   if (editing && s.amber && s.amber !== last?.amber) edit.onAccent?.(s.amber);
   last = s;
-  if (win && !win.isDestroyed() && ready) win.webContents.send('island:state', s);
+  send('island:state', s);
   update();
 }
 
-// Курсор на капсуле — ловим клики; ушёл — окно снова прозрачно для мыши
-function hover(on) {
-  hoverWatch.setHover(win, on); // src/hover.js: ещё и сам смотрит, где курсор
-}
-
 function settingsChanged() {
-  if (win && !win.isDestroyed()) {
+  if (alive()) {
     level();
     place();
     sendConfig();
@@ -343,7 +514,7 @@ function settingsChanged() {
 }
 
 function destroy() {
-  if (win && !win.isDestroyed()) win.destroy();
+  if (alive()) win.destroy();
 }
 
 module.exports = { init, state, beat, hover, settingsChanged, destroy, preview, screenInfo, editInfo, placement, setEditing, editMove, editOpen, editRect, editRaise };

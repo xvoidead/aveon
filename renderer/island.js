@@ -1,7 +1,9 @@
 'use strict';
 // Остров поверх всех окон: состояние присылает окно плеера (island-feed.js) через главный процесс.
-// Свёрнут — обложка и спектр (или строка текста песни); смена трека и уведомления на секунды
-// раскрывают его; наведение — кнопки, перемотка, друзья.
+// Свёрнут — обложка и спектр (или строка текста песни); смена трека на секунды показывает название;
+// нажатие раскрывает — кнопки, перемотка, друзья, лента событий.
+// Мышью и «живой ли остров» правит главный процесс (src/island.js): здесь ничего не должно замереть
+// навсегда — цикл кадров переживает любую ошибку, а «спрятать» сбрасывает всё, что было начато.
 const api = window.tishe;
 const $ = (s) => document.querySelector(s);
 const pill = $('#pill');
@@ -11,7 +13,6 @@ let st = null;
 let lastId = null;
 let lastLine = '';
 let peekTimer = 0;
-let leaveTimer = 0;
 
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const fmt = (s) => {
@@ -19,6 +20,16 @@ const fmt = (s) => {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`;
 };
 const is = (c) => pill.classList.contains(c);
+// ошибки — в журнал острова (src/islandlog.js), не чаще раза в 5 с на место: на каждом кадре забили бы его
+const reported = {};
+function report(where, e) {
+  const t = Date.now();
+  if (t - (reported[where] || 0) < 5000) return;
+  reported[where] = t;
+  api.island.log?.('ошибка', where, String(e?.stack || e).slice(0, 400));
+}
+window.addEventListener('error', (e) => report('window', e.error || e.message));
+window.addEventListener('unhandledrejection', (e) => report('promise', e.reason));
 const expanded = () => is('open') || is('peek') || is('notice');
 const plural = (n, one, few, many) => {
   const a = n % 10, b = n % 100;
@@ -53,7 +64,8 @@ api.island.onPreview((on) => {
   if (on && !st?.hasTrack) { $('#p-title').textContent = 'остров будет здесь'; $('#p-title').dataset.key = ''; }
 });
 
-api.island.onState((s) => {
+api.island.onState((s) => { try { applyState(s); } catch (e) { report('состояние', e); } });
+function applyState(s) {
   st = s;
   for (const [k, v] of Object.entries(s.avatars || {})) avatars.set(k, v);
   // Уведомление остров не раскрывает: событие уходит в каплю слева (renderSideEv — она подпрыгивает),
@@ -112,7 +124,7 @@ api.island.onState((s) => {
   renderSide(s.friends);
   renderSideEv();
   if (pill.className !== lastClass) { lastClass = pill.className; wakeGoo(); }
-});
+}
 let lastClass = '';
 const WAVE = [4, 2, 1, 0, 1, 3, 4];
 
@@ -374,10 +386,16 @@ function syncGoo() {
 }
 
 let fillAt = 0, fillLast = '', beatAt = 0;
+// Цикл кадров. Следующий кадр просим первым делом: раньше просили в конце, и любая ошибка посреди
+// кадра обрывала цикл навсегда — сторож молча перезагружал остров
 function tick() {
+  requestAnimationFrame(tick);
   const now = performance.now();
   // «живой» главному процессу раз в секунду: замолчали, пока остров виден, — он нас оживит (src/island.js)
   if (now - beatAt > 1000) { beatAt = now; api.island.beat?.(); }
+  try { frame(now); } catch (e) { report('кадр', e); }
+}
+function frame(now) {
   if (now < gooAwake || now - gooSynced > 500) syncGoo();
   const drops = !!st?.hasTrack && !expanded() && !document.body.classList.contains('hidden');
   $('#side').classList.toggle('on', drops && is('friend-live'));
@@ -402,7 +420,6 @@ function tick() {
     $('#t-dur').textContent = dur ? `-${fmt(dur - Math.min(pos, dur))}` : '0:00'; // справа — сколько осталось, как в iOS
     $('#seek-fill').style.width = dur ? `${Math.min(100, (pos / dur) * 100)}%` : '0';
   }
-  requestAnimationFrame(tick);
 }
 requestAnimationFrame(tick);
 
@@ -411,7 +428,6 @@ requestAnimationFrame(tick);
 // переключается «пропускать клики / ловить», — капсула сворачивалась под курсором, и кнопки не нажимались
 function pointerIn() {
   api.island.log?.('pointerIn', pill.className);
-  clearTimeout(leaveTimer);
   if (is('open')) { api.island.hover(true); return; } // уже раскрыт — но ловить мышь напомнить (вдруг сбросили)
   pill.classList.remove('peek', 'notice', 'dev');
   pill.classList.add('open');
@@ -424,11 +440,16 @@ function pointerIn() {
   api.island.hover(true);
 }
 function pointerOut() {
-  api.island.log?.('pointerOut', pill.className, 'hover', pill.matches(':hover'));
-  clearTimeout(leaveTimer);
+  api.island.log?.('pointerOut', pill.className);
+  collapse();
+}
+// Свернуться и сказать главному процессу, что остров больше не раскрыт
+function collapse() {
+  const was = is('open');
   pill.classList.remove('open');
   sideZone = null;
   renderLabel();
+  if (was) api.island.hover(false);
 }
 // Раскрывается по нажатию, как в iOS; наведение только подсвечивает капсулу
 pill.addEventListener('pointerdown', (e) => {
@@ -439,7 +460,6 @@ pill.addEventListener('pointerdown', (e) => {
 // Редактор места (src/islandedit.js) просит показать остров раскрытым — видно, куда он откроется.
 // Мышь в это время у редактора, так что наведение и уход курсора сюда не приходят
 api.island.onDemo?.((on) => {
-  clearTimeout(leaveTimer);
   if (on) {
     pill.classList.remove('peek', 'notice', 'dev');
     pill.classList.add('open');
@@ -455,11 +475,9 @@ api.island.onDemo?.((on) => {
 api.island.onPointer((on) => {
   api.island.log?.('onPointer', on);
   pill.classList.toggle('hover', on === true);
-  if (on === 'reset') { // окно прячут: свернуться сразу, без задержки и без проверки :hover
-    clearTimeout(leaveTimer);
-    pill.classList.remove('open');
-    sideZone = null;
-    renderLabel();
+  if (on === 'reset') { // окно прячут: свернуться сразу и бросить всё начатое — перемотку тоже
+    seekCancel();
+    collapse();
     return;
   }
   if (!on && seekDrag) { outWhileDrag = true; return; } // тянут перемотку — свернёмся, когда отпустят
@@ -505,6 +523,7 @@ for (const el of document.querySelectorAll('.side')) {
 const RUBBER = 16;
 let seekDrag = null; // { f } — пока тянут
 let outWhileDrag = false; // курсор ушёл с капсулы посреди перемотки — свернём, когда отпустят
+let seekCancel = () => {}; // бросить перемотку, не перематывая (остров прячут)
 function seekAt(e) {
   const bar = $('#seek');
   const r = bar.getBoundingClientRect();
@@ -523,24 +542,33 @@ $('#seek').addEventListener('pointerdown', (e) => {
   outWhileDrag = false;
   seekAt(e);
   const move = (ev) => seekAt(ev);
-  const up = (ev) => {
-    if (ev.type === 'pointerup') seekAt(ev);
+  // отпустили — перематываем; отменили (pointercancel, потеря захвата, остров спрятали) — нет.
+  // Раньше потерянное отпускание оставляло перемотку «тянут» навсегда: время стояло, остров не сворачивался
+  const end = (ev) => {
+    if (!seekDrag) return;
+    const done = ev?.type === 'pointerup';
+    if (done) seekAt(ev);
     const pos = seekDrag.f * st.duration;
-    act('seek', { pos });
     bar.classList.remove('drag');
     bar.style.setProperty('--sx', '1');
     bar.style.setProperty('--tx', '0px');
     bar.removeEventListener('pointermove', move);
-    bar.removeEventListener('pointerup', up);
-    bar.removeEventListener('pointercancel', up);
-    // плеер пришлёт новую позицию чуть позже — до тех пор держим ту, куда отпустили
-    st = { ...st, pos, at: Date.now() };
+    bar.removeEventListener('pointerup', end);
+    bar.removeEventListener('pointercancel', end);
+    bar.removeEventListener('lostpointercapture', end);
     seekDrag = null;
+    seekCancel = () => {};
+    if (done) {
+      act('seek', { pos });
+      st = { ...st, pos, at: Date.now() }; // плеер пришлёт новую позицию чуть позже — до тех пор держим ту, куда отпустили
+    }
     if (outWhileDrag) pointerOut();
   };
+  seekCancel = () => end(null);
   bar.addEventListener('pointermove', move);
-  bar.addEventListener('pointerup', up);
-  bar.addEventListener('pointercancel', up);
+  bar.addEventListener('pointerup', end);
+  bar.addEventListener('pointercancel', end);
+  bar.addEventListener('lostpointercapture', end);
 });
 // колесо над островом — громкость
 pill.addEventListener('wheel', (e) => { e.preventDefault(); act('volume', { delta: e.deltaY < 0 ? 0.05 : -0.05 }); }, { passive: false });
@@ -548,7 +576,7 @@ pill.addEventListener('wheel', (e) => { e.preventDefault(); act('volume', { delt
 // Где панель — главному процессу (src/hover.js): над ней окно ловит мышь, даже если сама панель —
 // область перетаскивания и движение мыши сюда не приходит
 (() => {
-  let last = '';
+  let last = '', lastAt = 0;
   const box = (r) => ({ x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) });
   const send = () => {
     const el = document.querySelector('#pill');
@@ -565,7 +593,9 @@ pill.addEventListener('wheel', (e) => { e.preventDefault(); act('volume', { delt
     const drops = sides();
     if (drops.length) rect.extra = drops.map((d) => box(d.getBoundingClientRect()));
     const key = JSON.stringify(rect);
-    if (key !== last) { last = key; api.popup?.rect(rect); }
+    // то же самое не шлём, но раз в 2 с всё равно: главный процесс мог забыть (перезагрузка, новое окно)
+    const t = Date.now();
+    if (key !== last || t - lastAt > 2000) { last = key; lastAt = t; api.popup?.rect(rect); }
   };
   // Капсула растёт ~0,4 с: пока меняется размер, шлём каждый кадр (ResizeObserver) — иначе кнопки
   // раскрытой капсулы какое-то время были «за границей» и клики уходили насквозь.
@@ -621,5 +651,5 @@ function renderEvents(list) {
 // временно: любое нажатие в острове — в журнал (куда попало, в каком состоянии капсула)
 document.addEventListener('pointerdown', (e) => {
   const t = e.target;
-  api.island.log?.('pointerdown', `${t.tagName}#${t.id}.${String(t.className).replace(/\s+/g, '.')}`, 'text', (t.textContent || '').slice(0, 20), 'pill', pill.className, 'at', e.clientX, e.clientY, 'pillRect', pill.getBoundingClientRect().toJSON());
+  api.island.log?.('pointerdown', `${t.tagName}#${t.id || ''}`, 'pill', pill.className, 'at', e.clientX, e.clientY);
 }, true);

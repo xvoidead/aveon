@@ -20,7 +20,7 @@ const (
 )
 
 var (
-	syncKinds = map[string]bool{"albums": true, "settings": true, "stats": true, "keys": true} // keys — зашифрованы на клиенте
+	syncKinds = map[string]bool{"albums": true, "settings": true, "stats": true, "keys": true, "likes": true} // keys — зашифрованы на клиенте; likes — лайки, которые Яндекс не принял
 	loginRe   = regexp.MustCompile(`^[a-z0-9_.-]{3,32}$`)
 	keyRe     = regexp.MustCompile(`^[A-Za-z0-9_-]{1,64}$`)
 	avatarRe  = regexp.MustCompile(`^data:image/(jpeg|png|webp);base64,([A-Za-z0-9+/]+={0,2})$`)

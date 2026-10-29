@@ -6,7 +6,9 @@ const path = require('path');
 
 // cache и lyrics — индекс кэша треков и тексты песен (src/cache.js)
 // wallpaper — своя картинка фона (renderer/look.js), только на этом устройстве
-const NAMES = new Set(['session', 'stats', 'statsRemote', 'cache', 'lyrics', 'wallpaper']);
+// fckcensor — копия списка треков без цензуры (src/services/fckcensor.js)
+// likesLocal — лайки, которые Яндекс не принял (удалённые треки), только на этом устройстве (services/yandex.js)
+const NAMES = new Set(['session', 'stats', 'statsRemote', 'cache', 'lyrics', 'wallpaper', 'fckcensor', 'likesLocal']);
 const cache = new Map();
 
 function fileOf(name) {

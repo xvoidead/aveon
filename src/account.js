@@ -339,15 +339,46 @@ async function syncStats(docs, changed) {
   }
 }
 
+// Свои лайки Яндекса (services/yandex.js, store likesLocal): по каждому треку побеждает последнее
+// действие — лайк (tracks[].at) или снятие (removed[id]). Пометки о снятии старше полугода забываем
+const LIKE_TOMBSTONE = 180 * 24 * 3600 * 1000;
+function mergeLikes(a, b) {
+  const removed = { ...(a?.removed || {}) };
+  for (const [id, at] of Object.entries(b?.removed || {})) if (!(removed[id] >= at)) removed[id] = at;
+  for (const [id, at] of Object.entries(removed)) if (Date.now() - at > LIKE_TOMBSTONE) delete removed[id];
+  const byId = new Map();
+  for (const t of [...(a?.tracks || []), ...(b?.tracks || [])]) {
+    const cur = byId.get(t.id);
+    if (!cur || (t.at || 0) > (cur.at || 0)) byId.set(t.id, t);
+  }
+  const tracks = [...byId.values()].filter((t) => !(removed[t.id] >= (t.at || 0))).sort((x, y) => (y.at || 0) - (x.at || 0));
+  return { tracks, removed };
+}
+
+async function syncLikes(remote, changed) {
+  await put('likes', 'main', remote, (theirs) => {
+    const mine = store.read('likesLocal');
+    if (!mine && !theirs) return undefined;
+    const merged = mergeLikes(mine, theirs);
+    if (JSON.stringify(merged) !== JSON.stringify(mine)) {
+      store.write('likesLocal', merged);
+      changed.likes = true;
+    }
+    return theirs && JSON.stringify(merged) === JSON.stringify(theirs) ? undefined : merged;
+  });
+}
+
 async function runSync() {
   const { docs } = await api('GET', '/api/sync');
   const doc = (kind, key) => docs.find((d) => d.kind === kind && d.key === key) || null;
-  const changed = { albums: false, settings: false, stats: false, avatar: false, keys: false };
+  const changed = { albums: false, settings: false, stats: false, avatar: false, keys: false, likes: false };
   await syncAlbums(doc('albums', 'main'), changed);
   await syncSettings(doc('settings', 'main'), changed);
   await syncStats(docs, changed);
   await syncAvatar(changed);
   await syncKeys(doc('keys', 'main'), changed);
+  // последним и без падения всей синхронизации: старый сервер не знает вид likes (404)
+  try { await syncLikes(doc('likes', 'main'), changed); } catch (e) { if (e.status !== 404) throw e; }
   config.set({ account: { lastSync: Date.now() } });
   return changed;
 }
@@ -513,6 +544,7 @@ async function syncKeys(remote, changed) {
 
 // Поменяли ключ сервиса (настройки, вход в Spotify) — синхронизировать поскорее
 function keysChanged() { schedule(); }
+function likesChanged() { schedule(); } // свои лайки Яндекса (services/yandex.js)
 
 // ---- админка (server/admin.go) и объявление для всех ----
 
@@ -535,5 +567,5 @@ async function announcement() {
 module.exports = {
   init, status, register, login, resetRequest, resetCheck, resetConfirm, setEmail, confirmEmail,
   logout, logoutAll, me, rename, changePassword, remove, sync, settingsChanged,
-  sharePut, shareGet, sharePublic, collab, avatarOf, setAvatar, api, adminApi, announcement, keysChanged,
+  sharePut, shareGet, sharePublic, collab, avatarOf, setAvatar, api, adminApi, announcement, keysChanged, likesChanged,
 };

@@ -50,7 +50,13 @@ html.mobile .row.playing { background: var(--rivet); }
 html.mobile .row-more { opacity: 1; width: 40px; height: 40px; }
 html.mobile .row:active { background: var(--oak-2); }
 
-html.mobile .artist-hero { margin-left: 0; height: 300px; }
+html.mobile .artist-top, html.mobile .hero-chips { margin-left: 0; }
+html.mobile .artist-top.with-release { grid-template-columns: minmax(0, 1fr); }
+html.mobile .artist-hero { height: 300px; }
+html.mobile .hero-release { flex-direction: row; align-items: center; height: 84px; padding: 10px; }
+html.mobile .hero-release .rel-kind { display: none; }
+html.mobile .rel-pic { flex: none; width: 64px; height: 64px; }
+html.mobile .rel-foot { flex: 1; }
 html.mobile .hero-body { left: 16px; right: 16px; bottom: 16px; flex-direction: column; align-items: flex-start; gap: 12px; }
 html.mobile .hero-name { font-size: 30px; }
 html.mobile .disc-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 0; }

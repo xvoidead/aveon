@@ -1,0 +1,7 @@
+<!doctype html>
+<!-- Голосовое управление: Vosk живёт в невидимой рамке, потому что его сборка (embind) создаёт функции через new Function.
+     Главному окну 'unsafe-eval' не даём — разрешено только здесь, где нет ничего, кроме распознавания (renderer/voice.js) -->
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-eval' 'wasm-unsafe-eval'; connect-src media: blob:; worker-src blob:">
+<script src="../node_modules/vosk-browser/dist/vosk.js"></script>
+<script src="voice-host.js"></script>

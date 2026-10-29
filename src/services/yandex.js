@@ -3,6 +3,8 @@
 const crypto = require('crypto');
 const config = require('../config');
 const { request } = require('./http');
+const fc = require('./fckcensor');
+const store = require('../store');
 
 const API = 'https://api.music.yandex.net';
 const SIGN_SALT = 'XGRlBW9FXlekgbPrRHuSiA';
@@ -45,8 +47,9 @@ function cover(uri, size = '300x300') {
   return uri ? `https://${uri.replace('%%', size)}` : '';
 }
 
-function mapTrack(t) {
-  if (!t || !t.id) return null;
+function mapTrack(raw) {
+  if (!raw || !raw.id) return null;
+  const t = fc.patchTrack(raw); // название и обложка без звёздочек (services/fckcensor.js)
   const album = t.albums?.[0];
   return {
     id: `ym:${t.id}`,
@@ -57,7 +60,9 @@ function mapTrack(t) {
     duration: Math.round((t.durationMs || 0) / 1000),
     cover: cover(t.coverUri || album?.coverUri),
     link: album ? `https://music.yandex.ru/album/${album.id}/track/${t.id}` : '',
-    playable: t.available !== false,
+    playable: t.available !== false || !!fc.audioFor(t.id), // удалённый с сервиса, но есть в базе FckCensor
+    ...(fc.audioFor(t.id) ? { uncensored: true } : {}),
+    ...(t.available === false ? { gone: true } : {}), // в Яндексе его нет — лайк только локальный
     explicit: t.contentWarning === 'explicit' || t.explicit === true, // 18+: мат в тексте
     // id исполнителей — чтобы открыть страницу артиста без поиска по имени
     ref: { id: String(t.id), artists: (t.artists || []).map((a) => ({ id: String(a.id), name: a.name })) },
@@ -100,11 +105,14 @@ async function collections() {
 }
 
 async function collection(cid) {
+  await fc.load();
   const id = await uid();
   if (cid === 'likes') {
     const res = await api(`/users/${id}/likes/tracks`);
     const ids = res.library.tracks.map((t) => (t.albumId ? `${t.id}:${t.albumId}` : t.id));
-    return tracksByIds(ids);
+    const remote = await tracksByIds(ids);
+    const have = new Set(remote.map((t) => t.id));
+    return [...localLikes().filter((t) => !have.has(t.id)), ...remote]; // свои — сверху, они новее
   }
   if (cid.startsWith('pl:')) {
     const pl = await api(`/users/${id}/playlists/${cid.slice(3)}`);
@@ -168,7 +176,8 @@ async function findArtist(name) {
   return hit ? String(hit.id) : null;
 }
 
-function mapAlbum(a) {
+function mapAlbum(raw) {
+  const a = fc.patchAlbum(raw);
   return {
     id: `ym:${a.id}`,
     title: a.title + (a.version ? ` (${a.version})` : ''),
@@ -183,6 +192,7 @@ function mapAlbum(a) {
 async function artist(id) {
   const hit = artistCache.get(id);
   if (hit && Date.now() - hit.at < 10 * 60 * 1000) return hit.data;
+  await fc.load();
   const brief = await api(`/artists/${id}/brief-info`);
   const albums = [];
   for (let page = 0; page < 10; page++) {
@@ -219,8 +229,15 @@ async function artistByName(name, hintId) {
 }
 
 async function album(id) {
+  await fc.load();
   const a = await api(`/albums/${id}/with-tracks`);
-  return { ...mapAlbum(a), tracks: (a.volumes || []).flat().map(mapTrack).filter(Boolean) };
+  // FckCensor может вернуть в альбом удалённые треки: тогда у него свой трек-лист, только из id
+  const fa = fc.patchAlbum(a);
+  const fixed = fa.volumes;
+  const tracks = fixed && fixed !== a.volumes
+    ? (await tracksByIds(fixed.flat().map((x) => x.id))).map((t) => (t.cover ? t : { ...t, cover: cover(fa.coverUri) }))
+    : (a.volumes || []).flat().map(mapTrack).filter(Boolean);
+  return { ...mapAlbum(a), tracks };
 }
 
 function reset() { uidCache = null; likedCache = { at: 0, ids: null }; }
@@ -233,7 +250,33 @@ async function likedIds(fresh = false) {
   const res = await api(`/users/${await uid()}/likes/tracks`);
   const ids = (res.library?.tracks || []).map((t) => `ym:${t.id}`);
   likedCache = { at: Date.now(), ids };
-  return ids;
+  return [...ids, ...localLikes().map((t) => t.id)];
+}
+
+// Локальные лайки: удалённые с Яндекса треки (их «Мне нравится» не принимает) и те, что Яндекс
+// почему-то не взял. Показываются в «Мне нравится» вместе с остальными и ездят между устройствами
+// через аккаунт (account.js → syncLikes). { tracks: [{ ...трек, at }], removed: { id: когда сняли } } —
+// по removed снятый на одном устройстве лайк не вернётся с другого
+let onLikesChange = () => {};
+const likesDoc = () => store.read('likesLocal') || { tracks: [], removed: {} };
+const localLikes = () => likesDoc().tracks || [];
+function likeLocal(t) {
+  const doc = likesDoc();
+  const keep = {
+    id: t.id, source: 'ym', title: t.title || '', artist: t.artist || '', album: t.album || '', duration: t.duration || 0,
+    cover: t.cover || '', link: t.link || '', playable: true, explicit: !!t.explicit, ref: t.ref || {},
+    ...(t.uncensored ? { uncensored: true } : {}), ...(t.gone ? { gone: true } : {}), at: Date.now(),
+  };
+  const { [t.id]: _, ...removed } = doc.removed || {};
+  store.write('likesLocal', { tracks: [keep, ...(doc.tracks || []).filter((x) => x.id !== t.id)], removed });
+  onLikesChange();
+}
+function unlikeLocal(t) {
+  const doc = likesDoc();
+  if (!(doc.tracks || []).some((x) => x.id === t.id)) return false;
+  store.write('likesLocal', { tracks: doc.tracks.filter((x) => x.id !== t.id), removed: { ...(doc.removed || {}), [t.id]: Date.now() } });
+  onLikesChange();
+  return true;
 }
 
 
@@ -299,7 +342,9 @@ async function waveFeedback(type, track, played = 0) {
     if (!wave.legacy && wave.sid) await api(`/rotor/session/${wave.sid}/feedback`, {}, jsonPost({ event, batchId: wave.batch }));
     else await api(`/rotor/station/${WAVE_STATION}/feedback`, wave.batch ? { 'batch-id': wave.batch } : {}, jsonPost(event));
   } catch {}
-  // «нравится» — в лайки аккаунта; «не нравится» — в дизлайки, чтобы волна его больше не ставила
+  // «нравится» — в лайки аккаунта; «не нравится» — в дизлайки, чтобы волна его больше не ставила.
+  // Удалённый трек или Яндекс лайк не взял — лайк остаётся на устройстве ('local')
+  if (type === 'like' && track?.gone) { likeLocal(track); return 'local'; }
   if ((type === 'like' || type === 'dislike') && track) {
     try {
       const u = await uid();
@@ -309,13 +354,16 @@ async function waveFeedback(type, track, played = 0) {
         body: new URLSearchParams({ 'track-ids': waveTrackId(track) }).toString(),
       });
       if (type === 'like' && likedCache.ids && !likedCache.ids.includes(track.id)) likedCache.ids.push(track.id);
-    } catch {}
+    } catch {
+      if (type === 'like') { likeLocal(track); return 'local'; }
+    }
   }
   return true;
 }
 
 // Убрать из «Мне нравится» — второе нажатие на сердечко. Ошибку отдаём наверх: плеер вернёт сердечко
 async function unlike(track) {
+  if (unlikeLocal(track) && (track.gone || !likedCache.ids?.includes(track.id))) return true; // был только локальным
   const u = await uid();
   await api(`/users/${u}/likes/tracks/remove`, {}, {
     method: 'POST',
@@ -336,4 +384,7 @@ async function searchArtists(q) {
   }));
 }
 
-module.exports = { searchArtists, search, collections, collection, stream, reset, artistByName, album, waveStart, waveMore, waveFeedback, likedIds, unlike };
+module.exports = {
+  searchArtists, search, collections, collection, stream, reset, artistByName, album, waveStart, waveMore, waveFeedback, likedIds, unlike,
+  onLocalLikes: (cb) => { onLikesChange = cb; }, // свои лайки поменялись — account.js синхронизирует
+};

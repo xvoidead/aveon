@@ -5,12 +5,25 @@ const sc = require('./services/soundcloud');
 const ym = require('./services/yandex');
 const sp = require('./services/spotify');
 const texts = require('./services/texts');
+const fc = require('./services/fckcensor');
 const cache = require('./cache');
 
 const SOURCES = { sc, ym, sp };
 let local = null; // services/local.js на Windows, mobile/bridge/local.js на Android
 
-function init(localModule) { local = localModule; }
+function init(localModule) { local = localModule; fc.load(); }
+
+// Трек Яндекса, для которого в базе FckCensor есть версия без цензуры, играет оттуда
+function sourceStream(t) {
+  const url = t.source === 'ym' && fc.audioFor(t.id);
+  if (url) return { url, hls: false, mime: 'audio/mpeg', uncensored: true };
+  return SOURCES[t.source].stream(t);
+}
+
+// В кэше лежит запиканная копия, а версия без цензуры уже есть — копию выкидываем
+function censoredCopy(track) {
+  return track.source === 'ym' && !!fc.audioFor(track.id) && cache.has(track) && !cache.isUncensored(track);
+}
 
 const matchCache = new Map();
 
@@ -67,27 +80,28 @@ async function matchTrack(track) {
 // Трек уже в кэше — играем с диска; иначе берём поток сервиса и докачиваем его в кэш вместе с текстом
 async function resolveStream(track) {
   if (track.source === 'local') return { url: local.streamUrl(track.ref.path), hls: false };
+  if (track.source === 'ym') await fc.load();
+  const pin = censoredCopy(track) ? await cache.drop(track) : false;
   const hit = cache.cachedStream(track);
   if (hit) return hit;
   const s = await serviceStream(track);
-  keep(track, s);
+  keep(track, s, pin);
   return s;
 }
 
-function keep(track, s) {
-  cache.remember(track, s);
+function keep(track, s, pin = false) {
+  cache.remember(track, s, { pin }).catch(() => {});
   if (!s.preview) texts.find(track).catch(() => {});
 }
 
 async function serviceStream(track) {
   if (track.source === 'sp') {
     const m = await matchTrack(track);
-    const s = await SOURCES[m.source].stream(m);
+    const s = await sourceStream(m);
     return { ...s, via: { source: m.source, title: m.title, artist: m.artist } };
   }
-  const svc = SOURCES[track.source];
-  if (!svc) throw new Error('Неизвестный источник');
-  return svc.stream(track);
+  if (!SOURCES[track.source]) throw new Error('Неизвестный источник');
+  return sourceStream(track);
 }
 
 // Трек, который включил друг в «Слушать вместе». Если у нас подключён тот же сервис — играем
@@ -109,7 +123,7 @@ async function sharedStream(track) {
     if (/подключи/i.test(e.message)) throw new Error('Чтобы слушать вместе, подключи Яндекс Музыку или SoundCloud — через них плеер находит трек друга');
     throw e;
   }
-  const st = await SOURCES[m.source].stream(m);
+  const st = await sourceStream(m);
   const out = { ...st, cover: m.cover, via: { source: m.source, title: m.title, artist: m.artist, label: `У друга ${FROM[track.source] || ''}, звучит через ${NAMES_RU[m.source]}` } };
   keep(track, out);
   return out;
@@ -142,6 +156,7 @@ async function runDownloads() {
     const t = dlQueue.shift();
     const key = `${t.source}:${t.id}`;
     try {
+      if (censoredCopy(t)) await cache.drop(t);
       const s = cache.has(t) ? { url: 'cached' } : await serviceStream(t);
       await cache.remember(t, s, { pin: true });
       texts.find(t).catch(() => {}); // текст — тоже для офлайна

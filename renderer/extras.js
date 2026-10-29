@@ -619,11 +619,17 @@ function parseLRC(text) {
   return lines.sort((a, b) => a.t - b.t);
 }
 
-function lyricsOpen() { return !$('#lyrics').hidden; }
+function lyricsOpen() { return !$('#lyrics').hidden && !$('#lyrics').classList.contains('closing'); }
 
+// Открытие: панель всплывает (styles.css → lyr-open), строки въезжают лесенкой. Закрытие — панель
+// уходит вниз и только потом прячется; без анимаций (look-still) animationend не придёт — страхует таймер
 function openLyrics() {
   closeStats();
-  $('#lyrics').hidden = false;
+  const el = $('#lyrics');
+  clearTimeout(closeLyrics.t);
+  el.classList.remove('closing');
+  el.hidden = false;
+  requestAnimationFrame(lyricsCascade);
   $('#btn-lyrics').setAttribute('aria-pressed', 'true');
   if (state.track && ly.track?.id !== state.track.id) loadLyrics(state.track);
   else if (!state.track) renderLyricsEmpty('Сначала включи трек', 'Текст появится здесь и будет идти вместе с музыкой.');
@@ -631,14 +637,39 @@ function openLyrics() {
 }
 
 function closeLyrics() {
-  $('#lyrics').hidden = true;
+  const el = $('#lyrics');
   $('#btn-lyrics').setAttribute('aria-pressed', 'false');
   cancelAnimationFrame(ly.raf);
+  if (el.hidden || el.classList.contains('closing')) return;
+  const done = () => { clearTimeout(closeLyrics.t); el.classList.remove('closing'); el.hidden = true; };
+  el.classList.add('closing');
+  el.addEventListener('animationend', (e) => { if (e.target === el) done(); }, { once: true });
+  closeLyrics.t = setTimeout(done, 320);
+}
+
+// Строки въезжают лесенкой сверху вниз, начиная с первой видимой: посреди песни текст открывается
+// уже прокрученным к текущей строке. Невидимые строки не трогаем
+function lyricsCascade() {
+  const body = $('#lyrics-body');
+  if ($('#lyrics').hidden) return;
+  const box = body.getBoundingClientRect();
+  let i = 0;
+  for (const el of body.children) {
+    const r = el.getBoundingClientRect();
+    if (r.bottom < box.top || r.top > box.bottom) continue;
+    el.style.setProperty('--i', Math.min(i++, 14));
+    el.classList.remove('ly-in');
+    void el.offsetWidth; // перезапустить анимацию, если строка уже въезжала
+    el.classList.add('ly-in');
+  }
+  clearTimeout(lyricsCascade.t);
+  lyricsCascade.t = setTimeout(() => body.querySelectorAll('.ly-in').forEach((el) => el.classList.remove('ly-in')), 1400);
 }
 
 function renderLyricsEmpty(title, text) {
   ly.lines = [];
   $('#lyrics-body').innerHTML = `<div class="lyrics-empty"><h3>${esc(title)}</h3><p>${esc(text)}</p></div>`;
+  requestAnimationFrame(lyricsCascade);
 }
 
 async function loadLyrics(track) {
@@ -669,11 +700,13 @@ async function loadLyrics(track) {
     body.innerHTML = ly.lines.map((l, i) => `<button class="lyric karaoke" data-l="${i}">${l.words.map((w, j) => `${gap(l.words, j)}<span class="w">${esc(w.text)}</span>`).join('')}</button>`).join('');
     body.scrollTop = 0;
     syncLyrics(true);
+    requestAnimationFrame(lyricsCascade);
   } else if (res.synced) {
     ly.lines = parseLRC(res.synced);
     body.innerHTML = ly.lines.map((l, i) => `<button class="lyric${l.text ? '' : ' gap'}" data-l="${i}">${l.text ? esc(l.text) : '♪ ♪ ♪'}</button>`).join('');
     body.scrollTop = 0;
     syncLyrics(true);
+    requestAnimationFrame(lyricsCascade);
   } else if (res.plain) {
     body.classList.add('lyrics-plain');
     body.innerHTML = `<p class="lyrics-note">У этого трека в LRCLIB текст без таймкодов, поэтому строки не подсвечиваются.</p>`

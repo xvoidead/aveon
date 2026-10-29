@@ -18,7 +18,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 CREATE INDEX IF NOT EXISTS sessions_user ON sessions(user_id);
 
--- kind: albums | settings | stats; key: main или id устройства (у статистики своя на каждый компьютер)
+-- kind: albums | settings | stats | keys | likes; key: main или id устройства (у статистики своя на каждый компьютер)
 CREATE TABLE IF NOT EXISTS docs (
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     kind       TEXT NOT NULL,

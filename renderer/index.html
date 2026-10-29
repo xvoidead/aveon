@@ -19,6 +19,7 @@
   <link rel="stylesheet" href="../node_modules/@fontsource/manrope/700.css">
   <link rel="stylesheet" href="../node_modules/@fontsource/manrope/800.css">
   <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="aveon.css">
 </head>
 <body class="paused"><!-- paused снимает updatePlayState (app.js), когда музыка пошла -->
   <!-- Полоса вдоль верха, за которую тащат окно, — ПЕРВОЙ в разметке: Electron применяет области
@@ -143,6 +144,9 @@
       </div>
     </div>
 
+    <!-- дальше в очереди (upnext.js) — виден в дизайне «Авеон» -->
+    <section class="upnext" id="upnext" aria-label="Дальше в очереди" hidden></section>
+
     <!-- низ сцены: Discord (звонок) и аккаунт -->
     <div class="stage-foot">
       <div class="call" id="discord">
@@ -179,6 +183,9 @@
 
   <main class="library" id="content">
     <div class="lib-top">
+      <!-- свернуть панель разделов в ленту значков нажатием на знак — только в «Авеоне»: кнопка прозрачная,
+           лежит поверх знака (look.js → applyRail, aveon.css) -->
+      <button class="icon-btn side-toggle" id="side-toggle" aria-label="Свернуть панель" title="Свернуть панель (Ctrl+B)" aria-expanded="true"><svg><use href="#i-chevron-l"/></svg></button>
       <nav class="sources" id="sources">
         <button class="source" data-view="home">Главная</button>
         <button class="source" data-view="wave">Волна</button>
@@ -190,6 +197,7 @@
         <button class="source" data-view="sp">Spotify</button>
       </nav>
       <button class="icon-btn" id="open-friends" aria-label="Друзья" title="Друзья" aria-expanded="false"><svg><use href="#i-friends"/></svg><i class="badge" id="friends-badge" hidden></i></button>
+      <button class="icon-btn" id="open-settings-side" aria-label="Настройки" title="Настройки (Ctrl+,)"><svg><use href="#i-settings"/></svg></button>
     </div>
 
     <form class="search" id="search-form" autocomplete="off">
@@ -410,9 +418,7 @@
   <script src="wave.js"></script>
   <script src="scratch.js"></script>
   <script src="home.js"></script>
-  <script src="design-core.js"></script>
   <script src="look.js"></script>
-  <script src="designer.js"></script>
   <script src="island-feed.js"></script>
   <script src="desk.js"></script>
   <script src="karaoke.js"></script>
@@ -422,5 +428,7 @@
   <script src="focus.js"></script>
   <script src="wrapped.js"></script>
   <script src="modes.js"></script>
+  <script src="voice.js"></script>
+  <script src="upnext.js"></script>
 </body>
 </html>

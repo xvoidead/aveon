@@ -248,6 +248,22 @@ const fmtNum = (n) => (n >= 1e6 ? `${(n / 1e6).toFixed(1).replace(/\.0$/, '').re
 // После «млн» и «тыс.» — всегда «слушателей», иначе по обычным правилам
 const pluralNum = (n, one, few, many) => (n >= 1e4 ? many : plural(n, one, few, many));
 
+// Свежий релиз артиста — справа от шапки: обложка открывает альбом, кнопка сразу его играет.
+// Дискография приходит из Яндекса новыми сверху, так что это первый альбом или сингл
+function releaseHtml(disco) {
+  const r = disco?.albums?.[0];
+  if (!r) return '';
+  const meta = [r.type === 'single' ? 'сингл' : 'альбом', r.year].filter(Boolean).join(' · ');
+  return `<div class="hero-release" data-disc="${esc(r.id)}" role="button" tabindex="0" aria-label="Открыть «${esc(r.title)}»">
+    <span class="rel-kind">Новый релиз</span>
+    <span class="rel-pic">${r.cover ? `<img src="${esc(r.cover)}" alt="">` : '♪'}</span>
+    <span class="rel-foot">
+      <span class="rel-text"><b>${esc(r.title)}</b><span>${esc(meta)}</span></span>
+      <button class="rel-play" data-rel-play="${esc(r.id)}" aria-label="Играть «${esc(r.title)}»" title="Играть"><svg><use href="#i-play"/></svg></button>
+    </span>
+  </div>`;
+}
+
 function heroHtml(artist, disco, loading) {
   const photo = disco?.cover || artist.cover;
   const banner = disco?.banner || photo;
@@ -255,36 +271,41 @@ function heroHtml(artist, disco, loading) {
   const bg = disco?.video && !calm
     ? `<video class="hero-bg" src="${esc(disco.video)}" poster="${esc(banner)}" autoplay muted loop playsinline disablepictureinpicture></video>`
     : `<div class="hero-bg${banner ? '' : ' empty'}" data-bg="${esc(banner || '')}"></div>`;
-  const stats = [];
+  // Цифры и факты — плашками под шапкой, а не текстом поверх фото: на светлом кадре их было не прочесть
+  const chips = [];
   if (disco?.listeners != null) {
     const d = disco.listenersDelta;
     const delta = d ? ` <span class="${d > 0 ? 'up' : 'down'}" title="За месяц">${d > 0 ? '↑' : '↓'} ${fmtNum(Math.abs(d))}</span>` : '';
-    stats.push(`<b>${fmtNum(disco.listeners)}</b> ${pluralNum(disco.listeners, 'слушатель', 'слушателя', 'слушателей')} за месяц${delta}`);
+    chips.push(`<b>${fmtNum(disco.listeners)}</b> ${pluralNum(disco.listeners, 'слушатель', 'слушателя', 'слушателей')} за месяц${delta}`);
   }
-  if (disco?.likes) stats.push(`<b>${fmtNum(disco.likes)}</b> ${pluralNum(disco.likes, 'лайк', 'лайка', 'лайков')}`);
-  if (!disco && artist.count) stats.push(`у тебя ${artist.count} ${plural(artist.count, 'трек', 'трека', 'треков')}`);
-  if (loading) stats.push('загружаю из Яндекс Музыки…');
+  if (disco?.likes) chips.push(`<b>${fmtNum(disco.likes)}</b> ${pluralNum(disco.likes, 'лайк', 'лайка', 'лайков')}`);
+  for (const c of disco?.countries || []) chips.push(esc(c));
   const years = disco?.years || [];
-  const meta = [...(disco?.countries || []), years.length > 1 ? years.join('–') : years.length ? `с ${years[0]}` : ''].filter(Boolean).join(' · ');
+  if (years.length) chips.push(years.length > 1 ? years.join('–') : `с ${years[0]}`);
+  if (artist.count) chips.push(`у тебя ${artist.count} ${plural(artist.count, 'трек', 'трека', 'треков')}`);
+  if (loading) chips.push('загружаю из Яндекс Музыки…');
   const color = /^#[0-9a-f]{6}$/i.test(disco?.color || '') ? ` style="--hero:${disco.color}"` : '';
   const canPlay = state.shown.length > 0;
-  return `<section class="artist-hero"${color}>
-    ${bg}
-    <div class="hero-shade"></div>
-    <div class="hero-body">
-      <span class="hero-pic">${photo ? `<img src="${esc(photo)}" alt="">` : esc(artist.name.trim()[0]?.toUpperCase() || '♪')}</span>
-      <div class="hero-text">
-        <span class="hero-kind">Артист</span>
-        <h2 class="hero-name">${esc(artist.name)}</h2>
-        ${stats.length ? `<p class="hero-stats">${stats.join('<i>·</i>')}</p>` : ''}
-        ${meta ? `<p class="hero-meta">${esc(meta)}</p>` : ''}
-        <div class="hero-actions">
-          <button class="btn primary" data-hero="play" ${canPlay ? '' : 'disabled'}><svg><use href="#i-play"/></svg><span>Слушать</span></button>
-          <button class="btn" data-hero="shuffle" ${canPlay ? '' : 'disabled'}><svg><use href="#i-shuffle"/></svg><span>Вперемешку</span></button>
+  const release = releaseHtml(disco);
+  return `<div class="artist-top${release ? ' with-release' : ''}">
+    <section class="artist-hero"${color}>
+      ${bg}
+      <div class="hero-shade"></div>
+      <div class="hero-body">
+        <span class="hero-pic">${photo ? `<img src="${esc(photo)}" alt="">` : esc(artist.name.trim()[0]?.toUpperCase() || '♪')}</span>
+        <div class="hero-text">
+          <span class="hero-kind">Артист</span>
+          <h2 class="hero-name">${esc(artist.name)}</h2>
+          <div class="hero-actions">
+            <button class="btn primary" data-hero="play" ${canPlay ? '' : 'disabled'}><svg><use href="#i-play"/></svg><span>Слушать</span></button>
+            <button class="btn" data-hero="shuffle" ${canPlay ? '' : 'disabled'}><svg><use href="#i-shuffle"/></svg><span>Вперемешку</span></button>
+          </div>
         </div>
       </div>
-    </div>
-  </section>`;
+    </section>
+    ${release}
+  </div>
+  ${chips.length ? `<p class="hero-chips">${chips.map((c) => `<span>${c}</span>`).join('')}</p>` : ''}`;
 }
 
 const sectionHead = (title, count) => `<h3 class="disc-h">${esc(title)}${count != null ? `<span>${count}</span>` : ''}</h3>`;
@@ -360,7 +381,9 @@ function renderArtist(artist, { keepScroll = false } = {}) {
   if (bg?.dataset.bg) bg.style.backgroundImage = `url("${bg.dataset.bg.replace(/"/g, '%22')}")`;
   // вернулись из альбома — страница там же, откуда его открыли: карточка на месте, и обложке есть куда вернуться
   el.scrollTop = back?.scroll != null ? back.scroll : keepScroll ? scroll : 0;
-  if (fromRect) requestAnimationFrame(() => zoomFly(fromRect, el.querySelector(`.disc-card[data-disc="${CSS.escape(back.id)}"] .disc-pic`), fromSrc, back.radius));
+  // открывали со свежего релиза в шапке — туда обложка и возвращается
+  const home = back && (back.rel ? `.hero-release[data-disc="${CSS.escape(back.id)}"] .rel-pic` : `.disc-card[data-disc="${CSS.escape(back.id)}"] .disc-pic`);
+  if (fromRect) requestAnimationFrame(() => zoomFly(fromRect, el.querySelector(home), fromSrc, back.radius));
 
   const bits = [];
   if (disco) bits.push(`${disco.albums.length} ${plural(disco.albums.length, 'релиз', 'релиза', 'релизов')} в Яндекс Музыке`);
@@ -486,7 +509,7 @@ async function openDiscAlbum(artist, id) {
   list.insertAdjacentHTML('afterbegin', albumHeroHtml(artist, { ...known, ...album }, tracks));
   $('#content').classList.add('hero-on'); // название уже в шапке альбома
   renderArtistChips(artist, true);
-  zoom.back = { key: artist.key, id, scroll: zoom.from?.id === id ? zoom.from.scroll : null };
+  zoom.back = { key: artist.key, id, scroll: zoom.from?.id === id ? zoom.from.scroll : null, rel: zoom.from?.id === id && !!zoom.from.rel };
   // прилетели с карточки артиста (не дольше полутора секунд назад — иначе альбом грузился, и лететь поздно)
   const z = zoom.from;
   zoom.from = null;
@@ -535,10 +558,12 @@ function openArtist(name) {
 $('#tracklist').addEventListener('click', (e) => {
   const card = e.target.closest('.artist-card');
   if (card) { openView('artists', card.dataset.artistKey); return; }
-  const disc = e.target.closest('.disc-card');
+  const relPlay = e.target.closest('[data-rel-play]');
+  if (relPlay) { playRelease(relPlay.dataset.relPlay, relPlay); return; }
+  const disc = e.target.closest('.disc-card, .hero-release');
   if (disc) {
-    const pic = disc.querySelector('.disc-pic');
-    zoom.from = { id: disc.dataset.disc, rect: pic.getBoundingClientRect(), radius: radius(pic), at: performance.now(), scroll: $('#tracklist').scrollTop };
+    const pic = disc.querySelector('.disc-pic, .rel-pic');
+    zoom.from = { id: disc.dataset.disc, rel: disc.classList.contains('hero-release'), rect: pic.getBoundingClientRect(), radius: radius(pic), at: performance.now(), scroll: $('#tracklist').scrollTop };
     openView('artists', `${state.sub.split(SUB_SEP)[0]}${SUB_SEP}${disc.dataset.disc}`);
     return;
   }
@@ -555,6 +580,30 @@ $('#tracklist').addEventListener('click', (e) => {
     playFrom(state.shown.slice(from, from + +play.dataset.playCount), 0);
   }
 });
+
+// Обложка релиза в шапке открывается и с клавиатуры, как кнопка
+$('#tracklist').addEventListener('keydown', (e) => {
+  if ((e.key === 'Enter' || e.key === ' ') && e.target.classList?.contains('hero-release')) { e.preventDefault(); e.target.click(); }
+});
+
+// Кнопка на свежем релизе: альбом грузим (или берём из art.albums) и играем с первого трека
+async function playRelease(id, btn) {
+  let album = art.albums.get(id);
+  if (!album) {
+    btn.classList.add('busy');
+    try {
+      album = await api.artist.album(id);
+      art.albums.set(id, album);
+    } catch (e) {
+      toast(`Релиз не загрузился: ${e.message}`);
+      return;
+    } finally {
+      btn.classList.remove('busy');
+    }
+  }
+  const tracks = album.tracks.filter((t) => t.playable !== false);
+  if (tracks.length) playFrom(tracks, 0);
+}
 
 // Имя исполнителя — ссылка на его страницу: в списках треков и в «сейчас играет»
 document.addEventListener('click', (e) => {

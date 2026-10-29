@@ -81,6 +81,7 @@ const DEFAULTS = {
   look: {}, // оформление: тема, цвета, шрифты… (значения по умолчанию — renderer/look.js)
   cache: { keep: true, limitMb: 2048 }, // треки сохраняются сами, пока их слушаешь (src/cache.js)
   speaker: { enabled: false, host: '', syncMs: 0, display: true, keys: true, ring: true, pulse: true }, // колонка по SSH (src/speaker.js): host — имя из ~/.ssh/config или адрес, пусто — выключена; громкость — ползунком в окне
+  voice: { enabled: false }, // голосовое управление (renderer/voice.js), модель — src/voice.js
   mxm: { token: '' }, // токен Musixmatch: выдаётся редко, поэтому храним
 };
 

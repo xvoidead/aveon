@@ -173,6 +173,9 @@ def test_sync_revisions(client):
 
     assert client.put("/api/sync/nope/main", headers=h(token), json={"data": 1}).status_code == 404
     assert client.put("/api/sync/stats/bad key", headers=h(token), json={"data": 1}).status_code == 404
+    # свои лайки Яндекса (удалённые треки) — тоже документ
+    likes = {"tracks": [{"id": "ym:1", "at": 1}], "removed": {}}
+    assert client.put("/api/sync/likes/main", headers=h(token), json={"data": likes, "base_rev": None}).json() == {"rev": 1}
 
 
 def test_users_isolated(client):
