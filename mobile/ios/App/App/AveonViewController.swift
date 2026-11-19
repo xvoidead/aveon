@@ -6,6 +6,10 @@ import Capacitor
 // Контроллер приложения: движок авеона (тот же плеер, что на компьютере) живёт в WebView,
 // а нативный интерфейс нарисован поверх него SwiftUI. Как в Android-порте: звук, бочка и
 // таймеры работают как обычно, а касания до движка не доходят — всё рисует SwiftUI.
+//
+// Полноэкранный режим (строка состояния и домашняя полоска) на iOS ведёт штатный плагин
+// Capacitor SystemBars: переопределить prefersHomeIndicatorAutoHidden здесь нельзя —
+// Capacitor перекрывает его в своём модуле, и SystemBars прячет обе полоски.
 public class AveonViewController: CAPBridgeViewController {
     private var host: UIHostingController<AveonRootView>?
     private var proxy: BridgeProxy?
@@ -95,16 +99,6 @@ public class AveonViewController: CAPBridgeViewController {
         ])
         hosting.didMove(toParent: self)
         host = hosting
-    }
-
-    /// Полноэкранный режим: прячем строку состояния и домашнюю полоску.
-    func setFullscreen(_ on: Bool) {
-        isStatusBarVisible = !on
-        setNeedsStatusBarAppearanceUpdate()
-    }
-
-    public override var prefersHomeIndicatorAutoHidden: Bool {
-        isStatusBarVisible == false
     }
 
     deinit {

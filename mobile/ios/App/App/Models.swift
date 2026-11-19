@@ -57,7 +57,9 @@ struct Track: Identifiable, Hashable {
 
 // ---------- плеер ----------
 
-struct FocusState: Hashable {
+/// Фокус-сессия плеера. Имя `PlayerFocusState`, а не `FocusState`, чтобы не конфликтовать
+/// со SwiftUI-свойством `@FocusState` в видах.
+struct PlayerFocusState: Hashable {
     var phase: String = ""
     var left: Int = 0
     var paused: Bool = false
@@ -94,7 +96,9 @@ struct PlayerState {
     var volume: Double = 1
     var muted: Bool = false
     var shuffle: Bool = false
-    var repeat: String = "off"
+    /// Режим повтора. JSON-ключ остаётся `"repeat"` — переименование нужно только в Swift,
+    /// потому что `repeat` совпадает с одноимённым методом `Sequence`.
+    var repeatMode: String = "off"
     var via: String = ""
     var barrel: Float = 0
     var manual: Bool = false
@@ -105,7 +109,7 @@ struct PlayerState {
     var dj: Bool = false
     var karaoke: Bool = false
     var sleep: Int = 0
-    var focus: FocusState? = nil
+    var focus: PlayerFocusState? = nil
     var room: RoomState? = nil
     var friendsBadge: Bool = false
     var locked: Bool = false
@@ -122,7 +126,7 @@ struct PlayerState {
         volume = o.num("volume", 1)
         muted = o.flag("muted")
         shuffle = o.flag("shuffle")
-        repeat = o.str("repeat", "off")
+        repeatMode = o.str("repeat", "off")
         via = o.str("via")
         barrel = Float(o.num("barrel"))
         manual = o.flag("manual")
@@ -133,7 +137,7 @@ struct PlayerState {
         dj = o.flag("dj")
         karaoke = o.flag("karaoke")
         sleep = o.int("sleep")
-        if let f = o.obj("focus") { focus = FocusState(f) }
+        if let f = o.obj("focus") { focus = PlayerFocusState(f) }
         if let r = o.obj("room") { room = RoomState(r) }
         friendsBadge = o.flag("friendsBadge")
         locked = o.flag("locked")
@@ -885,7 +889,6 @@ struct MessageOut: Identifiable, Hashable {
     var my: String = ""
     var time: String = ""
     var track: [String: String]? = nil
-    var album: [String: Any]? = nil
     var reactions: [MessageReaction] = []
 
     init(_ o: JObj) {
@@ -898,9 +901,6 @@ struct MessageOut: Identifiable, Hashable {
         time = o.str("time")
         if let t = o.obj("track") {
             track = ["title": t.str("title"), "artist": t.str("artist"), "cover": t.str("cover")]
-        }
-        if let a = o.obj("album") {
-            album = ["title": a.str("title"), "cover": a.str("cover"), "count": a.int("count")]
         }
         reactions = o.arr("reactions").map { MessageReaction($0) }
     }

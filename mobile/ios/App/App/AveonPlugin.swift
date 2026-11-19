@@ -36,7 +36,6 @@ public class AveonPlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "openUrl", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "copy", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "deviceName", returnType: CAPPluginReturnPromise),
-        CAPPluginMethod(name: "setFullscreen", returnType: CAPPluginReturnPromise),
     ]
 
     private var pendingFolder: CAPPluginCall? = nil
@@ -393,15 +392,6 @@ public class AveonPlugin: CAPPlugin, CAPBridgedPlugin {
         var name = device.name
         if name.isEmpty { name = "iPhone" }
         call.resolve(["name": name])
-    }
-
-    @objc func setFullscreen(_ call: CAPPluginCall) {
-        let on = call.getBool("on", false)
-        DispatchQueue.main.async { [weak self] in
-            guard let vc = self?.bridge?.viewController as? AveonViewController else { return }
-            vc.setFullscreen(on)
-            call.resolve()
-        }
     }
 }
 

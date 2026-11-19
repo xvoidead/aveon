@@ -190,7 +190,7 @@ struct PlayerLayer: View {
                 IconButton(system: "forward.fill", size: 26, color: .white) { engine.send("next") }
                     .frame(width: 56, height: 56)
                 Spacer()
-                IconButton(system: "repeat", size: 17, color: pl.repeat == "off" ? .white.opacity(0.75) : Pal.apple.accent) {
+                IconButton(system: "repeat", size: 17, color: pl.repeatMode == "off" ? .white.opacity(0.75) : Pal.apple.accent) {
                     engine.send("repeat")
                 }
             }

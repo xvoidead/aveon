@@ -2,7 +2,7 @@
 // (src/) работает прямо здесь, в WebView. Node-модули подменены шимами (mobile/build.mjs),
 // сеть идёт через нативный HTTP без CORS, а звонок, уведомление и файлы — через AveonPlugin.
 import { App } from '@capacitor/app';
-import { Aveon } from './native.js';
+import { Aveon, SystemBars } from './native.js';
 import * as fsShim from './shims/fs.js';
 import { setHostname } from './shims/os.js';
 import { mapMedia, proxiedStream, proxyOn } from './proxy.js';
@@ -27,6 +27,9 @@ const local = require('./local.js');
 const { SOURCES, resolveStream, sharedStream, matchCache } = resolve;
 resolve.init(local);
 ym.onLocalLikes(() => account.likesChanged());
+
+// Платформа сборки: на iOS и Android разные нативные пути (см. mobile/build.mjs).
+const IS_IOS = process.platform === 'ios';
 
 // ---- события «главного процесса» → окно ----
 const listeners = new Map();
@@ -364,7 +367,16 @@ const api = {
   win: {
     action: (a) => {
       if (a === 'close' || a === 'min') App.minimizeApp();
-      if (a === 'fullscreen-on' || a === 'fullscreen-off') Aveon.setFullscreen({ on: a === 'fullscreen-on' }).catch(() => {});
+      if (a === 'fullscreen-on' || a === 'fullscreen-off') {
+        const on = a === 'fullscreen-on';
+        if (IS_IOS) {
+          // На iOS строку состояния и домашнюю полоску прячет штатный плагин Capacitor:
+          // свой override prefersHomeIndicatorAutoHidden в модуле приложения запрещён.
+          (on ? SystemBars.hide({ animation: 'FADE' }) : SystemBars.show({ animation: 'FADE' })).catch(() => {});
+        } else {
+          Aveon.setFullscreen({ on }).catch(() => {});
+        }
+      }
     },
     onState: (cb) => on('win:state', cb),
     thumbState: (st) => pushMedia({ playing: !!st?.playing, hasTrack: !!st?.hasTrack }),
