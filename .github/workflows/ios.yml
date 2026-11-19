@@ -1,0 +1,79 @@
+name: ios
+
+# Сборка приложения для iOS на macOS-раннере GitHub: не нужен ни Mac, ни Xcode.
+# Артефакт (App.app) скачивается из вкладки Actions — его можно запустить в симуляторе.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: приложение (симулятор)
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+
+      - name: зависимости
+        run: npm ci
+
+      - name: веб-часть и мост
+        run: node mobile/build.mjs ios
+
+      - name: cap sync
+        run: npx cap sync ios
+
+      - name: сборка
+        run: |
+          set -o pipefail
+          xcodebuild \
+            -project mobile/ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath mobile/ios/build \
+            CODE_SIGNING_ALLOWED=NO \
+            build | tee mobile/ios/build.log
+
+      - name: приложение
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: aveon-ios-simulator
+          path: mobile/ios/build/Build/Products/Debug-iphonesimulator/App.app
+          if-no-files-found: error
+
+      - name: лог сборки
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-log
+          path: mobile/ios/build.log
+          if-no-files-found: warn
+
+  checks:
+    name: проверки swift-файлов
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: баланс скобок
+        run: python3 mobile/ios/tools/check_swift.py
+      - name: имена символов
+        run: python3 mobile/ios/tools/check_symbols.py
