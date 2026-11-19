@@ -7,6 +7,12 @@
     "allowMixedContent": true,
     "backgroundColor": "#1b1411"
   },
+  "ios": {
+    "path": "mobile/ios",
+    "backgroundColor": "#1b1411",
+    "contentInset": "never",
+    "scrollEnabled": false
+  },
   "server": {
     "androidScheme": "https"
   },

@@ -6,6 +6,7 @@
 
 ![windows](https://img.shields.io/badge/windows-10%20%7C%2011-2a201b?style=flat-square)
 ![android](https://img.shields.io/badge/android-7%2B-2a201b?style=flat-square)
+![ios](https://img.shields.io/badge/ios-16%2B-2a201b?style=flat-square)
 ![electron](https://img.shields.io/badge/electron-44-2a201b?style=flat-square&logo=electron)
 ![license](https://img.shields.io/badge/license-MIT-2a201b?style=flat-square)
 
@@ -128,6 +129,52 @@ Node-модулей шимы, сеть идёт через нативный HTTP
 `mobile/android/app/src/main/java/com/aveon/player/ui`, связь с движком — `Engine.kt`, виджеты — `Widgets.kt`. Нативная часть — `mobile/android/app/src/main/java/com/aveon/player`:
 уведомление (`MediaService`), звонок, медиатека и файлы данных, зашифрованные ключом Android
 Keystore (`AveonPlugin`), свои файлы и CORS для потоков (`AveonWebViewClient`).
+
+## ios
+
+Своё приложение на SwiftUI — с другим дизайном, но с тем же функционалом, что на компьютере:
+движок — тот же плеер в WebView, а весь интерфейс нарисован нативно: вкладки «главная · волна ·
+медиатека · поиск», мини-плеер снизу, раскрытый плеер с пластинкой (её можно крутить и
+перематывать пальцем), текст песни по словам, очередь, волна с диджеем, медиатека с чипами и
+блоками, профиль со статистикой по месяцам, друзья с чатом, эквалайзер, визуализатор, итоги года.
+Палитра обложки и «Оформление» красят и телефон.
+
+Что по-другому:
+
+- **страница живёт на локальном сервере приложения** (`http://127.0.0.1:порт`): обложки и сам поток
+  отдаются через `/proxy?u=…` — иначе WebKit не даст прочитать картинку (палитра из обложки) и не
+  отдаст звук в Web Audio (бочка, эквалайзер). Это то же, что на Android делает перехват запросов
+  с CORS-заголовками;
+- **бочка в звонке** — iOS не даёт приложениям слышать чужие голоса, поэтому музыка уходит в бочку
+  на весь звонок (плеер видит прерывание аудиосессии или включённый микрофон). Ещё бочку можно
+  включить вручную: кнопка «в бочку» на экране плеера;
+- **уведомление и экран блокировки** — обложка, пауза, перемотка, следующий и предыдущий трек;
+- **свои файлы** — папки и треки выбираются системным диалогом «Файлов», копируются в контейнер
+  приложения, обложки и теги читаются из самого файла;
+- **данные** (настройки, альбомы, статистика) зашифрованы ключом из связки ключей iOS (AES-256-GCM,
+  формат тот же, что на Android и на компьютере);
+- **фоновое воспроизведение** — звук играет, когда приложение свёрнуто (категория `playback`);
+- статуса в discord на телефоне нет: rich presence есть только у discord на компьютере.
+
+Сборка (нужны Xcode 16 и macOS; проект — `mobile/ios/App/App.xcodeproj`):
+
+```bash
+npm run mobile:build:ios           # renderer + мост → mobile/www → ios-проект
+open mobile/ios/App/App.xcodeproj  # выбрать схему App и телефон, запустить
+```
+
+Как устроено: `mobile/ios/App/App` — нативный слой.
+
+| файл | что делает |
+|---|---|
+| `AveonViewController.swift` | контроллер: движок в WebView + SwiftUI поверх; мост `window.AveonUI` ↔ нативная часть |
+| `Engine.swift` | состояние плеера, библиотеки и панелей; команды движку (`NativeUI.call`) |
+| `AveonRootView.swift` | вкладки, мини-плеер, тосты, шторки (вход, профиль, друзья, эквалайзер) |
+| `PlayerView.swift`, `HomeView.swift`, `WaveView.swift`, `LibraryView.swift`, `ProfileView.swift`, `FriendsView.swift`, `AuthView.swift`, `EqView.swift` | экраны |
+| `Kit.swift`, `Theme.swift` | общие детали: обложки, стеклянные плашки, кнопки, палитра, шрифты |
+| `MirrorView.swift` | «зеркало» панелей движка (настройки, рума, будильник…) — рисуем нативными полями |
+| `LocalServer.swift` | локальный сервер: веб-часть, `/proxy`, `/_media/*`, Range и CORS |
+| `MediaStore.swift`, `Vault.swift`, `NowPlaying.swift`, `CallMonitor.swift`, `AveonPlugin.swift` | свои файлы, шифрование, экран блокировки, звонок, мост с JS (тот же набор методов, что на Android) |
 
 ## как это работает
 

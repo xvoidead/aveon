@@ -1,0 +1,151 @@
+name: ios
+
+# Сборка приложения для iOS на macOS-раннере GitHub: не нужен ни Mac, ни Xcode.
+# Артефакт (App.app) скачивается из вкладки Actions — его можно запустить в симуляторе.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ios-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: приложение (симулятор)
+    runs-on: macos-15
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v6
+
+      # Capacitor CLI 8 требует Node 22 или новее.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: зависимости
+        run: npm ci
+
+      - name: веб-часть и мост
+        run: node mobile/build.mjs ios
+
+      # Ошибки печатаются в аннотации GitHub — их видно без скачивания логов.
+      - name: web-ассеты в нативный проект
+        run: |
+          set +e
+          npx cap copy ios 2>&1 | tee cap-copy.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "::error title=cap copy::$(tail -c 3000 cap-copy.log | sed 's/%/%25/g' | tr '\n' '%0A')"
+            exit "$status"
+          fi
+
+      - name: плагины и пакеты
+        run: |
+          set +e
+          npx cap update ios 2>&1 | tee cap-update.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "::error title=cap update::$(tail -c 3000 cap-update.log | sed 's/%/%25/g' | tr '\n' '%0A')"
+            exit "$status"
+          fi
+
+      - name: сборка
+        run: |
+          set +e
+          xcodebuild \
+            -project mobile/ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath mobile/ios/build \
+            CODE_SIGNING_ALLOWED=NO \
+            build 2>&1 | tee mobile/ios/build.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "::error title=xcodebuild::$(grep -E 'error:|error :' mobile/ios/build.log | head -c 6000 | sed 's/%/%25/g' | tr '\n' '%0A')"
+            exit "$status"
+          fi
+
+      - name: приложение
+        if: success()
+        uses: actions/upload-artifact@v6
+        with:
+          name: aveon-ios-simulator
+          path: mobile/ios/build/Build/Products/Debug-iphonesimulator/App.app
+          if-no-files-found: error
+
+      # Тот же проект, но под настоящий телефон (arm64) и без подписи: получается .ipa,
+      # который можно подписать своим Apple ID (Xcode или Sideloadly) и поставить на телефон.
+      - name: ipa для телефона
+        run: |
+          set +e
+          xcodebuild \
+            -project mobile/ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath mobile/ios/build-device \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build 2>&1 | tee mobile/ios/build-device.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "::error title=xcodebuild (iphoneos)::$(grep -E 'error:|error :' mobile/ios/build-device.log | head -c 6000 | sed 's/%/%25/g' | tr '\n' '%0A')"
+            exit "$status"
+          fi
+
+      - name: ipa (артефакт)
+        if: success()
+        run: |
+          app="mobile/ios/build-device/Build/Products/Debug-iphoneos/App.app"
+          rm -rf ipa-payload && mkdir -p ipa-payload/Payload
+          cp -R "$app" ipa-payload/Payload/
+          (cd ipa-payload && zip -qry "$GITHUB_WORKSPACE/aveon-ios-unsigned.ipa" Payload)
+          rm -rf ipa-payload
+          ls -la aveon-ios-unsigned.ipa
+
+      - name: ipa
+        if: success()
+        uses: actions/upload-artifact@v6
+        with:
+          name: aveon-ios-ipa
+          path: aveon-ios-unsigned.ipa
+          if-no-files-found: error
+
+      - name: логи
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: ios-logs
+          path: |
+            cap-copy.log
+            cap-update.log
+            mobile/ios/build.log
+            mobile/ios/build-device.log
+          if-no-files-found: warn
+
+  checks:
+    name: проверки swift-файлов
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: баланс скобок
+        run: python3 mobile/ios/tools/check_swift.py
+      - name: имена символов
+        run: python3 mobile/ios/tools/check_symbols.py

@@ -1,7 +1,13 @@
 // Нативная часть Android (android/app/src/main/java/com/aveon/player/AveonPlugin.java)
-import { registerPlugin } from '@capacitor/core';
+// и встроенные плагины Capacitor, нужные обоим портам.
+import { registerPlugin, SystemBars } from '@capacitor/core';
 
 export const Aveon = registerPlugin('Aveon');
+
+// Системные полосы — строка состояния и домашняя полоска. На iOS переопределить
+// prefersHomeIndicatorAutoHidden нельзя: Capacitor перекрывает его в своём модуле,
+// и прячет полоски только встроенный плагин SystemBars.
+export { SystemBars };
 
 export function b64ToBytes(b64) {
   const bin = atob(b64 || '');
