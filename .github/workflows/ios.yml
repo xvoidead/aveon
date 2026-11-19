@@ -32,19 +32,32 @@ jobs:
       - name: веб-часть и мост
         run: node mobile/build.mjs ios
 
-      - name: cap sync
+      # Ошибки печатаются в аннотации GitHub — их видно без скачивания логов.
+      - name: web-ассеты в нативный проект
         run: |
-          set -o pipefail
-          npx cap sync ios 2>&1 | tee cap-sync.log
-          status=$?
+          set +e
+          npx cap copy ios 2>&1 | tee cap-copy.log
+          status=${PIPESTATUS[0]}
+          set -e
           if [ "$status" -ne 0 ]; then
-            echo "::error title=cap sync::$(tail -c 3000 cap-sync.log | tr '\n' '%0A')"
+            echo "::error title=cap copy::$(tail -c 3000 cap-copy.log | sed 's/%/%25/g' | tr '\n' '%0A')"
+            exit "$status"
+          fi
+
+      - name: плагины и пакеты
+        run: |
+          set +e
+          npx cap update ios 2>&1 | tee cap-update.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "::error title=cap update::$(tail -c 3000 cap-update.log | sed 's/%/%25/g' | tr '\n' '%0A')"
             exit "$status"
           fi
 
       - name: сборка
         run: |
-          set -o pipefail
+          set +e
           xcodebuild \
             -project mobile/ios/App/App.xcodeproj \
             -scheme App \
@@ -54,9 +67,10 @@ jobs:
             -derivedDataPath mobile/ios/build \
             CODE_SIGNING_ALLOWED=NO \
             build 2>&1 | tee mobile/ios/build.log
-          status=$?
+          status=${PIPESTATUS[0]}
+          set -e
           if [ "$status" -ne 0 ]; then
-            echo "::error title=xcodebuild::$(grep -E 'error:|warning: .*Swift' mobile/ios/build.log | head -c 6000 | tr '\n' '%0A')"
+            echo "::error title=xcodebuild::$(grep -E 'error:|error :' mobile/ios/build.log | head -c 6000 | sed 's/%/%25/g' | tr '\n' '%0A')"
             exit "$status"
           fi
 
@@ -67,6 +81,17 @@ jobs:
           name: aveon-ios-simulator
           path: mobile/ios/build/Build/Products/Debug-iphonesimulator/App.app
           if-no-files-found: error
+
+      - name: логи
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-logs
+          path: |
+            cap-copy.log
+            cap-update.log
+            mobile/ios/build.log
+          if-no-files-found: warn
 
   checks:
     name: проверки swift-файлов
