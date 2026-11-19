@@ -84,11 +84,11 @@ struct EqView: View {
                     get: { eq.preamp },
                     set: { eq.preamp = $0 }
                 ),
-                in: -eq.max...eq.max
+                in: -eq.max...eq.max,
+                onEditingChanged: { editing in
+                    if !editing { apply() }
+                }
             )
-            .onEditingChanged { editing in
-                if !editing { apply() }
-            }
             .tint(Pal.apple.accent)
         }
         .padding(.horizontal, 14)
@@ -129,11 +129,11 @@ struct EqView: View {
                         eq.gains = gains
                     }
                 ),
-                in: -eq.max...eq.max
+                in: -eq.max...eq.max,
+                onEditingChanged: { editing in
+                    if !editing { apply() }
+                }
             )
-            .onEditingChanged { editing in
-                if !editing { apply() }
-            }
             .tint(Pal.apple.accent)
             Text(String(format: "%+.0f", gain))
                 .font(T.caption)
