@@ -19,11 +19,12 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      # Capacitor CLI 8 требует Node 22 или новее.
+      - uses: actions/setup-node@v6
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
 
       - name: зависимости
@@ -76,7 +77,7 @@ jobs:
 
       - name: приложение
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: aveon-ios-simulator
           path: mobile/ios/build/Build/Products/Debug-iphonesimulator/App.app
@@ -84,7 +85,7 @@ jobs:
 
       - name: логи
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: ios-logs
           path: |
@@ -98,8 +99,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
       - name: баланс скобок
