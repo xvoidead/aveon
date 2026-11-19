@@ -33,7 +33,14 @@ jobs:
         run: node mobile/build.mjs ios
 
       - name: cap sync
-        run: npx cap sync ios
+        run: |
+          set -o pipefail
+          npx cap sync ios 2>&1 | tee cap-sync.log
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "::error title=cap sync::$(tail -c 3000 cap-sync.log | tr '\n' '%0A')"
+            exit "$status"
+          fi
 
       - name: сборка
         run: |
@@ -46,7 +53,12 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath mobile/ios/build \
             CODE_SIGNING_ALLOWED=NO \
-            build | tee mobile/ios/build.log
+            build 2>&1 | tee mobile/ios/build.log
+          status=$?
+          if [ "$status" -ne 0 ]; then
+            echo "::error title=xcodebuild::$(grep -E 'error:|warning: .*Swift' mobile/ios/build.log | head -c 6000 | tr '\n' '%0A')"
+            exit "$status"
+          fi
 
       - name: приложение
         if: success()
@@ -55,14 +67,6 @@ jobs:
           name: aveon-ios-simulator
           path: mobile/ios/build/Build/Products/Debug-iphonesimulator/App.app
           if-no-files-found: error
-
-      - name: лог сборки
-        if: failure()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ios-build-log
-          path: mobile/ios/build.log
-          if-no-files-found: warn
 
   checks:
     name: проверки swift-файлов
