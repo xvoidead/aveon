@@ -5,6 +5,7 @@ import { App } from '@capacitor/app';
 import { Aveon } from './native.js';
 import * as fsShim from './shims/fs.js';
 import { setHostname } from './shims/os.js';
+import { mapMedia, proxiedStream, proxyOn } from './proxy.js';
 
 const config = require('../../src/config');
 const store = require('../../src/store');
@@ -203,7 +204,7 @@ const api = {
     collections: call((src) => SOURCES[src].collections()),
     collection: call((src, id) => SOURCES[src].collection(id)),
   },
-  stream: call((track) => resolveStream(track)),
+  stream: call(async (track) => proxiedStream(await resolveStream(track))),
   albums: {
     list: call(() => albums.list()),
     get: call((id) => { const a = albums.get(id); return { ...a, tracks: a.tracks.map(local.applyOverride) }; }),
@@ -269,7 +270,7 @@ const api = {
     join: call((code) => together.join(code)),
     leave: call(() => together.leave()),
     status: call(() => together.status()),
-    stream: call((track) => sharedStream(track)),
+    stream: call(async (track) => proxiedStream(await sharedStream(track))),
     avatar: call((userId, at) => account.avatarOf(userId, at)),
     send: (state, beat) => { ready.then(() => together.send(clone(state), beat)); },
     react: (e) => { ready.then(() => together.react(String(e))); },
@@ -386,7 +387,20 @@ const api = {
   },
 };
 
-window.tishe = api;
+// На iOS обложки и картинки отдаём через локальный прокси (см. mobile/bridge/proxy.js): иначе
+// WebKit не даст прочитать картинку и палитра из обложки останется пустой.
+window.tishe = proxyOn
+  ? new Proxy(api, {
+    get(target, prop, receiver) {
+      const v = Reflect.get(target, prop, receiver);
+      if (typeof v !== 'function') return v;
+      return (...args) => {
+        const out = v(...args);
+        return out && typeof out.then === 'function' ? out.then((x) => mapMedia(x)) : out;
+      };
+    },
+  })
+  : api;
 
 // Приложение ушло в фон: сохранить сессию и статистику (в Electron это делает beforeunload)
 App.addListener('pause', () => {

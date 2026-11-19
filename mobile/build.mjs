@@ -1,5 +1,7 @@
-// Сборка веб-части для Android: renderer/ как есть + мост (mobile/bridge → bridge.js) + телефонные
-// стили и скрипт. Результат — mobile/www (webDir в capacitor.config.json), оттуда `cap sync`.
+// Сборка веб-части для Android и iOS: renderer/ как есть + мост (mobile/bridge → bridge.js) +
+// телефонные стили и скрипт. Результат — mobile/www (webDir в capacitor.config.json), оттуда
+// `cap sync`. Платформа (android|ios) меняет process.platform в мосте: на iOS картинки и поток
+// идут через локальный прокси приложения (mobile/bridge/proxy.js).
 import { build } from 'esbuild';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -8,6 +10,8 @@ import { fileURLToPath } from 'node:url';
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const www = path.join(root, 'mobile', 'www');
 const r = (...p) => path.join(root, ...p);
+
+const platform = process.argv[2] === 'ios' ? 'ios' : 'android';
 
 // Чистим содержимое, а не саму папку: её может держать открытой dev-сервер
 fs.mkdirSync(www, { recursive: true });
@@ -50,7 +54,11 @@ await build({
     path: 'path-browserify',
   },
   inject: [r('mobile', 'bridge', 'shims', 'globals.js')],
-  define: { 'process.platform': '"android"', 'process.env.NODE_ENV': '"production"' },
+  define: {
+    'process.platform': JSON.stringify(platform),
+    __AVEON_PLATFORM__: JSON.stringify(platform),
+    'process.env.NODE_ENV': '"production"',
+  },
   logLevel: 'warning',
 });
 

@@ -346,15 +346,22 @@
     el.dispatchEvent(new Event('input', { bubbles: true }));
   };
   handlers.authSubmit = (server, login, password, password2) => {
-    $('#auth-login').value = login || '';
-    $('#auth-password').value = password || '';
-    $('#auth-password2').value = password2 || '';
+    // пишем только в видимые поля: в шаге «новый пароль» логин уже известен движку
+    const setIf = (wrap, sel, v) => {
+      const w = $(wrap), el = $(sel);
+      if (el && w && !w.hidden && v != null) el.value = String(v);
+    };
+    setIf('#auth-login-field', '#auth-login', login);
+    setIf('#auth-password-field', '#auth-password', password);
+    setIf('#auth-password2-field', '#auth-password2', password2);
     $('#auth-form').requestSubmit();
   };
   handlers.authSwitch = () => $('#auth-switch').click();
   handlers.authServerEdit = () => {}; // старые сборки Android ещё зовут его — сервер один, менять нечего
 
   handlers.friendProfile = (id) => { if (friendsEl.hidden) openFriends(); openFriendProfile(id); };
+  // список друзей — телефон рисует его сам (список, кто что слушает)
+  handlers.friendsList = () => (Friends.data?.friends || []).map(frOut);
 
   // ---------- чат и профиль друга — нативные экраны внутри панели «Друзья» ----------
 
