@@ -237,7 +237,7 @@ final class MediaStore {
         guard let items = try? await asset.load(.commonMetadata) else { return }
         for item in items {
             guard item.commonKey == .commonKeyArtwork else { continue }
-            if let data = try? await item.load(.dataValue), let data, !data.isEmpty {
+            if let data = try? await item.load(.dataValue), !data.isEmpty {
                 let out = MediaStore.shared.mediaDir.appendingPathComponent(name + ".jpg")
                 try? data.write(to: out)
                 return

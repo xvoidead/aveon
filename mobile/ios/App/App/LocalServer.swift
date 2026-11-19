@@ -97,15 +97,15 @@ final class LocalServer {
         func receive() {
             conn.receive(minimumIncompleteLength: 1, maximumLength: 1 << 16) { data, _, isComplete, error in
                 if let d = data, !d.isEmpty { buffer.append(d) }
-                if let req = parse(buffer) {
+                if let req = self.parse(buffer) {
                     done = true
-                    respond(conn, req)
+                    self.respond(conn, req)
                     return
                 }
                 if isComplete || error != nil {
                     if !done {
                         done = true
-                        send(conn, status: 400, reason: "Bad Request", headers: cors(), body: Data())
+                        self.send(conn, status: 400, reason: "Bad Request", headers: self.cors(), body: Data())
                     }
                     return
                 }
@@ -281,7 +281,7 @@ final class LocalServer {
             return
         }
         var headers = cors()
-        headers["Content-Type"] = LocalServer.mime(for: url.pathExtension)
+        headers["Content-Type"] = mime(for: url.pathExtension)
         headers["Accept-Ranges"] = "bytes"
 
         var start = 0
