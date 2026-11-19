@@ -207,10 +207,10 @@ struct PlayerLayer: View {
                             engine.send("volume", [$0, false])
                         }
                     ),
+                    in: 0...1,
                     onEditingChanged: { editing in
                         if !editing { engine.send("volume", [volume, true]) }
-                    },
-                    in: 0...1
+                    }
                 )
                 .tint(.white)
             }
@@ -372,7 +372,7 @@ struct LyricsView: View {
     }
 
     private func load() async {
-        guard let r = await engine.call("lyrics") as? JObj else { return }
+        guard let r = await engine.obj("lyrics") else { return }
         let l = LyricsState(r)
         lyrics = l
         none = l.none

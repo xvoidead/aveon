@@ -132,12 +132,12 @@ struct MirrorView: View {
                     get: { node.o.num("v") },
                     set: { engine.send("setVal", [node.id, $0, false]) }
                 ),
-                in: node.o.num("min")...max(node.o.num("max", 100), node.o.num("min") + 0.001)
+                in: node.o.num("min")...max(node.o.num("max", 100), node.o.num("min") + 0.001),
+                onEditingChanged: { editing in
+                    if !editing { engine.send("setVal", [node.id, node.o.num("v"), true]) }
+                }
             )
             .tint(Pal.apple.accent)
-            .onEditingChanged { editing in
-                if !editing { engine.send("setVal", [node.id, node.o.num("v"), true]) }
-            }
         }
     }
 
@@ -157,7 +157,7 @@ struct MirrorView: View {
 
     private var select: some View {
         Menu {
-            ForEach(node.o.arr("opts").enumerated(), id: \.offset) { _, opt in
+            ForEach(Array(node.o.arr("opts").enumerated()), id: \.offset) { _, opt in
                 Button(opt.str("s")) { engine.send("setVal", [node.id, opt.str("v")]) }
             }
         } label: {

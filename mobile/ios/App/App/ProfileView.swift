@@ -220,12 +220,13 @@ struct ProfileView: View {
 
     private var daysChart: some View {
         let days = profile.month.days
-        let max = max(days.max() ?? 1, 1)
+        // peak, а не max: локальная переменная перекрыла бы функцию max()
+        let peak = max(days.max() ?? 1, 1)
         return VStack(alignment: .leading, spacing: 8) {
             SectionHeader(title: "По дням")
             HStack(alignment: .bottom, spacing: 3) {
                 ForEach(Array(days.enumerated()), id: \.offset) { index, value in
-                    let h = max(CGFloat(value) / CGFloat(max) * 60, value > 0 ? 3 : 1)
+                    let h = max(CGFloat(value) / CGFloat(peak) * 60, value > 0 ? 3 : 1)
                     RoundedRectangle(cornerRadius: 2)
                         .fill(index + 1 == profile.month.today ? Pal.apple.accent : Color.white.opacity(0.22))
                         .frame(height: h)
@@ -243,13 +244,13 @@ struct ProfileView: View {
     }
 
     private func prevMonth(_ key: String) -> String {
-        guard let parts = key.split(separator: "-").first(2).map(String.init), parts.count == 2,
+        guard let parts = key.split(separator: "-").prefix(2).map(String.init), parts.count == 2,
               let m = Int(parts[1]), let y = Int(parts[0]) else { return key }
         return m == 1 ? "\(y - 1)-12" : "\(y)-\(String(format: "%02d", m - 1))"
     }
 
     private func nextMonth(_ key: String) -> String {
-        guard let parts = key.split(separator: "-").first(2).map(String.init), parts.count == 2,
+        guard let parts = key.split(separator: "-").prefix(2).map(String.init), parts.count == 2,
               let m = Int(parts[1]), let y = Int(parts[0]) else { return key }
         return m == 12 ? "\(y + 1)-01" : "\(y)-\(String(format: "%02d", m + 1))"
     }
