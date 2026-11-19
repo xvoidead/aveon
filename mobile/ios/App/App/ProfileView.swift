@@ -244,14 +244,14 @@ struct ProfileView: View {
     }
 
     private func prevMonth(_ key: String) -> String {
-        guard let parts = key.split(separator: "-").prefix(2).map(String.init), parts.count == 2,
-              let m = Int(parts[1]), let y = Int(parts[0]) else { return key }
+        let parts = key.split(separator: "-").prefix(2).map(String.init)
+        guard parts.count == 2, let m = Int(parts[1]), let y = Int(parts[0]) else { return key }
         return m == 1 ? "\(y - 1)-12" : "\(y)-\(String(format: "%02d", m - 1))"
     }
 
     private func nextMonth(_ key: String) -> String {
-        guard let parts = key.split(separator: "-").prefix(2).map(String.init), parts.count == 2,
-              let m = Int(parts[1]), let y = Int(parts[0]) else { return key }
+        let parts = key.split(separator: "-").prefix(2).map(String.init)
+        guard parts.count == 2, let m = Int(parts[1]), let y = Int(parts[0]) else { return key }
         return m == 12 ? "\(y + 1)-01" : "\(y)-\(String(format: "%02d", m + 1))"
     }
 }
