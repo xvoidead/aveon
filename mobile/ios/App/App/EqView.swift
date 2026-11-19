@@ -86,10 +86,10 @@ struct EqView: View {
                 ),
                 in: -eq.max...eq.max
             )
-            .tint(Pal.apple.accent)
             .onEditingChanged { editing in
                 if !editing { apply() }
             }
+            .tint(Pal.apple.accent)
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 12)
@@ -131,10 +131,10 @@ struct EqView: View {
                 ),
                 in: -eq.max...eq.max
             )
-            .tint(Pal.apple.accent)
             .onEditingChanged { editing in
                 if !editing { apply() }
             }
+            .tint(Pal.apple.accent)
             Text(String(format: "%+.0f", gain))
                 .font(T.caption)
                 .foregroundColor(.white.opacity(0.6))

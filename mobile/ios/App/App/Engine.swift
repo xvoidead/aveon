@@ -214,8 +214,9 @@ final class Engine: ObservableObject {
 
     /// Команда со списком на ответ.
     func list(_ name: String, _ args: [Any] = []) async -> [JObj] {
+        // call() отдаёт Any? — try? схлопывает вложенный optional, поэтому
+        // «ошибка» и «пустой ответ» приходят одинаково: пустым списком.
         guard let value = try? await call(name, args) else { return [] }
-        guard let value else { return [] }
         return (value as? [JObj]) ?? []
     }
 

@@ -38,7 +38,8 @@ struct Pal: Equatable {
     static func of(_ m: [String: String]) -> Pal {
         let d = Pal()
         func c(_ k: String, _ def: Color) -> Color {
-            guard let raw = m[k], let col = Color(css: raw), col.opacity > 0.05 else { return def }
+            // alphaValue, а не opacity: в Color.opacity — метод, а не свойство.
+            guard let raw = m[k], let col = Color(css: raw), col.alphaValue > 0.05 else { return def }
             return col
         }
         var p = Pal()
@@ -54,16 +55,6 @@ struct Pal: Equatable {
         p.voice = c("voice", d.voice)
         p.danger = c("danger", d.danger)
         return p
-    }
-
-    func mix(_ other: Color, _ k: Double) -> Color {
-        let t = min(max(k, 0), 1)
-        let a = UIColor(self), b = UIColor(other)
-        var ar: CGFloat = 0, ag: CGFloat = 0, ab: CGFloat = 0, aa: CGFloat = 0
-        var br: CGFloat = 0, bg: CGFloat = 0, bb: CGFloat = 0, ba: CGFloat = 0
-        a.getRed(&ar, green: &ag, blue: &ab, alpha: &aa)
-        b.getRed(&br, green: &bg, blue: &bb, alpha: &ba)
-        return Color(.sRGB, red: Double(ar + (br - ar) * t), green: Double(ag + (bg - ag) * t), blue: Double(ab + (bb - ab) * t), opacity: Double(aa + (ba - aa) * t))
     }
 }
 
@@ -122,6 +113,24 @@ extension Color {
         var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
         c.getRed(&r, green: &g, blue: &b, alpha: &a)
         return 0.2126 * Double(r) + 0.7152 * Double(g) + 0.0722 * Double(b)
+    }
+
+    /// Прозрачность цвета: палитра из движка может прийти почти прозрачной.
+    var alphaValue: Double {
+        var r: CGFloat = 0, g: CGFloat = 0, b: CGFloat = 0, a: CGFloat = 0
+        guard UIColor(self).getRed(&r, green: &g, blue: &b, alpha: &a) else { return 1 }
+        return Double(a)
+    }
+
+    /// Смешивание с другим цветом: k = 0 — этот цвет, k = 1 — другой.
+    func mix(_ other: Color, _ k: Double) -> Color {
+        let t = min(max(k, 0), 1)
+        let a = UIColor(self), b = UIColor(other)
+        var ar: CGFloat = 0, ag: CGFloat = 0, ab: CGFloat = 0, aa: CGFloat = 0
+        var br: CGFloat = 0, bg: CGFloat = 0, bb: CGFloat = 0, ba: CGFloat = 0
+        a.getRed(&ar, green: &ag, blue: &ab, alpha: &aa)
+        b.getRed(&br, green: &bg, blue: &bb, alpha: &ba)
+        return Color(.sRGB, red: Double(ar + (br - ar) * t), green: Double(ag + (bg - ag) * t), blue: Double(ab + (bb - ab) * t), opacity: Double(aa + (ba - aa) * t))
     }
 }
 
