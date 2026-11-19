@@ -6,8 +6,15 @@
 ## собрать
 
 Без Mac и Xcode — на серверах GitHub: толкни ветку, открой **Actions → ios**,
-скачай артефакт `aveon-ios-simulator` (это `App.app`, его запускают в симуляторе).
-Лог сборки, если что-то не собралось, — в артефакте `ios-build-log`.
+в job «приложение (симулятор)» внизу есть два артефакта:
+
+- **`aveon-ios-simulator`** — `App.app` для симулятора: запускается в Simulator на Mac,
+  на телефон не ставится.
+- **`aveon-ios-ipa`** — `aveon-ios-unsigned.ipa`: сборка под настоящий телефон (arm64)
+  **без подписи**. Чтобы поставить на iPhone, его надо подписать своим Apple ID:
+  бесплатный Apple ID (личная команда) — на 7 дней, платный разработчика — на год.
+
+Лог сборки, если что-то не собралось, — в артефакте `ios-logs`.
 
 На своём Mac:
 
@@ -15,12 +22,24 @@
 npm ci                     # один раз
 npm run mobile:build:ios   # веб-часть + cap sync
 npm run mobile:ios:build   # и сборка xcodebuild (симулятор)
+npm run mobile:ios:ipa     # сборка под телефон без подписи + aveon-ios-unsigned.ipa
 ```
 
 Чтобы поставить на свой телефон: в Xcode выбери схему `App`, свой iPhone
 (потребуется бесплатный Apple ID — Xcode предложит «Manage Signing») и нажми Run.
 Скриптом: `npm run mobile:ios:device` — он соберёт без подписи, дальше Xcode
 допишет её сам.
+
+### подписать ipa
+
+Скачанный `aveon-ios-unsigned.ipa` ставится на телефон после подписи:
+
+- **Xcode** (Mac): открой `.ipa` как проект? — проще: `unzip`, открой `Payload/App.app`
+  в Xcode, в разделе Signing & Capabilities выбери свою команду и нажми Run на своём iPhone.
+- **Sideloadly / AltStore / TrollStore** — сторонние программы: открывают `.ipa`,
+  подписывают своим Apple ID и ставят на телефон.
+
+Подпись бесплатным Apple ID живёт 7 дней — потом переустановить заново.
 
 ## что где
 

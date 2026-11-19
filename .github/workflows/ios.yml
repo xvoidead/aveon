@@ -83,6 +83,47 @@ jobs:
           path: mobile/ios/build/Build/Products/Debug-iphonesimulator/App.app
           if-no-files-found: error
 
+      # Тот же проект, но под настоящий телефон (arm64) и без подписи: получается .ipa,
+      # который можно подписать своим Apple ID (Xcode или Sideloadly) и поставить на телефон.
+      - name: ipa для телефона
+        run: |
+          set +e
+          xcodebuild \
+            -project mobile/ios/App/App.xcodeproj \
+            -scheme App \
+            -configuration Debug \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath mobile/ios/build-device \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build 2>&1 | tee mobile/ios/build-device.log
+          status=${PIPESTATUS[0]}
+          set -e
+          if [ "$status" -ne 0 ]; then
+            echo "::error title=xcodebuild (iphoneos)::$(grep -E 'error:|error :' mobile/ios/build-device.log | head -c 6000 | sed 's/%/%25/g' | tr '\n' '%0A')"
+            exit "$status"
+          fi
+
+      - name: ipa (артефакт)
+        if: success()
+        run: |
+          app="mobile/ios/build-device/Build/Products/Debug-iphoneos/App.app"
+          rm -rf ipa-payload && mkdir -p ipa-payload/Payload
+          cp -R "$app" ipa-payload/Payload/
+          (cd ipa-payload && zip -qry "$GITHUB_WORKSPACE/aveon-ios-unsigned.ipa" Payload)
+          rm -rf ipa-payload
+          ls -la aveon-ios-unsigned.ipa
+
+      - name: ipa
+        if: success()
+        uses: actions/upload-artifact@v6
+        with:
+          name: aveon-ios-ipa
+          path: aveon-ios-unsigned.ipa
+          if-no-files-found: error
+
       - name: логи
         if: failure()
         uses: actions/upload-artifact@v6
@@ -92,6 +133,7 @@ jobs:
             cap-copy.log
             cap-update.log
             mobile/ios/build.log
+            mobile/ios/build-device.log
           if-no-files-found: warn
 
   checks:
